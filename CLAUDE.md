@@ -33,6 +33,7 @@ This is a **devcontainer template** that provides a standardized development env
 ## Key Commands
 
 ### Extension Installation by Stack
+
 ```bash
 # Auto-detect project type and install extensions
 .vscode/extensions/install_by_stack.sh
@@ -45,6 +46,7 @@ This is a **devcontainer template** that provides a standardized development env
 ```
 
 ### Pre-commit Hooks
+
 ```bash
 # Setup (copy example config first)
 cp .vscode/git/.pre-commit-config.yaml.example .pre-commit-config.yaml
@@ -58,6 +60,7 @@ pre-commit run <hook-name> --all-files
 ```
 
 ### Logs Location
+
 - `/tmp/project_init.log` - post_create.sh output
 - `/tmp/project_init_env.log` - init_env.sh output
 - `/tmp/project_docker_startup.log` - start_docker.sh output
@@ -65,10 +68,14 @@ pre-commit run <hook-name> --all-files
 ## Environment Variables
 
 Set in `devcontainer.json`:
-- `PROJECT_ROOT` - Workspace folder path inside container
-- `DEVCONTAINER_SCRIPTS` - Path to `.devcontainer/scripts/`
-- `REMOTE_CONTAINERS` / `DEVCONTAINER` - Set to `true` in container
-- `TZ` - Timezone (Europe/Paris)
+
+`PROJECT_ROOT` - Workspace folder path inside container
+
+`DEVCONTAINER_SCRIPTS` - Path to `.devcontainer/scripts/`
+
+`REMOTE_CONTAINERS` / `DEVCONTAINER` - Set to `true` in container
+
+`TZ` - Timezone (Europe/Paris)
 
 ## Forwarded Ports
 
@@ -78,6 +85,7 @@ Set in `devcontainer.json`:
 ## Shell Aliases
 
 The environment includes modern CLI tool aliases:
+
 - `ls` → `eza`, `ll` → `eza -lah --git`, `lt` → `eza --tree --level=2`
 - `cat` → `bat`, `ffind` → `fd`, `rgrep` → `rg`
 - Git: `gs`, `gd`, `gl`, `ga`, `gc`, `gp`, `gco`, `gb`
@@ -86,6 +94,7 @@ The environment includes modern CLI tool aliases:
 ## Commit Standards
 
 When using this template in a project:
+
 - Branch format: `opv_[task_number]-[description]` or `opv_[task_number]-ticket_[ticket_number]-[description]`
 - Commit format: `OPV-[task_number]([commit_type]): message`
 - Commit types: `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
