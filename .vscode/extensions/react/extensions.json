@@ -1,0 +1,24 @@
+{
+    "$schema": "https://json.schemastore.org/vscode-extensions",
+    "recommendations": [
+        // === React Core ===
+        "burkeholland.simple-react-snippets",
+        // === TypeScript ===
+        "ms-vscode.vscode-typescript-next",
+        // === Babel/JSX ===
+        "mgmcdermott.vscode-language-babel",
+        // === Node & NPM ===
+        "christian-kohler.npm-intellisense",
+        // === CSS/SCSS ===
+        "bradlc.vscode-tailwindcss",
+        "syler.sass-indented",
+        "pranaygp.vscode-css-peek",
+        // === Testing ===
+        "firsttris.vscode-jest-runner",
+        // === Utilities ===
+        "formulahendry.auto-rename-tag",
+        "vincaslt.highlight-matching-tag",
+        "wix.vscode-import-cost",
+        "chakrounanas.turbo-console-log"
+    ]
+}

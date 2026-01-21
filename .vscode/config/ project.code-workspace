@@ -1,0 +1,213 @@
+{
+    "folders": [
+        {
+            "name": "📁 Project",
+            "path": ".."
+        }
+    ],
+    "settings": {
+        // === File Management ===
+        "files.exclude": {
+            "**/node_modules": true,
+            "**/var/cache": true,
+            "**/var/logs": true,
+            "**/build": true,
+            "**/dist": true,
+            "**/.git": false,
+            "**/.DS_Store": true,
+            "**/Thumbs.db": true,
+            "**/.nyc_output": true,
+            "**/coverage": true,
+            "**/.php-cs-fixer.cache": true,
+            "**/.phpunit.cache": true
+        },
+        "search.exclude": {
+            "**/node_modules": true,
+            "**/vendor/**/Tests": true,
+            "**/vendor/**/tests": true,
+            "**/var/cache": true,
+            "**/var/logs": true,
+            "**/build": true,
+            "**/dist": true,
+            "**/coverage": true,
+            "**/.git": true
+        },
+        "files.watcherExclude": {
+            "**/node_modules/**": true,
+            "**/vendor/**": true,
+            "**/var/cache/**": true,
+            "**/var/logs/**": true,
+            "**/build/**": true,
+            "**/dist/**": true,
+            "**/.venv/**": true
+        },
+        "files.eol": "\n",
+        "files.trimTrailingWhitespace": true,
+        "files.insertFinalNewline": true,
+        "files.trimFinalNewlines": true,
+        "files.autoSave": "onFocusChange",
+        "files.autoSaveDelay": 1000,
+        "files.associations": {
+            "*.yml": "yaml",
+            "*.env*": "dotenv",
+            "*.conf": "properties",
+            "docker-compose*.yml": "dockercompose",
+            ".prettierrc": "json",
+            ".eslintrc": "jsonc"
+        },
+        
+        // === Editor ===
+        "editor.formatOnSave": true,
+        "editor.formatOnPaste": false,
+        "editor.formatOnType": false,
+        "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit",
+            "source.sortImports": "never"
+        },
+        "editor.tabSize": 4,
+        "editor.insertSpaces": true,
+        "editor.detectIndentation": false,
+        "editor.rulers": [80, 120],
+        "editor.wordWrap": "bounded",
+        "editor.wordWrapColumn": 120,
+        "editor.minimap.enabled": true,
+        "editor.bracketPairColorization.enabled": true,
+        "editor.guides.bracketPairs": true,
+        "editor.linkedEditing": true,
+        "editor.stickyScroll.enabled": true,
+        "editor.inlineSuggest.enabled": true,
+        "editor.suggest.preview": true,
+        "editor.unicodeHighlight.ambiguousCharacters": true,
+        "editor.unicodeHighlight.invisibleCharacters": true,
+        "editor.accessibilitySupport": "auto",
+        
+        // === Language Specific ===
+        "[typescript]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[javascript]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[typescriptreact]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[javascriptreact]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[json]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[jsonc]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[html]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[css]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[scss]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[yaml]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.tabSize": 2
+        },
+        "[markdown]": {
+            "editor.defaultFormatter": "esbenp.prettier-vscode",
+            "editor.wordWrap": "on",
+            "editor.tabSize": 2
+        },
+        "[php]": {
+            "editor.defaultFormatter": "junstyle.php-cs-fixer",
+            "editor.tabSize": 4
+        },
+        
+        // === Terminal ===
+        "terminal.integrated.cwd": "${workspaceFolder}",
+        "terminal.integrated.fontSize": 14,
+        "terminal.integrated.cursorBlinking": true,
+        "terminal.integrated.cursorStyle": "line",
+        "terminal.integrated.scrollback": 10000,
+        
+        // === Git ===
+        "git.enableSmartCommit": true,
+        "git.confirmSync": false,
+        "git.autofetch": true,
+        "git.openRepositoryInParentFolders": "always",
+        "git.pruneOnFetch": true,
+        "git.fetchOnPull": true,
+        "git.branchProtection": ["main", "master", "develop"],
+        "git.inputValidation": "always",
+        "git.showPushSuccessNotification": true,
+        
+        // === Docker ===
+        "docker.showStartPage": false,
+        
+        // === Prettier ===
+        "prettier.enable": true,
+        "prettier.requireConfig": true,
+        "prettier.useEditorConfig": true,
+        
+        // === ESLint ===
+        "eslint.enable": true,
+        "eslint.format.enable": true,
+        "eslint.lintTask.enable": true,
+        "eslint.validate": [
+            "javascript",
+            "javascriptreact",
+            "typescript",
+            "typescriptreact"
+        ],
+        
+        // === Search ===
+        "search.smartCase": true,
+        "search.useIgnoreFiles": true,
+        "search.followSymlinks": false,
+        "search.quickOpen.includeSymbols": true,
+        
+        // === Workbench ===
+        "workbench.editor.enablePreview": false,
+        "workbench.editor.revealIfOpen": true,
+        "workbench.editor.limit.enabled": true,
+        "workbench.editor.limit.value": 10,
+        "workbench.settings.enableNaturalLanguageSearch": false,
+        "workbench.startupEditor": "none",
+        "workbench.iconTheme": "material-icon-theme",
+        
+        // === Security ===
+        "security.workspace.trust.enabled": true,
+        "security.workspace.trust.untrustedFiles": "prompt",
+        "security.workspace.trust.startupPrompt": "always",
+        
+        // === Performance ===
+        "extensions.ignoreRecommendations": false,
+        "extensions.autoUpdate": false,
+        
+        // === Emmet ===
+        "emmet.includeLanguages": {
+            "typescript": "html",
+            "javascript": "html"
+        },
+        "emmet.triggerExpansionOnTab": true,
+        "emmet.showExpandedAbbreviation": "inMarkupAndStylesheetFilesOnly",
+        
+        // === Breadcrumbs ===
+        "breadcrumbs.enabled": true,
+        "breadcrumbs.symbolPath": "on",
+        
+        // === Problems ===
+        "problems.autoReveal": true,
+        "problems.showCurrentInStatus": true
+    }
+}

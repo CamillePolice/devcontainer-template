@@ -1,0 +1,64 @@
+{
+    "$schema": "https://json.schemastore.org/vscode-extensions",
+    "recommendations": [
+        // === Core Development ===
+        "anthropic.claude-code",
+        "github.vscode-pull-request-github",
+        // === Code Quality ===
+        "editorconfig.editorconfig",
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "streetsidesoftware.code-spell-checker",
+        "usernamehw.errorlens",
+        // === Git ===
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        "gitlab.gitlab-workflow",
+        "codezombiech.gitignore",
+        // === Docker ===
+        "ms-azuretools.vscode-docker",
+        // === Utilities ===
+        "aaron-bond.better-comments",
+        "alefragnani.bookmarks",
+        "gruntfuggly.todo-tree",
+        "christian-kohler.path-intellisense",
+        "formulahendry.auto-close-tag",
+        "formulahendry.auto-rename-tag",
+        "vincaslt.highlight-matching-tag",
+        "chakrounanas.turbo-console-log",
+        "wix.vscode-import-cost",
+        // === Visuals ===
+        "johnpapa.vscode-peacock",
+        "pkief.material-icon-theme",
+        "pkief.material-product-icons",
+        "zhuangtongfa.material-theme",
+        "naumovs.color-highlight",
+        "oderwat.indent-rainbow",
+        // === File Support ===
+        "mikestead.dotenv",
+        "redhat.vscode-yaml",
+        "redhat.vscode-xml",
+        "dotjoshjohnson.xml",
+        "tamasfe.even-better-toml",
+        // === Documentation ===
+        "yzhang.markdown-all-in-one",
+        "yzane.markdown-pdf",
+        "hediet.vscode-drawio",
+        // === REST Client ===
+        "humao.rest-client",
+        "rangav.vscode-thunder-client",
+        // === Database ===
+        "mtxr.sqltools",
+        // === SSH ===
+        "cweijan.vscode-ssh",
+        // === Miscellaneous ===
+        "cweijan.vscode-office",
+        "ibm.output-colorizer",
+        "cweijan.vscode-ssh",
+        "softwaredotcom.swdc-vscode"
+    ],
+    "unwantedRecommendations": [
+        "ms-vscode.vscode-typescript-tslint-plugin",
+        "hookyqr.beautify"
+    ]
+}

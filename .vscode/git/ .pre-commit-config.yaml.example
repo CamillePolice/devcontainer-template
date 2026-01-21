@@ -1,0 +1,574 @@
+repos:
+    - repo: local
+      hooks:
+          #  Code Quality Tools - Main API
+          - id: phpstan-main
+            name: PHPStan Static Analysis (Main API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-api
+                    echo "🔍 Running PHPStan static analysis (Main API)..."
+
+                    # Check if any files in the Main API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Main API project files changed - skipping PHPStan"
+                      exit 0
+                    fi
+
+                    if ! composer phpstan; then
+                      echo "❌ PHPStan found issues in Main API!"
+                      echo "💡 Review and fix the issues above."
+                      exit 1
+                    fi
+                    echo "✅ PHPStan analysis passed (Main API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          - id: php-cs-fixer-main
+            name: PHP CS Fixer (Main API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-api
+                    echo "🔧 Running PHP CS Fixer fix (Main API)..."
+
+                    # Check if any files in the Main API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Main API project files changed - skipping PHP CS Fixer"
+                      exit 0
+                    fi
+
+                    # Run the fix command to automatically fix code style issues
+                    if ! composer cs-fix; then
+                      echo "❌ PHP CS Fixer failed to fix code style issues in Main API!"
+                      exit 1
+                    fi
+                    echo "✅ Code style issues fixed (Main API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          - id: rector-fix-main
+            name: Rector Fix (Main API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-api
+                    echo "🚀 Running Rector fix (Main API)..."
+
+                    # Check if any files in the Main API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Main API project files changed - skipping Rector"
+                      exit 0
+                    fi
+
+                    # Run the fix command to automatically modernize code
+                    if ! composer rector; then
+                      echo "❌ Rector failed to modernize code in Main API!"
+                      exit 1
+                    fi
+                    echo "✅ Code modernized (Main API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          # Validation Steps - Main API (after fixes)
+          - id: phpstan-validate-main
+            name: PHPStan Validation (Main API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-api
+                    echo "🔍 Running PHPStan validation (Main API)..."
+
+                    # Check if any files in the Main API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Main API project files changed - skipping PHPStan validation"
+                      exit 0
+                    fi
+
+                    if ! composer phpstan; then
+                      echo "❌ PHPStan found issues after fixes in Main API!"
+                      echo "💡 Review and fix the issues above."
+                      exit 1
+                    fi
+                    echo "✅ PHPStan validation passed (Main API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          # - id: phpunit-main
+          #   name: PHPUnit Tests (Main API)
+          #   entry: bash
+          #   args:
+          #       - -c
+          #       - |
+          #           cd /workspaces/opvigil/opvigil-api
+          #           echo "🧪 Running PHPUnit tests (Main API)..."
+
+          #           # Check if any files in the Main API project are staged/changed
+          #           api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-api/' | head -1)
+          #           if [ -z "$api_files" ]; then
+          #             echo "ℹ️  No Main API project files changed - skipping PHPUnit tests"
+          #             exit 0
+          #           fi
+
+          #           if ! composer test; then
+          #             echo "❌ Tests failed in Main API!"
+          #             echo "💡 Fix failing tests before committing."
+          #             exit 1
+          #           fi
+          #           echo "✅ All tests passed (Main API)!"
+          #   language: system
+          #   stages: [pre-commit]
+          #   pass_filenames: false
+
+          # Code Quality Tools - Historic API
+          - id: phpstan-historic
+            name: PHPStan Static Analysis (Historic API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-historic-api
+                    echo "🔍 Running PHPStan static analysis (Historic API)..."
+
+                    # Check if any files in the Historic API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-historic-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Historic API project files changed - skipping PHPStan"
+                      exit 0
+                    fi
+
+                    # Check if PHPStan is available
+                    if ! composer show phpstan/phpstan >/dev/null 2>&1; then
+                      echo "⚠️  PHPStan not found in Historic API - skipping"
+                      exit 0
+                    fi
+                    if ! composer phpstan; then
+                      echo "❌ PHPStan found issues in Historic API!"
+                      echo "💡 Review and fix the issues above."
+                      exit 1
+                    fi
+                    echo "✅ PHPStan analysis passed (Historic API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          - id: php-cs-fixer-historic
+            name: PHP CS Fixer (Historic API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-historic-api
+                    echo "🔧 Running PHP CS Fixer fix (Historic API)..."
+
+                    # Check if any files in the Historic API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-historic-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Historic API project files changed - skipping PHP CS Fixer"
+                      exit 0
+                    fi
+
+                    # Check if PHP CS Fixer is available
+                    if [ ! -f "vendor/bin/php-cs-fixer" ]; then
+                      echo "⚠️  PHP CS Fixer not found in Historic API - skipping"
+                      exit 0
+                    fi
+                    # Run the fix command to automatically fix code style issues
+                    if ! composer cs-fix; then
+                      echo "❌ PHP CS Fixer failed to fix code style issues in Historic API!"
+                      exit 1
+                    fi
+                    echo "✅ Code style issues fixed (Historic API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          - id: rector-fix-historic
+            name: Rector Fix (Historic API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-historic-api
+                    echo "🚀 Running Rector fix (Historic API)..."
+
+                    # Check if any files in the Historic API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-historic-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Historic API project files changed - skipping Rector"
+                      exit 0
+                    fi
+
+                    # Check if Rector is available
+                    if ! composer show rector/rector >/dev/null 2>&1; then
+                      echo "⚠️  Rector not found in Historic API - skipping"
+                      exit 0
+                    fi
+                    # Run the fix command to automatically modernize code
+                    if ! composer rector; then
+                      echo "❌ Rector failed to modernize code in Historic API!"
+                      exit 1
+                    fi
+                    echo "✅ Code modernized (Historic API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          # Validation Steps - Historic API (after fixes)
+          - id: phpstan-validate-historic
+            name: PHPStan Validation (Historic API)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-historic-api
+                    echo "🔍 Running PHPStan validation (Historic API)..."
+
+                    # Check if any files in the Historic API project are staged/changed
+                    api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-historic-api/' | head -1)
+                    if [ -z "$api_files" ]; then
+                      echo "ℹ️  No Historic API project files changed - skipping PHPStan validation"
+                      exit 0
+                    fi
+
+                    # Check if PHPStan is available
+                    if ! composer show phpstan/phpstan >/dev/null 2>&1; then
+                      echo "⚠️  PHPStan not found in Historic API - skipping"
+                      exit 0
+                    fi
+                    if ! composer phpstan; then
+                      echo "❌ PHPStan found issues after fixes in Historic API!"
+                      echo "💡 Review and fix the issues above."
+                      exit 1
+                    fi
+                    echo "✅ PHPStan validation passed (Historic API)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          # - id: phpunit-historic
+          #   name: PHPUnit Tests (Historic API)
+          #   entry: bash
+          #   args:
+          #       - -c
+          #       - |
+          #           cd /workspaces/opvigil/opvigil-historic-api
+          #           echo "🧪 Running PHPUnit tests (Historic API)..."
+
+          #           # Check if any files in the Historic API project are staged/changed
+          #           api_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-historic-api/' | head -1)
+          #           if [ -z "$api_files" ]; then
+          #             echo "ℹ️  No Historic API project files changed - skipping PHPUnit tests"
+          #             exit 0
+          #           fi
+
+          #           # Check if PHPUnit is available
+          #           if [ ! -f "vendor/bin/phpunit" ] && ! composer show phpunit/phpunit >/dev/null 2>&1; then
+          #             echo "⚠️  PHPUnit not found in Historic API - skipping"
+          #             exit 0
+          #           fi
+          #           if ! composer test; then
+          #             echo "❌ Tests failed in Historic API!"
+          #             echo "💡 Fix failing tests before committing."
+          #             exit 1
+          #           fi
+          #           echo "✅ All tests passed (Historic API)!"
+          #   language: system
+          #   stages: [pre-commit]
+          #   pass_filenames: false
+
+          # Angular/Frontend Code Quality Tools
+          - id: eslint-angular
+            name: ESLint (Angular)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-frontend  # adjust path as needed
+                    echo "🔧 Running ESLint (Angular)..."
+
+                    # Check if any files in the Angular project are staged/changed
+                    angular_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-frontend/' | head -1)
+                    if [ -z "$angular_files" ]; then
+                      echo "ℹ️  No Angular project files changed - skipping ESLint"
+                      exit 0
+                    fi
+
+                    # Check if Angular project exists
+                    if [ ! -f "package.json" ] || [ ! -f "angular.json" ]; then
+                      echo "⚠️  Angular project not found - skipping ESLint"
+                      exit 0
+                    fi
+                    # Check if node_modules exists
+                    if [ ! -d "node_modules" ]; then
+                      echo "⚠️  Node modules not installed - skipping ESLint"
+                      echo "💡 Run 'npm install' first"
+                      exit 0
+                    fi
+                    # First try to fix issues automatically
+                    echo "🔧 Attempting to fix ESLint issues automatically..."
+                    if ! npm run lint:fix; then
+                      echo "⚠️  Some ESLint issues could not be auto-fixed"
+                    fi
+
+                    # Then check if there are still issues (treat warnings as errors)
+                    if ! npx eslint . --max-warnings 0; then
+                      echo "❌ ESLint found issues in Angular app!"
+                      echo "💡 Please fix the remaining issues manually."
+                      exit 1
+                    fi
+                    echo "✅ ESLint passed (Angular)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          - id: prettier-angular
+            name: Prettier (Angular)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-frontend  # adjust path as needed
+                    echo "🎨 Running Prettier check (Angular)..."
+
+                    # Check if any files in the Angular project are staged/changed
+                    angular_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-frontend/' | head -1)
+                    if [ -z "$angular_files" ]; then
+                      echo "ℹ️  No Angular project files changed - skipping Prettier"
+                      exit 0
+                    fi
+
+                    # Check if Angular project exists
+                    if [ ! -f "package.json" ] || [ ! -f "angular.json" ]; then
+                      echo "⚠️  Angular project not found - skipping Prettier"
+                      exit 0
+                    fi
+                    # Check if node_modules exists
+                    if [ ! -d "node_modules" ]; then
+                      echo "⚠️  Node modules not installed - skipping Prettier"
+                      echo "💡 Run 'npm install' first"
+                      exit 0
+                    fi
+                    # First try to fix formatting issues automatically
+                    echo "🎨 Attempting to fix formatting issues automatically..."
+                    if ! npm run format; then
+                      echo "⚠️  Some formatting issues could not be auto-fixed"
+                    fi
+
+                    # Then check if there are still formatting issues
+                    if ! npm run format:check; then
+                      echo "❌ Code formatting issues found in Angular app!"
+                      echo "💡 Please fix the remaining formatting issues manually."
+                      exit 1
+                    fi
+                    echo "✅ Code formatting is clean (Angular)!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          - id: ng-build-check
+            name: Angular Build Check
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-frontend  # adjust path as needed
+                    echo "🏗️ Running Angular build check..."
+
+                    # Check if any files in the Angular project are staged/changed
+                    angular_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-frontend/' | head -1)
+                    if [ -z "$angular_files" ]; then
+                      echo "ℹ️  No Angular project files changed - skipping Angular build check"
+                      exit 0
+                    fi
+
+                    # Check if Angular project exists
+                    if [ ! -f "package.json" ] || [ ! -f "angular.json" ]; then
+                      echo "⚠️  Angular project not found - skipping build check"
+                      exit 0
+                    fi
+                    # Check if node_modules exists
+                    if [ ! -d "node_modules" ]; then
+                      echo "⚠️  Node modules not installed - skipping build check"
+                      echo "💡 Run 'npm install' first"
+                      exit 0
+                    fi
+                    if ! npm run build:check; then
+                      echo "❌ Angular build failed!"
+                      echo "💡 Fix build errors before committing."
+                      exit 1
+                    fi
+                    echo "✅ Angular build successful!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          # TypeScript Type Checking (Angular)
+          - id: tsc-angular
+            name: TypeScript Check (Angular)
+            entry: bash
+            args:
+                - -c
+                - |
+                    cd /workspaces/opvigil/opvigil-frontend  # adjust path as needed
+                    echo "📝 Running TypeScript type checking (Angular)..."
+
+                    # Check if any files in the Angular project are staged/changed
+                    angular_files=$(git diff --cached --name-only --diff-filter=ACM | grep '^opvigil-frontend/' | head -1)
+                    if [ -z "$angular_files" ]; then
+                      echo "ℹ️  No Angular project files changed - skipping TypeScript check"
+                      exit 0
+                    fi
+
+                    # Check if Angular project exists
+                    if [ ! -f "package.json" ] || [ ! -f "angular.json" ]; then
+                      echo "⚠️  Angular project not found - skipping TypeScript check"
+                      exit 0
+                    fi
+                    # Check if node_modules exists
+                    if [ ! -d "node_modules" ]; then
+                      echo "⚠️  Node modules not installed - skipping TypeScript check"
+                      echo "💡 Run 'npm install' first"
+                      exit 0
+                    fi
+                    if ! npx tsc --noEmit; then
+                      echo "❌ TypeScript type checking failed!"
+                      echo "💡 Fix type errors before committing."
+                      exit 1
+                    fi
+                    echo "✅ TypeScript type checking passed!"
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false
+
+          # Existing Validation Hooks
+          - id: commit-msg-format
+            name: Check commit message format
+            entry: bash
+            args:
+                - -c
+                - |
+                    # Handle different ways commit message can be passed
+                    commit_msg=""
+
+                    # Method 1: From file argument (normal git commit)
+                    if [ -n "$1" ] && [ -f "$1" ]; then
+                      commit_msg=$(cat "$1")
+                    # Method 2: From stdin with timeout (VS Code scenario)
+                    elif [ ! -t 0 ]; then
+                      commit_msg=$(timeout 1s cat 2>/dev/null || echo "")
+                    fi
+
+                    # If still empty, try other methods
+                    if [ -z "$commit_msg" ]; then
+                      # Method 3: Try reading from .git/COMMIT_EDITMSG
+                      if [ -f ".git/COMMIT_EDITMSG" ]; then
+                        commit_msg=$(cat ".git/COMMIT_EDITMSG")
+                      # Method 4: Check for git config commit.template
+                      elif git config --get commit.template >/dev/null 2>&1; then
+                        template_file=$(git config --get commit.template)
+                        if [ -f "$template_file" ]; then
+                          commit_msg=$(cat "$template_file")
+                        fi
+                      fi
+                    fi
+
+                    # Remove trailing whitespace and newlines
+                    commit_msg=$(echo "$commit_msg" | sed 's/[[:space:]]*$//' | head -1)
+
+                    # For VS Code empty message with --allow-empty-message, allow it to pass
+                    if [ -z "$commit_msg" ]; then
+                      echo "ℹ️  Empty commit message detected (VS Code scenario) - allowing"
+                      exit 0
+                    fi
+
+                    # Define the regex patterns for all allowed formats:
+                    # OPV-[task_number]([commit_type]): message
+                    # OPV-[task_number]_Ticket-[ticket_number]([commit_type]): message
+                    # Version [X.X.X]
+                    # Merge branch 'opv_[task_number]-[description]' into opv_[task_number]-[description]
+                    opv_pattern="^OPV-[0-9]+(_Ticket-[0-9]+)?\([a-zA-Z]+\): .+$"
+                    version_pattern="^Version \[[0-9]+\.[0-9]+\.[0-9]+\]$"
+                    merge_pattern="^Merge branch 'opv_[0-9]+(-ticket_[0-9]+)?-[a-zA-Z0-9_-]+' into opv_[0-9]+(-ticket_[0-9]+)?-[a-zA-Z0-9_-]+$"
+
+                    # Check if the commit message matches any of the allowed patterns
+                    if [[ ! $commit_msg =~ $opv_pattern && ! $commit_msg =~ $version_pattern && ! $commit_msg =~ $merge_pattern ]]; then
+                      echo "❌ Commit message format is invalid!"
+                      echo "Expected formats:"
+                      echo "  - OPV-[task_number]([commit_type]): message"
+                      echo "  - OPV-[task_number]_Ticket-[ticket_number]([commit_type]): message"
+                      echo "  - Version [X.X.X]"
+                      echo "  - Merge branch 'opv_[task_number]-[description]' into opv_[task_number]-[description]"
+                      echo "Examples:"
+                      echo "  - OPV-123(feat): add new login feature"
+                      echo "  - OPV-456(fix): resolve authentication bug"
+                      echo "  - OPV-123_Ticket-789(feat): add new login feature"
+                      echo "  - OPV-456_Ticket-101(fix): resolve authentication bug"
+                      echo "  - Version [1.2.3]"
+                      echo "  - Version [2.10.15]"
+                      echo "  - Merge branch 'opv_1866-upgrade_technique' into opv_1866-set_up_back"
+                      echo ""
+                      echo "Your commit message: '$commit_msg'"
+                      exit 1
+                    fi
+
+                    echo "✅ Commit message format is valid!"
+            language: system
+            stages: [commit-msg]
+            pass_filenames: false
+
+          - id: branch-name-format
+            name: Check branch name format
+            entry: bash
+            args:
+                - -c
+                - |
+                    # Get current branch name
+                    branch_name=$(git rev-parse --abbrev-ref HEAD)
+
+                    # Define allowed branch name patterns:
+                    # opv_123_description
+                    # opv_123-ticket_456_description
+                    # main, master, develop, staging (protected branches)
+
+                    opv_pattern="^opv_[0-9]+(-ticket_[0-9]+)?-[a-zA-Z0-9_-]+$"
+                    protected_branches="^(main|master|develop|staging)$"
+
+                    # Check if branch name matches any allowed pattern
+                    if [[ $branch_name =~ $protected_branches ]]; then
+                      echo "✅ Protected branch: $branch_name"
+                      exit 0
+                    elif [[ $branch_name =~ $opv_pattern ]]; then
+                      echo "✅ Valid branch name: $branch_name"
+                      exit 0
+                    else
+                      echo "❌ Invalid branch name: '$branch_name'"
+                      echo ""
+                      echo "Expected branch name format:"
+                      echo "  opv_[task_number]-[description]"
+                      echo "  opv_[task_number]-ticket_[ticket_number]-[description]"
+                      echo "  Protected branches: main, master, develop, staging"
+                      echo ""
+                      echo "Examples:"
+                      echo "  - opv_123-user_authentication"
+                      echo "  - opv_123-ticket_456-login_page"
+                      echo "  - opv_789-fix-login-bug"
+                      echo "  - opv_101-ticket_202-critical_security_fix"
+                      exit 1
+                    fi
+            language: system
+            stages: [pre-commit]
+            pass_filenames: false

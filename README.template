@@ -1,0 +1,273 @@
+# 🚀 OPVigil Development Environment
+
+> A comprehensive, containerized development environment for the OPVigil multi-project architecture
+
+[![PHP 8.4](https://img.shields.io/badge/PHP-8.4-777BB4?style=flat-square&logo=php)](https://php.net)
+[![Symfony 7.4](https://img.shields.io/badge/Symfony-7.4-000000?style=flat-square&logo=symfony)](https://symfony.com)
+[![Angular 20](https://img.shields.io/badge/Angular-20-DD0031?style=flat-square&logo=angular)](https://angular.io)
+[![Node.js 20](https://img.shields.io/badge/Node.js-20-339933?style=flat-square&logo=node.js)](https://nodejs.org)
+[![PostgreSQL 18](https://img.shields.io/badge/PostgreSQL-18-336791?style=flat-square&logo=postgresql)](https://postgresql.org)
+[![MapServer 8](https://img.shields.io/badge/MapServer-8-2E8B57?style=flat-square&logo=mapbox)](https://mapserver.org)
+[![Docker](https://img.shields.io/badge/Docker-enabled-2496ED?style=flat-square&logo=docker)](https://docker.com)
+[![Pre-commit](https://img.shields.io/badge/Pre--commit-enabled-brightgreen?style=flat-square&logo=pre-commit)](https://pre-commit.com)
+[![Trivy](https://img.shields.io/badge/Trivy-enabled-1904AE?style=flat-square&logo=aqua-security)](https://aquasecurity.github.io/trivy/)
+[![Dependency-Track](https://img.shields.io/badge/Dependency--Track-enabled-4A90E2?style=flat-square&logo=owasp)](https://dependencytrack.org)
+
+## ✨ What's Inside
+
+**Multi-Project Architecture**
+
+- 🔧 **Main API** - Symfony 7.4 based core API
+- 📊 **Historic API** - Symfony 7.4 data analysis and reporting API
+- 🎨 **Frontend** - Angular 20 with TypeScript
+- 🗄️ **Database** - PostgreSQL 18 with optimized configuration
+- 🗺️ **GIS Services** - MapServer 8 for geographic data
+
+**Development Tools**
+
+- 🔍 **Code Quality** - PHPStan, ESLint, Prettier, PHP CS Fixer
+- 🚀 **Live Reload** - Hot reloading for all services
+- 📄 **Pre-commit Hooks** - Automated quality checks
+- 🎯 **VS Code Integration** - Optimized workspace and extensions
+- 🤖 **AI Assistant Rules** - `.ai-rules` files for consistent AI assistance
+- 🔧 **Runtime Stack** - PHP 8.4, Node.js 20, Symfony 7.4
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- 🐳 [Docker Desktop](https://www.docker.com/products/docker-desktop)
+- 💻 [VS Code](https://code.visualstudio.com/) with [Remote Containers](https://marketplace.visualstudio.com/items?itemName=ms-vscode-remote.remote-containers)
+- 🔧 Git
+
+### Get Started in 3 Steps
+
+1. **Clone & Open**
+
+   ```bash
+   git clone <repository-url>
+   cd opvigil
+   code .
+   ```
+2. **Launch Container**
+
+   - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
+   - Select **"Dev Containers: Reopen in Container"**
+   - ☕ Grab coffee while it builds (first time only)
+3. **Start Developing**
+
+   ```bash
+   # All services start automatically!
+   # Check the terminal for service URLs
+   ```
+
+## 🤖 AI Assistant Configuration
+
+This project includes comprehensive `.ai-rules` files to ensure consistent AI assistance across different parts of the codebase:
+
+### 📁 Rule Files Location
+
+- **Global Rules**: `/.ai/rules/.ai-rules` - Multi-folder system coordination
+- **Backend Rules**: `/opvigil-api/.ai/rules/.ai-rules` - Symfony 7.4 API standards
+- **Frontend Rules**: `/opvigil-frontend/.ai/rules/.ai-rules` - Angular 20 migration patterns
+
+### 🎯 What These Rules Provide
+
+- **Code Standards**: Enforced coding patterns and best practices
+- **Architecture Guidelines**: Consistent project structure and patterns
+- **Migration Support**: Angular 11→20 migration patterns and modernization
+- **Error Handling**: Centralized error handling strategies
+- **Documentation**: Mandatory documentation standards
+- **Security**: Security best practices and validation patterns
+
+### 🚀 Setting Up Your AI Agent
+
+When using AI assistants (like ai, GitHub Copilot, or similar tools), these `.ai-rules` files will:
+
+1. **Automatically apply** project-specific coding standards
+2. **Suggest modern patterns** (Angular 20, Symfony 7.4)
+3. **Enforce documentation** requirements
+4. **Maintain consistency** across the entire codebase
+5. **Provide context-aware** suggestions based on file location
+
+The rules are designed to work seamlessly with your development workflow and will help maintain code quality and consistency across the entire team.
+
+## 🌐 Service Ports
+
+| Service                          | Port      | URL                    | Description                     |
+| -------------------------------- | --------- | ---------------------- | ------------------------------- |
+| 🔧**Main API**             | `11800` | http://localhost:11800 | Symfony 7.4 Core API            |
+| 📊**Historic API**         | `11820` | http://localhost:11820 | Symfony 7.4 Analytics & Reports |
+| 🎨**Frontend**             | `11420` | http://localhost:11420 | Angular 20 Application          |
+| 🗄️**Database**           | `11543` | localhost:11543        | PostgreSQL 18 Database          |
+| 📊**Historic Database**    | `11544` | localhost:11544        | PostgreSQL Historic Database    |
+| 🗺️**GeoSchapi Database** | `11545` | localhost:11545        | PostgreSQL GeoSchapi Database   |
+| 🔌**WebSocket**            | `11810` | ws://localhost:11810   | Real-time Communication         |
+| 🗺️**MapServer**          | `11080` | http://localhost:11080 | MapServer 8 GIS Service         |
+
+## 📚 Documentation
+
+### 📖 Core Documentation
+
+| Topic                                                | Description                                            |
+| ---------------------------------------------------- | ------------------------------------------------------ |
+| [🗗️ **Architecture**](./docs/ARCHITECTURE.md)   | Container setup, services, and project structure       |
+| [⚙️ **Configuration**](./docs/CONFIGURATION.md) | DevContainer, VS Code, and tool configurations         |
+| [📝 **Commit Rules**](./docs/COMMIT_RULES.md)     | Git commit standards, branch naming, and quality rules |
+
+### 🛠️ Setup & Development Guides
+
+| Topic                                             | Description                                            |
+| ------------------------------------------------- | ------------------------------------------------------ |
+| [🛠️ **Development Workflow**](./docs/guides/setup/DEVELOPMENT.md)         | Daily workflow, commands, and best practices           |
+| [🐛 **Debug Setup**](./docs/guides/setup/DEBUG.md)                     | Debugging setup, Xdebug, and troubleshooting           |
+| [🧪 **Backend Testing**](./docs/opvigil-backend/docs/TESTING.md)             | PHP testing with PHPUnit, debugging, and best practices |
+| [🧪 **Frontend Testing**](./opvigil-frontend/docs/TESTING.md)           | Angular testing with Jasmine, Karma, and best practices |
+| [⚡ **VS Code Tasks**](./docs/guides/setup/TASKS.md)                     | VS Code tasks, automation, and workflow optimization   |
+| [🛠️ **CLI Tools**](./docs/guides/setup/CLI_TOOLS.md)                     | Modern CLI tools guide (fzf, ripgrep, bat, zoxide, etc.) |
+
+### 🎨 Frontend Development
+
+| Topic                                                                                                                     | Description                                                               |
+| ------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| [🚀 **Angular Migration Guide**](./docs/ANGULAR_MIGRATION_GUIDE.md)                                                    | Modernizing Angular patterns from legacy to Angular 20                    |
+| [🛡️ **Error Handling**](./opvigil-frontend/src/app/core/interceptors/errors/ANGULAR_ERROR_HTTP_HANDLING.md) | Global error handling with HTTP interceptors                              |
+| [🎯 **Enum Service Guide**](./opvigil-frontend/src/app/shared/services/enum/ENUM_SERVICE_GUIDE.md)            | Universal enum service with translations and type safety                  |
+| [🔌 **WebSocket Services**](./opvigil-frontend/src/app/core/websocket/WEBSOCKET.md)                           | Real-time communication architecture with reactive state management       |
+| [📊 **Logging System**](./opvigil-frontend/src/app/core/logger/ANGULAR_LOGGING.md)                            | Complete logging system usage and implementation                          |
+| [🏠 **Home Module**](./opvigil-frontend/src/app/features/home/HOME_MODULE.md)                                 | Comprehensive guide to the Home Module dashboard and territory management |
+| [📊 **REXPRESS Graphics**](./opvigil-frontend/docs/REXPRESS_GRAPHIQUE.md)                                     | Implementation guide for REXPRESS graphics with tooltips                  |
+| [📈 **Forecast Observations Graphics**](./opvigil-frontend/src/app/features/forecast/territoire/troncons/components/forecast-tron-form/components/forecast-tron-details/PREVISIONS_OBS_GRAPHICS.md) | Complete guide to forecast and observation charts (hauteurs/debits) with ApexCharts |
+| [✅ **Validation Logic**](./opvigil-frontend/src/app/features/forecast/territoire/forecast-territoire-edit/helpers/VALIDATION.md) | Territory bulletin validation system (full and colors-only validation)    |
+
+### 🔧 API Backend Development
+
+| Topic                                                                                                | Description                                                                    |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [🏗️ **Architecture Diagram**](./docs/guides/backend/opvigil-architecture-diagram.drawio)        | System architecture and component relationships                                |
+| [🔍 **Generic Filters Guide**](./opvigil-api/src/Dto/Filter/FILTERS.md)                  | Type-safe filtering, sorting, and pagination system                            |
+| [🔌 **FTP System Guide**](./opvigil-api/src/Utils/Fichier/FTP.md)                        | Multi-protocol file transfer system (FTP, FTPS, SFTP)                          |
+| [🌐 **External API Guide**](./opvigil-api/src/Service/Services/External/EXTERNAL_API.md) | External API integration system with Historic and PHYC APIs                    |
+| [🚨 **Exception System Guide**](./opvigil-api/src/Exception/EXCEPTION.md)                | Structured exception handling with Domain, Smooth, and External API exceptions |
+| [📜 **Scripts Guide**](./opvigil-api/scripts/SCRIPTS.md)                                 | Utility scripts for testing, database, and production operations               |
+
+### 📊 Historic API Backend Development
+
+| Topic                                                                                                | Description                                                                    |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------ |
+| [📜 **Scripts Guide**](./opvigil-historic-api/scripts/SCRIPTS.md)                                 | Utility scripts for testing and database management for historic data analysis |
+
+### 🚀 Deployment
+
+| Topic                                                              | Description                                       |
+| ------------------------------------------------------------------ | ------------------------------------------------- |
+| [🔄 **CI/CD Pipeline**](./docs/guides/deployment/CI_CD.md)      | GitLab CI/CD pipeline configuration and execution |
+| [🚢 **Deployment Guide**](./docs/guides/deployment/DEPLOY.md)   | Release creation and demo platform deployment     |
+| [🌐 **Platform Access**](./docs/guides/deployment/PLATFORMS.md) | Access guide for demo and recette environments    |
+
+### 🎯 Standalone Module
+
+| Topic                                                             | Description                                                                                                                       |
+| ----------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| [🏠 **Standalone Module**](./opvigil-standalone/STANDALONE.md) | Autonomous emergency version - Windows executable with offline mode for degraded situations (network outages, server maintenance) |
+
+### 📦 Dependency Management
+
+| Topic                                                   | Description                                             |
+| ------------------------------------------------------- | ------------------------------------------------------- |
+| [🤖 **Renovate Guide**](./.gitlab/GUIDE_RENOVATE.md) | Automated dependency updates with module-based grouping |
+
+### 📖 Reference
+
+| Topic                                                                   | Description                                |
+| ----------------------------------------------------------------------- | ------------------------------------------ |
+| [🎯 **Terminal Guide**](./docs/guides/reference/TERMINAL.md)         | Understanding your terminal and Git prompt |
+| [🔧 **Troubleshooting**](./docs/guides/reference/TROUBLESHOOTING.md) | Common issues and solutions                |
+
+## 🎯 Key Features
+
+### 🔒 **Consistent Environment**
+
+- Same setup across all team members
+- No more "works on my machine" issues
+- Isolated from host system
+
+### ⚡ **Blazing Fast Development**
+
+- Hot reload for all services
+- Optimized Docker layers
+- Cached dependencies
+
+### 🛡️ **Quality Assurance**
+
+- Automated code formatting (PHP CS Fixer, Prettier)
+- Pre-commit quality checks (PHPStan, ESLint)
+- Static analysis for PHP and TypeScript
+- **Enforced commit standards** - [📝 See commit rules](./docs/COMMIT_RULES.md)
+
+### 🔄 **Automated Dependency Management**
+
+- **Renovate Bot** - Automated dependency updates grouped by module
+- **Security-first approach** - 3-day minimum age + vulnerability alerts
+- **Module-based MR grouping** - Separate updates by business logic (API, Frontend, etc.)
+- **Manual review required** - No automatic merging for safety
+
+### 🎨 **Developer Experience**
+
+- Rich VS Code integration
+- Intelligent autocomplete
+- Integrated debugging tools
+
+## 🎭 Understanding Your Terminal
+
+Your terminal uses **Oh My Zsh** with **Powerlevel10k** for a rich development experience:
+
+```
+opvigil  opv_1866-upgrade_technique ! ? >1 #20                    14:30
+>
+```
+
+| Symbol  | Meaning                   |
+| ------- | ------------------------- |
+| `!`   | Modified files (unstaged) |
+| `?`   | New files (untracked)     |
+| `>1`  | 1 commit ahead of remote  |
+| `#20` | Number of stashes         |
+
+## 🤝 Contributing
+
+### Git Standards
+
+1. **Follow our conventions** - [📝 Complete commit rules guide](./docs/COMMIT_RULES.md)
+
+   - Branch naming: `opv_123-feature_description`
+   - Commit format: `OPV-123(feat): description`
+   - Quality checks enforced automatically
+2. **Quality first**
+
+   - Pre-commit hooks run automatically
+   - All tests must pass
+   - Code must be formatted
+3. **Document changes**
+
+   - Update relevant documentation
+   - Add examples for new features
+
+### 🔄 Dependency Management
+
+- **Renovate handles updates automatically** - [🤖 See Renovate guide](./.gitlab/GUIDE_RENOVATE.md)
+- **Review dependency MRs promptly** - Grouped by module for easier review
+- **Security updates get priority** - Check for vulnerability alerts
+- **Test thoroughly** - All dependency updates require manual validation
+
+## 🆘 Need Help?
+
+- 📖 Check the [troubleshooting guide](./docs/guides/reference/TROUBLESHOOTING.md)
+- 📝 Review service logs in the terminal
+- 💬 Ask the development team
+
+---
+
+**Happy coding! 🎉**
+
+_Last updated: July 24, 2025 • Version 1.0.0_

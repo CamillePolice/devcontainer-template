@@ -1,0 +1,47 @@
+## 📄 `.prettierignore`
+# Dependencies
+node_modules
+vendor
+bower_components
+
+# Build outputs
+dist
+build
+out
+.next
+.nuxt
+.cache
+
+# Logs
+*.log
+logs
+var/logs
+var/cache
+
+# Coverage
+coverage
+.nyc_output
+
+# IDE
+.vscode
+.idea
+
+# Temporary files
+*.tmp
+*.temp
+.DS_Store
+Thumbs.db
+
+# Lock files
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+composer.lock
+
+# Environment
+.env
+.env.*
+
+# Generated files
+*.min.js
+*.min.css
