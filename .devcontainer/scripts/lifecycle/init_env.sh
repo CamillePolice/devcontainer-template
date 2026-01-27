@@ -39,18 +39,25 @@ git config --global pull.rebase true
 git config --global core.editor "cursor --wait"
 git config --global push.autoSetupRemote true
 
-log "Ensuring pre-commit is installed in current project"
+log "Checking for pre-commit configuration"
 if [ -f "$PROJECT_ROOT/.pre-commit-config.yaml" ]; then
-    log "Pre-commit config found, ensuring hooks are installed"
-    if command -v pre-commit &> /dev/null; then
-        pre-commit install 2>/dev/null || log "Warning: Could not install pre-commit hooks"
+    log "Pre-commit config found at $PROJECT_ROOT/.pre-commit-config.yaml"
+    
+    # Install pre-commit if not already installed
+    if ! command -v pre-commit &> /dev/null; then
+        log "Installing pre-commit via pip"
+        pip install pre-commit --quiet || log "Warning: Could not install pre-commit"
     else
-        log "Warning: pre-commit not found, installing via pip"
-        pip install pre-commit --quiet
+        log "pre-commit already installed"
+    fi
+    
+    # Install hooks for this project
+    if command -v pre-commit &> /dev/null; then
+        log "Installing pre-commit hooks for this project"
         pre-commit install 2>/dev/null || log "Warning: Could not install pre-commit hooks"
     fi
 else
-    log "No .pre-commit-config.yaml found, skipping pre-commit setup"
+    log "No .pre-commit-config.yaml found, skipping pre-commit installation"
 fi
 
 log "=== Environment initialization completed successfully $(date) ==="
