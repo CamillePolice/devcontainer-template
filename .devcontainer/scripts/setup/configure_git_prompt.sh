@@ -168,115 +168,188 @@ mkdir -p "$HOME/.config"
 if [ ! -f "$HOME/.config/starship.toml" ]; then
     log "Creating Starship configuration..."
     cat > "$HOME/.config/starship.toml" << 'EOF'
-# Starship configuration - Clean and fast prompt for devcontainers
+# Starship configuration - Beautiful and informative prompt for devcontainers
 # Documentation: https://starship.rs/config/
 
-# Don't print a new line at the start of the prompt
+# Add a new line at the start for better readability
 add_newline = true
 
 # Timeout for commands (in milliseconds)
 command_timeout = 1000
 
-# Format of the prompt
+# Format of the prompt - more colorful and organized
 format = """
+[┌─](bold cyan)$username\
 $directory\
 $git_branch\
 $git_status\
+$git_metrics\
+$git_state\
+$package\
 $docker_context\
 $php\
 $nodejs\
 $python\
 $rust\
 $golang\
-$line_break\
-$character"""
+$jobs
+[└─](bold cyan)$character"""
 
 # Right side of the prompt
-right_format = """$cmd_duration$time"""
+right_format = """$memory_usage$cmd_duration$battery$time"""
 
-# Directory
+# Username - shows current user (helpful in devcontainers)
+[username]
+style_user = "bold dimmed blue"
+format = "[$user]($style) "
+disabled = false
+show_always = true
+
+# Directory - with folder icon
 [directory]
-style = "blue bold"
+style = "bold bright-blue"
 truncation_length = 4
 truncate_to_repo = true
-format = "[$path]($style)[$read_only]($read_only_style) "
+format = "[ $path]($style)[$read_only]($read_only_style) "
+read_only = " 󰌾"
 
-# Git branch
+# Git branch - with prettier icon
 [git_branch]
-symbol = ""
-style = "green"
-format = "[$symbol$branch(:$remote_branch)]($style) "
+symbol = " "
+style = "bold green"
+format = "[$symbol$branch]($style) "
 
-# Git status
+# Git status - prettier emoji icons
 [git_status]
-style = "yellow"
-format = '([$all_status$ahead_behind]($style) )'
-conflicted = "="
-ahead = "↑${count}"
-behind = "↓${count}"
-diverged = "↕↑${ahead_count}↓${behind_count}"
-untracked = "?${count}"
-stashed = "*${count}"
-modified = "!${count}"
-staged = "+${count}"
-renamed = "»${count}"
-deleted = "✘${count}"
+format = '([\[$all_status$ahead_behind\]]($style) )'
+conflicted = "⚔️ ${count}"
+ahead = "⬆️ ${count}"
+behind = "⬇️ ${count}"
+diverged = "🔀 ${count}"
+untracked = "🆕 ${count}"
+stashed = "📦 ${count}"
+modified = "📝 ${count}"
+staged = "✅ ${count}"
+renamed = "📛 ${count}"
+deleted = "🗑️ ${count}"
+style = "bold yellow"
 
-# Prompt character
+# Git metrics - shows added/deleted lines
+[git_metrics]
+disabled = false
+added_style = "bold green"
+deleted_style = "bold red"
+format = '([+$added]($added_style) )([-$deleted]($deleted_style) )'
+
+# Git state - shows ongoing operations
+[git_state]
+format = '[\($state( $progress_current of $progress_total)\)]($style) '
+cherry_pick = "[🍒 PICKING](bold red)"
+rebase = "[📶 REBASING](bold yellow)"
+merge = "[🔀 MERGING](bold yellow)"
+revert = "[🔄 REVERTING](bold red)"
+bisect = "[🔍 BISECTING](bold blue)"
+am = "[📧 AM](bold yellow)"
+am_or_rebase = "[📧 AM/REBASE](bold yellow)"
+style = "bold yellow"
+
+# Prompt character - prettier arrows
 [character]
-success_symbol = "[>](green)"
-error_symbol = "[>](red)"
-vimcmd_symbol = "[<](green)"
+success_symbol = "[❯](bold green)"
+error_symbol = "[❯](bold red)"
+vimcmd_symbol = "[❮](bold green)"
 
-# Command duration
+# Command duration - with clock icon
 [cmd_duration]
 min_time = 2_000
-style = "yellow"
-format = "[$duration]($style) "
+style = "bold yellow"
+format = "[ $duration]($style) "
 
-# Time
+# Memory usage - shows RAM usage
+[memory_usage]
+disabled = false
+threshold = 75
+symbol = "🐏 "
+format = "$symbol[$ram]($style) "
+style = "bold dimmed white"
+
+# Battery status
+[battery]
+full_symbol = "🔋 "
+charging_symbol = "⚡ "
+discharging_symbol = "💀 "
+disabled = false
+
+[[battery.display]]
+threshold = 10
+style = "bold red"
+
+[[battery.display]]
+threshold = 30
+style = "bold yellow"
+
+[[battery.display]]
+threshold = 100
+style = "bold green"
+
+# Time - with clock icon
 [time]
 disabled = false
-style = "cyan"
-format = "[$time]($style)"
+style = "bold cyan"
+format = "[ $time]($style)"
 time_format = "%H:%M"
 
-# Docker context
+# Docker context - with whale icon
 [docker_context]
-symbol = "docker "
-style = "blue"
+symbol = " "
+style = "bold blue"
 format = "[$symbol$context]($style) "
 only_with_files = true
 
-# PHP
+# PHP - with elephant icon
 [php]
-symbol = "php "
+symbol = " "
 style = "147"
 format = "[$symbol$version]($style) "
 
-# Node.js
+# Node.js - with node icon
 [nodejs]
-symbol = "node "
-style = "green"
+symbol = " "
+style = "bold green"
 format = "[$symbol$version]($style) "
 
-# Python
+# Python - with snake icon
 [python]
-symbol = "py "
-style = "yellow"
+symbol = " "
+style = "bold yellow"
 format = "[$symbol$version]($style) "
 
-# Rust
+# Rust - with gear icon
 [rust]
-symbol = "rs "
-style = "red"
+symbol = " "
+style = "bold red"
 format = "[$symbol$version]($style) "
 
-# Go
+# Go - with gopher icon
 [golang]
-symbol = "go "
-style = "cyan"
+symbol = " "
+style = "bold cyan"
 format = "[$symbol$version]($style) "
+
+# Package version - shows project version
+[package]
+symbol = "📦 "
+format = "[$symbol$version]($style) "
+style = "bold 208"
+disabled = false
+
+# Background jobs indicator
+[jobs]
+symbol = "✦ "
+number_threshold = 1
+symbol_threshold = 1
+format = "[$symbol$number]($style) "
+style = "bold blue"
 
 # Disable modules we don't need
 [aws]
