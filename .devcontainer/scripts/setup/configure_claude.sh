@@ -44,7 +44,7 @@ set -x
 ##############################################
 if [ "$USE_CLAUDE" = "true" ]; then
    log "=== Configuring Claude via direct repository copy ==="
-   
+
    # Skip if .claude folder already exists AND has content
    if [ -d "$PROJECT_ROOT/.claude" ] && [ "$(ls -A $PROJECT_ROOT/.claude 2>/dev/null)" ]; then
       log ".claude folder already exists with content, skipping direct copy"
@@ -90,26 +90,127 @@ if [ "$USE_CLAUDE" = "true" ]; then
       # Copy plugin metadata
       log "Copying plugin metadata"
       cp -r "$TEMP_DIR/everything-claude-code/.claude-plugin" "$PROJECT_ROOT/.claude/" 2>/dev/null || true
-
       # Cleanup
       log "Cleaning up temporary directory"
       rm -rf "$TEMP_DIR"
-      
+
       log "Direct repository copy completed"
    fi
 fi
+
+##############################################
+# MCP Servers Configuration
+##############################################
+log "=== Configuring MCP servers ==="
+
+CLAUDE_SETTINGS="$HOME/.claude/settings.json"
+MCP_CONFIG="$PROJECT_ROOT/.claude/mcp/mcp.json"
+PERMISSIONS_CONFIG="$PROJECT_ROOT/.claude/permissions/permissions.json"
+
+# Create .claude directory if it doesn't exist
+mkdir -p "$HOME/.claude"
+
+# Initialize settings.json if it doesn't exist
+if [ ! -f "$CLAUDE_SETTINGS" ]; then
+   log "Creating new Claude settings.json"
+   echo '{' > "$CLAUDE_SETTINGS"
+   echo '  "$schema": "https://json.schemastore.org/claude-code-settings.json"' >> "$CLAUDE_SETTINGS"
+   echo '}' >> "$CLAUDE_SETTINGS"
+fi
+
+# Add MCP servers
+if [ -f "$MCP_CONFIG" ]; then
+   log "MCP configuration found at $MCP_CONFIG"
+
+   # Check if mcpServers section exists
+   if ! grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+      log "Adding MCP servers to settings.json"
+
+      # Use jq if available for proper JSON merging
+      if command -v jq &> /dev/null; then
+         # Merge using jq
+         MCP_CONTENT=$(cat "$MCP_CONFIG")
+         jq --argjson mcp "$MCP_CONTENT" '. + $mcp' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"
+         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+         log "MCP servers merged using jq"
+      else
+         log "Warning: jq not available, using basic merge"
+         # Remove closing brace from existing settings
+         sed -i '$d' "$CLAUDE_SETTINGS" 2>/dev/null || sed -i '' '$d' "$CLAUDE_SETTINGS" 2>/dev/null
+         echo ',' >> "$CLAUDE_SETTINGS"
+
+         # Extract and append mcpServers section from mcp.json
+         sed -n '/"mcpServers":/,/^}/p' "$MCP_CONFIG" | sed '$d' >> "$CLAUDE_SETTINGS"
+         echo '}' >> "$CLAUDE_SETTINGS"
+      fi
+
+      log "MCP servers added to $CLAUDE_SETTINGS"
+   else
+      log "MCP servers already configured in settings.json"
+   fi
+
+   log ""
+   log "MCP Servers configured:"
+   log "  - Context7: Enhanced context management (requires CONTEXT7_API_KEY)"
+   log "  - Playwright: Browser automation and E2E testing"
+else
+   log "No MCP configuration found at $MCP_CONFIG"
+fi
+
+# Add Permissions
+if [ -f "$PERMISSIONS_CONFIG" ]; then
+   log ""
+   log "Permissions configuration found at $PERMISSIONS_CONFIG"
+
+   # Check if permissions section exists
+   if ! grep -q '"permissions"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+      log "Adding permissions to settings.json"
+
+      # Use jq if available for proper JSON merging
+      if command -v jq &> /dev/null; then
+         # Merge using jq
+         PERM_CONTENT=$(cat "$PERMISSIONS_CONFIG")
+         jq --argjson perm "$PERM_CONTENT" '. + $perm' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"
+         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+         log "Permissions merged using jq"
+      else
+         log "Warning: jq not available, using basic merge"
+         # Remove closing brace from existing settings
+         sed -i '$d' "$CLAUDE_SETTINGS" 2>/dev/null || sed -i '' '$d' "$CLAUDE_SETTINGS" 2>/dev/null
+         echo ',' >> "$CLAUDE_SETTINGS"
+
+         # Extract and append permissions section
+         sed -n '/"permissions":/,/^}/p' "$PERMISSIONS_CONFIG" | sed '$d' >> "$CLAUDE_SETTINGS"
+         echo '}' >> "$CLAUDE_SETTINGS"
+      fi
+
+      log "Permissions added to $CLAUDE_SETTINGS"
+   else
+      log "Permissions already configured in settings.json"
+   fi
+
+   log ""
+   log "Pre-approved commands configured (git, npm, docker, etc.)"
+else
+   log "No permissions configuration found at $PERMISSIONS_CONFIG"
+fi
+
+log ""
+log "To set Context7 API key:"
+log "  export CONTEXT7_API_KEY='your-api-key-here'"
+log "  Or add to ~/.zshrc for persistence"
 
 ##############################################
 # Option 2: Plugin Marketplace Setup
 ##############################################
 if [ "$USE_CLAUDE_MARKETPLACE" = "true" ]; then
    log "=== Configuring Claude via plugin marketplace ==="
-   
+
    CLAUDE_SETTINGS="$HOME/.claude/settings.json"
-   
+
    # Create .claude directory if it doesn't exist
    mkdir -p "$HOME/.claude"
-   
+
    # Check if settings.json exists
    if [ ! -f "$CLAUDE_SETTINGS" ]; then
       log "Creating new Claude settings.json"
@@ -158,14 +259,21 @@ log "Summary:"
 if [ "$USE_CLAUDE" = "true" ]; then
    log "✓ Direct copy: Configurations copied to $PROJECT_ROOT/.claude/"
 fi
+if [ -f "$PROJECT_ROOT/.claude/mcp/mcp.json" ]; then
+   log "✓ MCP Servers: Configured in $CLAUDE_SETTINGS"
+fi
+if [ -f "$PROJECT_ROOT/.claude/permissions/permissions.json" ]; then
+   log "✓ Permissions: Pre-approved commands configured"
+fi
 if [ "$USE_CLAUDE_MARKETPLACE" = "true" ]; then
    log "✓ Marketplace: Check $CLAUDE_SETTINGS for plugin configuration"
 fi
 log ""
 log "Next steps:"
-log "1. Review configurations in $PROJECT_ROOT/.claude/ (if using direct copy)"
-log "2. Update MCP configs with your API keys if needed"
-log "3. Customize rules/skills for your project"
-log "4. In Claude Code, verify plugins with: /plugin list"
+log "1. Review configurations in $PROJECT_ROOT/.claude/"
+log "2. Set CONTEXT7_API_KEY environment variable for Context7 MCP"
+log "3. Customize rules/skills/permissions for your project"
+log "4. In Claude Code, verify with: /plugin list"
+log "5. Test MCP servers by checking available tools"
 
 set +x  # Disable debug mode
