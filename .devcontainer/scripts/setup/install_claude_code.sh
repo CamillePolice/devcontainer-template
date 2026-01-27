@@ -210,6 +210,27 @@ EOF
         log "ℹ️  CLAUDE.md already exists at project root"
     fi
     
+    # Add 'cc' alias to zshrc for convenient Claude Code access
+    log ""
+    log "⚙️  Setting up 'cc' alias for Claude Code..."
+    if [ -f ~/.zshrc ]; then
+        # Remove any existing cc alias for claude (avoid duplicates)
+        sed -i '/^alias cc=.*claude/d' ~/.zshrc 2>/dev/null || true
+        
+        # Add the alias
+        if ! grep -q "alias cc='claude'" ~/.zshrc 2>/dev/null; then
+            echo "" >> ~/.zshrc
+            echo "# Claude Code CLI shortcut" >> ~/.zshrc
+            echo "alias cc='claude'" >> ~/.zshrc
+            log "✅ Added 'cc' alias to ~/.zshrc"
+            log "   You can now use 'cc' as a shortcut for 'claude'"
+        else
+            log "ℹ️  'cc' alias already exists in ~/.zshrc"
+        fi
+    else
+        log "⚠️  ~/.zshrc not found, skipping alias setup"
+    fi
+    
     log ""
     log "📝 Next steps:"
     log "   1. Customize CLAUDE.md with your project details"
