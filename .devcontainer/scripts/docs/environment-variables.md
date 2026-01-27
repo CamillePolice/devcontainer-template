@@ -1,0 +1,253 @@
+# Environment Variables Reference
+
+Complete reference for all environment variables used in devcontainer scripts.
+
+## Core Variables
+
+### DEVCONTAINER_SCRIPTS
+- **Type**: Path
+- **Set By**: devcontainer.json
+- **Default**: Auto-detected from script location
+- **Purpose**: Path to the scripts directory
+- **Used By**: All scripts for path resolution
+
+### PROJECT_ROOT
+- **Type**: Path
+- **Set By**: devcontainer.json
+- **Default**: Auto-detected (workspace folder)
+- **Purpose**: Root directory of the project
+- **Used By**: All scripts for file operations
+
+### PROJECT_NAME
+- **Type**: String
+- **Set By**: devcontainer.json
+- **Default**: `"project"`
+- **Purpose**: Name of the project, used for workspace file naming
+- **Used By**: `setup/configure_vscode.sh`
+- **Example**: If set to `"my-app"`, creates `my-app.code-workspace`
+
+**Example**:
+```json
+"PROJECT_NAME": "my-awesome-project"
+```
+
+### REMOTE_CONTAINERS
+- **Type**: Boolean string
+- **Set By**: devcontainer.json
+- **Values**: `"true"` when in devcontainer
+- **Purpose**: Detect if running in devcontainer
+- **Used By**: Conditional logic in scripts
+
+### DEVCONTAINER
+- **Type**: Boolean string
+- **Set By**: devcontainer.json
+- **Values**: `"true"` when in devcontainer
+- **Purpose**: Detect if running in devcontainer
+- **Used By**: Conditional logic in scripts
+
+## Feature Control Variables
+
+### USE_CLAUDE_CODE
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Master toggle for Claude Code CLI installation and integration
+- **Affects**: `setup/install_claude_code.sh`, `setup/configure_claude.sh`
+- **When disabled**: Skips Claude Code CLI installation and configuration
+
+**Example**:
+```json
+"USE_CLAUDE_CODE": "false"  // Disable all Claude features
+```
+
+### CLAUDE_CODE_CHANNEL
+- **Type**: String
+- **Default**: `"latest"`
+- **Values**: `"latest"` | `"stable"` | version number (e.g., `"1.0.58"`)
+- **Purpose**: Control which Claude Code version/channel to install
+- **Affects**: `setup/install_claude_code.sh`
+- **Options**:
+  - `"latest"` - Install latest version with auto-updates
+  - `"stable"` - Install stable channel (~1 week behind latest)
+  - `"1.0.58"` - Install specific version (no auto-update)
+
+**Example**:
+```json
+"CLAUDE_CODE_CHANNEL": "stable"  // Use stable channel
+```
+
+### USE_CLAUDE
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Enable direct repository copy mode
+- **Affects**: `setup/configure_claude.sh`
+- **When enabled**: 
+  - Clones everything-claude-code repository
+  - Copies to `.claude/` folder in project
+  - Provides offline access to configurations
+
+**Example**:
+```json
+"USE_CLAUDE": "true",  // Copy configs to project
+```
+
+### USE_CLAUDE_MARKETPLACE
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Enable plugin marketplace mode
+- **Affects**: `setup/configure_claude.sh`
+- **When enabled**:
+  - Creates/updates `~/.claude/settings.json`
+  - Registers everything-claude-code marketplace
+  - Enables plugin automatically
+
+**Example**:
+```json
+"USE_CLAUDE_MARKETPLACE": "true",  // Use plugin marketplace
+```
+
+### USE_GIT_PROMPT
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Enable Oh My Zsh and Starship prompt
+- **Affects**: `setup/configure_git_prompt.sh`
+- **When disabled**: Skips shell prompt customization
+
+**Example**:
+```json
+"USE_GIT_PROMPT": "false",  // Use default shell prompt
+```
+
+### USE_DOCKER_AUTOCOMPLETE
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Enable Docker command completion
+- **Affects**: `config/docker_autocomplete.sh`
+- **When disabled**: Skips Docker autocomplete setup
+
+**Example**:
+```json
+"USE_DOCKER_AUTOCOMPLETE": "false",  // No Docker completion
+```
+
+### USE_VSCODE_CONFIG
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Enable VS Code configuration setup
+- **Affects**: `setup/configure_vscode.sh`
+- **When disabled**: Skips VS Code configuration files copy
+- **When enabled**:
+  - Copies settings.json, tasks.json, extensions.json
+  - Copies linting configs (.editorconfig, .prettierrc)
+  - Creates workspace symlinks
+  - Backs up existing files automatically
+
+**Example**:
+```json
+"USE_VSCODE_CONFIG": "false",  // Manual VS Code setup
+```
+
+## Configuration Examples
+
+### Minimal Setup
+```json
+"containerEnv": {
+    "PROJECT_ROOT": "${containerWorkspaceFolder}",
+    "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts",
+    "USE_CLAUDE_CODE": "false",
+    "USE_GIT_PROMPT": "false",
+    "USE_DOCKER_AUTOCOMPLETE": "false",
+    "USE_VSCODE_CONFIG": "false"
+}
+```
+
+### Claude Marketplace Only
+```json
+"containerEnv": {
+    "USE_CLAUDE_CODE": "true",
+    "CLAUDE_CODE_CHANNEL": "stable",
+    "USE_CLAUDE": "false",
+    "USE_CLAUDE_MARKETPLACE": "true",
+    "USE_VSCODE_CONFIG": "true"
+}
+```
+
+### Full Features (Default)
+```json
+"containerEnv": {
+    "USE_CLAUDE_CODE": "true",
+    "CLAUDE_CODE_CHANNEL": "latest",
+    "USE_CLAUDE": "true",
+    "USE_CLAUDE_MARKETPLACE": "true",
+    "USE_GIT_PROMPT": "true",
+    "USE_DOCKER_AUTOCOMPLETE": "true",
+    "USE_VSCODE_CONFIG": "true"
+}
+```
+
+### Enterprise/Team Setup
+```json
+"containerEnv": {
+    "USE_CLAUDE_CODE": "true",
+    "CLAUDE_CODE_CHANNEL": "stable",
+    "DISABLE_AUTOUPDATER": "1",
+    "USE_CLAUDE": "true",
+    "USE_CLAUDE_MARKETPLACE": "false",
+    "USE_GIT_PROMPT": "true",
+    "USE_DOCKER_AUTOCOMPLETE": "true",
+    "USE_VSCODE_CONFIG": "true"
+}
+```
+
+## Variable Hierarchy
+
+### Claude Code Variables
+```
+USE_CLAUDE_CODE (master toggle for CLI + config)
+  ├── CLAUDE_CODE_CHANNEL (version/channel selection)
+  ├── USE_CLAUDE (direct copy of configs)
+  └── USE_CLAUDE_MARKETPLACE (marketplace setup)
+```
+
+If `USE_CLAUDE_CODE=false`, the CLI is not installed and both `USE_CLAUDE` and `USE_CLAUDE_MARKETPLACE` are ignored.
+
+## Testing Variables
+
+You can test variable behavior by running scripts manually:
+
+```bash
+# Test with variable disabled
+USE_GIT_PROMPT=false .devcontainer/scripts/setup/configure_git_prompt.sh
+
+# Test Claude CLI installation with stable channel
+CLAUDE_CODE_CHANNEL=stable .devcontainer/scripts/setup/install_claude_code.sh
+
+# Test Claude with only marketplace
+USE_CLAUDE=false USE_CLAUDE_MARKETPLACE=true .devcontainer/scripts/setup/configure_claude.sh
+
+# Test with all disabled
+USE_CLAUDE_CODE=false .devcontainer/scripts/setup/configure_claude.sh
+
+# Test VS Code configuration
+USE_VSCODE_CONFIG=true .devcontainer/scripts/setup/configure_vscode.sh
+```
+
+## Troubleshooting
+
+### Variable Not Recognized
+- Check spelling in `devcontainer.json`
+- Ensure value is a string: `"true"` not `true`
+- Rebuild container after changes
+
+### Variable Not Taking Effect
+- Verify script reads the variable (check script source)
+- Check log files in `.devcontainer/.log/` for variable values
+- Try manual execution with the variable set
+
+### Default Values
+All feature control variables default to `"true"` if not specified, ensuring backwards compatibility.

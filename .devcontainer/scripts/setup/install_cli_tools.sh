@@ -1,7 +1,15 @@
 #!/bin/bash
 
+# Use env vars from devcontainer.json, with fallback for manual execution
+SCRIPT_DIR="${DEVCONTAINER_SCRIPTS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+
+# Create log directory if it doesn't exist
+LOG_DIR="$PROJECT_ROOT/.devcontainer/.log"
+mkdir -p "$LOG_DIR"
+
 # Set up logging
-LOGFILE="/tmp/cli_tools_install.log"
+LOGFILE="$LOG_DIR/cli_tools_install.log"
 exec 1> >(tee -a "$LOGFILE") 2>&1
 
 function log() {

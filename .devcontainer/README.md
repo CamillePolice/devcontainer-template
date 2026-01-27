@@ -30,18 +30,43 @@
    code .
    ```
 
-2. **Launch Container**
+2. **Configure Your Environment**
+
+   - Review environment variables in `devcontainer.json`:
+     - Set `PROJECT_NAME` to your project name
+     - Toggle features (`USE_CLAUDE_CODE`, `USE_GIT_PROMPT`, etc.)
+     - See [Environment Variables](scripts/docs/environment-variables.md) for details
+
+   - Create project-specific configurations (optional):
+     ```bash
+     # Copy example files to create your own configs
+     cp .devcontainer/.vscode/config/launch.json.example .devcontainer/.vscode/config/launch.json
+     cp .devcontainer/.vscode/git/.pre-commit-config.yaml.example .devcontainer/.vscode/git/.pre-commit-config.yaml
+     ```
+
+3. **Launch Container**
 
    - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
    - Select **"Dev Containers: Reopen in Container"**
    - ☕ Grab coffee while it builds (first time only)
 
-3. **Start Developing**
+4. **Start Developing**
 
    ```bash
    # All services start automatically!
    # Check the terminal for service URLs
    ```
+
+5. **Customize CLAUDE.md** (Optional but Recommended)
+
+   After container creation, a `CLAUDE.md` template is automatically created at your project root. Customize it with your project details to help Claude Code understand your codebase better:
+
+   ```bash
+   # Edit CLAUDE.md with your project information
+   vim CLAUDE.md
+   ```
+
+   This file serves as both documentation and context for Claude Code.
 
 ---
 
@@ -55,13 +80,23 @@
 ├── 🔧 bin/                   # Binary tools (php-cs-fixer, etc.)
 ├── 📋 linter-conf/           # Linter configuration files
 └── 📜 scripts/               # Initialization and utility scripts
-    ├── post_create.sh        # Runs once after container creation
-    ├── init_env.sh           # Runs on every container start
-    ├── start_docker.sh       # Starts Docker Compose services
-    ├── configure_git_prompt.sh   # Oh My Zsh + Starship prompt setup
-    ├── install_cli_tools.sh      # Modern CLI tools (fzf, ripgrep, etc.)
-    └── docker_autocomplete.sh    # Docker bash/zsh completion
+    ├── lifecycle/            # Container lifecycle hooks
+    │   ├── post_create.sh        # Runs once after container creation
+    │   ├── init_env.sh           # Runs on every container start
+    │   └── start_docker.sh       # Starts Docker Compose services
+    ├── setup/                # One-time setup scripts
+    │   ├── install_claude_code.sh    # Claude Code CLI installation
+    │   ├── configure_claude.sh       # Claude Code configuration
+    │   ├── configure_git_prompt.sh   # Oh My Zsh + Starship setup
+    │   └── install_cli_tools.sh      # Modern CLI tools installation
+    ├── config/               # Configuration scripts
+    │   └── docker_autocomplete.sh    # Docker bash/zsh completion
+    ├── tests/                # Test scripts
+    ├── docs/                 # Script documentation
+    └── INDEX.md              # Scripts quick reference
 ```
+
+> 📚 **Scripts Documentation**: See [scripts/INDEX.md](scripts/INDEX.md) for detailed script documentation and [scripts/docs/](scripts/docs/) for specific guides.
 
 ---
 
@@ -84,6 +119,11 @@
 | `REMOTE_CONTAINERS` | Set to `true` when running in devcontainer |
 | `DEVCONTAINER` | Set to `true` when running in devcontainer |
 | `TZ` | Timezone (Europe/Paris) |
+| `USE_CLAUDE_CODE` | Enable Claude Code integration (`true`/`false`) |
+| `USE_CLAUDE` | Enable Claude Code direct repository copy (`true`/`false`) |
+| `USE_CLAUDE_MARKETPLACE` | Enable Claude Code plugin marketplace (`true`/`false`) |
+| `USE_GIT_PROMPT` | Enable Oh My Zsh + Starship prompt (`true`/`false`) |
+| `USE_DOCKER_AUTOCOMPLETE` | Enable Docker autocomplete (`true`/`false`) |
 
 ### 🔌 Forwarded Ports
 
@@ -114,6 +154,7 @@
 - ✅ Installs Angular CLI and build tools
 - ✅ Builds Docker base images
 - ✅ Generates SSL keys
+- ✅ Configures Claude Code (if enabled)
 
 ### ⚡ `init_env.sh` (runs on every start)
 
@@ -132,552 +173,126 @@
 
 ---
 
-## 🛠️ Installed Tools
+## 📜 Scripts Organization
 
-### 🎨 Shell Environment
+The devcontainer uses an organized script structure for better maintainability. All scripts are located in `.devcontainer/scripts/` with the following organization:
 
-| Tool | Description |
-|------|-------------|
-| **Oh My Zsh** | Enhanced shell framework |
-| **Starship** | Fast, customizable, cross-shell prompt (written in Rust) |
-| **Plugins** | git, docker, docker-compose, node, npm, zsh-autosuggestions, zsh-syntax-highlighting |
+### Directory Structure
 
-#### 🚀 Starship Prompt
-
-Starship provides a minimal, fast, and customizable prompt that shows:
-
-- 📁 Current directory (smart truncation)
-- 🌿 Git branch and status (ahead/behind, modified, staged, untracked)
-- 🐳 Docker context (when relevant)
-- 💻 Language versions (Node.js, PHP, Python, Go, Rust) - only when in project
-- ⏱️ Command execution time (for commands > 500ms)
-- ❌ Error status on command failure
-
-**Configuration**: `~/.config/starship.toml`
-
-**Useful commands**:
-```bash
-starship explain    # Show what each prompt segment means
-starship timings    # Show how long each module takes to render
+```
+scripts/
+├── lifecycle/           # Container lifecycle hooks
+│   ├── post_create.sh       # One-time setup (container creation)
+│   ├── init_env.sh          # Environment refresh (every start)
+│   └── start_docker.sh      # Docker Compose startup
+│
+├── setup/               # One-time setup scripts
+│   ├── install_claude_code.sh   # Claude Code CLI installation
+│   ├── configure_claude.sh      # Claude Code configuration
+│   ├── configure_git_prompt.sh  # Oh My Zsh + Starship setup
+│   ├── configure_vscode.sh      # VS Code environment setup
+│   └── install_cli_tools.sh     # Modern CLI tools installation
+│
+├── config/              # Configuration scripts
+│   └── docker_autocomplete.sh   # Docker bash/zsh completion
+│
+├── tests/               # Test scripts
+├── docs/                # Detailed documentation
+└── INDEX.md             # Quick reference guide
 ```
 
-### ⚡ Modern CLI Tools
+### Script Control Variables
 
-| Tool | Description | Alias |
-|------|-------------|-------|
-| 📂 `eza` | Modern ls replacement with git integration | `ls` → `eza` |
-| 🔍 `fzf` | Fuzzy finder | - |
-| 🔎 `ripgrep` | Fast grep replacement | `rgrep` → `rg` |
-| 🦇 `bat` | Better cat with syntax highlighting | `cat` → `bat` |
-| 📁 `fd-find` | Better find replacement | `ffind` → `fd` |
-| 🚀 `zoxide` | Smart directory jumping | `cd` → `z` |
-| 🌐 `httpie` | Modern HTTP client | `http` |
-| 📖 `tldr` | Simplified man pages | `help` |
+All scripts can be individually controlled via environment variables in `devcontainer.json`:
 
-### ⌨️ Aliases
+| Variable | Controls | Default |
+|----------|----------|---------|
+| `USE_CLAUDE_CODE` | Master toggle for Claude Code CLI installation and integration | `true` |
+| `CLAUDE_CODE_CHANNEL` | Claude Code release channel or version (`latest`, `stable`, or version number) | `latest` |
+| `USE_CLAUDE` | Direct repository copy to `.claude/` folder | `true` |
+| `USE_CLAUDE_MARKETPLACE` | Plugin marketplace setup in `~/.claude/settings.json` | `true` |
+| `USE_GIT_PROMPT` | Oh My Zsh and Starship prompt installation | `true` |
+| `USE_DOCKER_AUTOCOMPLETE` | Docker and Docker Compose autocomplete | `true` |
+| `USE_VSCODE_CONFIG` | VS Code settings, tasks, extensions configuration | `true` |
 
-#### 📂 File Listing (eza)
+### Log Files
 
-```bash
-ls    → eza                    # Modern ls with colors
-ll    → eza -lah --git         # Long listing with git status
-lt    → eza --tree --level=2   # Tree view (2 levels)
-```
+All scripts log their output to `.devcontainer/.log/` for troubleshooting:
 
-#### 🔀 Git Shortcuts
+| Script | Log File |
+|--------|----------|
+| `post_create.sh` | `.devcontainer/.log/project_init.log` |
+| `init_env.sh` | `.devcontainer/.log/project_init_env.log` |
+| `start_docker.sh` | `.devcontainer/.log/project_docker_startup.log` |
+| `install_claude_code.sh` | `.devcontainer/.log/claude_code_install.log` |
+| `configure_claude.sh` | `.devcontainer/.log/claude_config.log` |
+| `configure_vscode.sh` | `.devcontainer/.log/vscode_config.log` |
+| `configure_git_prompt.sh` | `.devcontainer/.log/configure_git_prompt.log` |
+| `install_cli_tools.sh` | `.devcontainer/.log/cli_tools_install.log` |
+| `docker_autocomplete.sh` | `.devcontainer/.log/docker_autocomplete.log` |
 
-```bash
-gs    → git status
-gd    → git diff
-gl    → git log --oneline --graph --decorate
-ga    → git add
-gc    → git commit
-gp    → git push
-gco   → git checkout
-gb    → git branch
-```
+### Manual Execution
 
-#### 🐳 Docker Shortcuts
+Scripts can be run manually when needed:
 
 ```bash
-dps   → docker ps
-dpa   → docker ps -a
-di    → docker images
-dex   → docker exec -it
-dc    → docker-compose
-dcu   → docker-compose up
-dcd   → docker-compose down
-dcb   → docker-compose build
-dcl   → docker-compose logs
+# Re-initialize environment
+.devcontainer/scripts/lifecycle/init_env.sh
+
+# Re-configure Claude Code
+.devcontainer/scripts/setup/configure_claude.sh
+
+# With environment variables
+USE_CLAUDE=true .devcontainer/scripts/setup/configure_claude.sh
 ```
+
+### Testing Installation
+
+Verify your devcontainer setup with the automated test suite:
+
+```bash
+# Full test suite (recommended)
+bash .devcontainer/scripts/tests/run_tests.sh
+
+# Quick health check
+bash .devcontainer/scripts/tests/quick_test.sh
+```
+
+**Test Results:**
+- ✓ **Pass** - Feature installed and working
+- ✗ **Fail** - Feature expected but not found
+- ⊘ **Skip** - Feature disabled (intentional)
+- ⚠ **Warn** - Optional or non-critical issue
+
+See **[Test Suite Documentation](scripts/tests/README.md)** for details.
+
+### Documentation
+
+- **[scripts/INDEX.md](scripts/INDEX.md)** - Quick reference guide
+- **[scripts/docs/](scripts/docs/)** - Detailed documentation for specific scripts
+- **[scripts/tests/](scripts/tests/)** - Test suite documentation
 
 ---
 
-## 🧩 VS Code Extensions
-
-Extensions are automatically installed when opening the container:
-
-### 🤖 AI & Productivity
-
-| Extension | Description |
-|-----------|-------------|
-| **Claude Code** | Official Anthropic AI coding assistant |
-
-### ✨ Code Quality
-
-| Extension | Description |
-|-----------|-------------|
-| Prettier | Code formatter |
-| ESLint | JavaScript linter |
-| EditorConfig | Consistent coding styles |
-| Code Spell Checker | Spelling checker |
-
-### 🔀 Git
-
-| Extension | Description |
-|-----------|-------------|
-| GitLens | Git supercharged |
-| Git Graph | Visual git history |
-
-### 🐳 Docker & DevOps
-
-| Extension | Description |
-|-----------|-------------|
-| Docker | Container management |
-| Remote Containers | Dev container support |
-| Remote SSH | SSH development |
-
-### 🔧 Utilities
-
-| Extension | Description |
-|-----------|-------------|
-| Path Intellisense | Autocomplete paths |
-| Auto Rename Tag | Sync HTML/XML tags |
-| Todo Tree | Track TODO comments |
-| Better Comments | Annotated comments |
-| Error Lens | Inline error display |
-| Material Icon Theme | File icons |
-
-### 📝 Documentation
-
-| Extension | Description |
-|-----------|-------------|
-| Markdown All in One | Markdown toolkit |
-| Markdown Mermaid | Diagram support |
-| YAML | YAML language support |
-| REST Client | API testing |
-
-### 📦 Extension Installation by Stack
-
-> Install extensions based on your project's tech stack automatically
-
-The `install_by_stack.sh` script provides smart, stack-based extension installation:
-
-```bash
-# Run from project root
-.vscode/extensions/install_by_stack.sh [stack1] [stack2] ...
-```
-
-#### Available Stacks
-
-| Stack | Description | Detection |
-|-------|-------------|-----------|
-| `base` | Base extensions (always included) | Always |
-| `angular` | Angular development extensions | `angular.json` |
-| `vue` | Vue.js development extensions | `vue.config.js` or package.json |
-| `react` | React development extensions | package.json (no Next.js) |
-| `nextjs` | Next.js development extensions | `next.config.js` |
-| `symfony` | Symfony/PHP development extensions | `symfony.lock` or `composer.json` |
-| `go` | Go development extensions | `go.mod` |
-| `all` | All available extensions | Manual |
-
-#### Usage Examples
-
-```bash
-# Automatic detection (recommended)
-.vscode/extensions/install_by_stack.sh
-
-# Install specific stacks
-.vscode/extensions/install_by_stack.sh angular symfony
-
-# Install all extensions
-.vscode/extensions/install_by_stack.sh all
-
-# Show help
-.vscode/extensions/install_by_stack.sh --help
-```
-
-#### Features
-
-- ✅ **Automatic detection**: Detects project type from config files
-- ✅ **Skip installed**: Won't reinstall already present extensions
-- ✅ **Progress tracking**: Shows installation progress with colors
-- ✅ **Summary report**: Displays installed/skipped/failed counts
-
----
-
-## 🤖 AI Agent Skills
-
-> Enhance your AI coding assistants with reusable capabilities from [Skills.sh](https://skills.sh)
-
-Skills are reusable capabilities for AI agents that provide procedural knowledge and best practices. They work with **Cursor**, GitHub Copilot, Claude Code, and many other AI assistants.
-
-### 🚀 Installation
-
-Install skills with a single command:
-
-```bash
-npx skills add <owner/repo>
-```
-
-### ⭐ Recommended Skills
-
-#### 🎨 Frontend Development
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| **React Best Practices** | `npx skills add vercel-labs/agent-skills` | Vercel's React patterns and conventions |
-| **Web Design Guidelines** | `npx skills add vercel-labs/agent-skills` | Modern web design principles |
-| **Tailwind Setup** | `npx skills add expo/skills` | Tailwind CSS configuration |
-| **UI/UX Pro Max** | `npx skills add nextlevelbuilder/ui-ux-pro-max-skill` | Advanced UI/UX patterns |
-
-#### 🔧 Backend & APIs
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| **Better Auth** | `npx skills add better-auth/skills` | Authentication best practices |
-| **NestJS** | `npx skills add Kadajett/agent-nestjs-skills` | NestJS patterns and conventions |
-| **Stripe Integration** | `npx skills add anthropics/claude-plugins-official` | Payment integration patterns |
-
-#### 🧪 Testing & Quality
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| **Test-Driven Development** | `npx skills add obra/superpowers` | TDD methodology |
-| **Webapp Testing** | `npx skills add anthropics/skills` | Web application testing |
-| **Systematic Debugging** | `npx skills add obra/superpowers` | Debugging methodologies |
-
-#### 📝 Documentation & Workflow
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| **Skill Creator** | `npx skills add anthropics/skills` | Create your own skills |
-| **PDF Generation** | `npx skills add anthropics/skills` | PDF document handling |
-| **Doc Co-authoring** | `npx skills add anthropics/skills` | Collaborative documentation |
-
-#### 🚀 DevOps & Deployment
-
-| Skill | Command | Description |
-|-------|---------|-------------|
-| **CI/CD Workflows** | `npx skills add expo/skills` | CI/CD pipeline patterns |
-| **Deployment** | `npx skills add expo/skills` | Deployment strategies |
-
-### 💡 Usage Examples
-
-```bash
-# Install React best practices for your project
-npx skills add vercel-labs/agent-skills
-
-# Install testing superpowers
-npx skills add obra/superpowers
-
-# Install authentication patterns
-npx skills add better-auth/skills
-```
-
-### 🎯 Compatible Agents
-
-Skills work with these AI coding assistants:
-
-| Agent | Support | Note |
-|-------|---------|------|
-| 🧠 **Claude Code** | ✅ Full support | **Primary agent** |
-| 🖱️ **Cursor** | ✅ Full support | |
-| 🤖 **GitHub Copilot** | ✅ Full support | |
-| 💎 **Gemini** | ✅ Full support | |
-| 🌊 **Windsurf** | ✅ Full support | |
-| 🦆 **Goose** | ✅ Full support | |
-
-### 📚 More Information
-
-- 🌐 **Website**: [skills.sh](https://skills.sh)
-- 📖 **Documentation**: [skills.sh/docs](https://skills.sh)
-- 🏆 **Leaderboard**: Browse trending skills on the homepage
-
----
-
-## 📂 `.vscode` Folder
-
-The `.vscode` folder contains VS Code workspace configuration:
-
-```
-.vscode/
-├── 📁 config/
-│   ├── tasks.json              # Build and utility tasks
-│   └── launch.json.example     # Debug configurations template
-├── 📁 extensions/              # Extension management by stack
-│   ├── install_by_stack.sh     # Stack-based extension installer
-│   ├── extensions.json         # Base extensions
-│   ├── angular/extensions.json # Angular-specific extensions
-│   ├── symfony/extensions.json # Symfony/PHP extensions
-│   └── go/extensions.json      # Go extensions
-├── 📁 git/
-│   └── .pre-commit-config.yaml.example
-├── 📁 linting/                 # Linter configurations
-├── 📁 profiles/                # VS Code profiles
-│   ├── CamilleP (Dark).code-profile
-│   └── CamilleP (Light).code-profile
-└── 📄 extensions.json          # Recommended extensions
-```
-
-### ⚡ Tasks (`tasks.json`)
-
-| Task | Description | Trigger |
-|------|-------------|---------|
-| 🔧 **Init env** | Initialize environment | On folder open |
-| 🐳 **Start docker** | Start Docker services | On folder open (after Init env) |
-| 🧹 **Clean Zone.Identifier** | Remove Windows WSL artifacts | Manual |
-
-### 🐛 Debug Configurations (`launch.json.example`)
-
-Pre-configured debug profiles for:
-
-| Configuration | Description |
-|---------------|-------------|
-| 🔧 **Xdebug (Main API)** | PHP debugging on port 9003 |
-| 🔧 **Xdebug (Historic API)** | PHP debugging on port 9004 |
-| 🌐 **Chrome/Edge/Firefox** | Frontend debugging |
-| 🧪 **Angular Tests** | Test debugging |
-| 🎯 **Full Stack** | Combined debugging |
-
----
-
-## 📋 Pre-commit Hooks
-
-> Automated code quality checks that run before each commit
-
-### 🚀 Setup
-
-1. **Copy the example configuration**
-
-   ```bash
-   cp .vscode/git/.pre-commit-config.yaml.example .pre-commit-config.yaml
-   ```
-
-2. **Install pre-commit** (automatically done by `init_env.sh`)
-
-   ```bash
-   pip install pre-commit
-   pre-commit install
-   ```
-
-3. **Install commit-msg hook** (for commit message validation)
-
-   ```bash
-   pre-commit install --hook-type commit-msg
-   ```
-
-### 🔧 Available Hooks
-
-#### 🐘 PHP Backend (Main API)
-
-| Hook | Stage | Description |
-|------|-------|-------------|
-| 🔍 `phpstan-main` | pre-commit | Static analysis with PHPStan |
-| 🎨 `php-cs-fixer-main` | pre-commit | Code style fixing |
-| 🚀 `rector-fix-main` | pre-commit | Code modernization |
-| ✅ `phpstan-validate-main` | pre-commit | Final PHPStan validation |
-
-#### 📊 PHP Backend (Historic API)
-
-| Hook | Stage | Description |
-|------|-------|-------------|
-| 🔍 `phpstan-historic` | pre-commit | Static analysis with PHPStan |
-| 🎨 `php-cs-fixer-historic` | pre-commit | Code style fixing |
-| 🚀 `rector-fix-historic` | pre-commit | Code modernization |
-| ✅ `phpstan-validate-historic` | pre-commit | Final PHPStan validation |
-
-#### 🎨 Angular Frontend
-
-| Hook | Stage | Description |
-|------|-------|-------------|
-| 🔧 `eslint-angular` | pre-commit | ESLint with auto-fix |
-| 🎨 `prettier-angular` | pre-commit | Code formatting |
-| 🏗️ `ng-build-check` | pre-commit | Angular build verification |
-| 📝 `tsc-angular` | pre-commit | TypeScript type checking |
-
-#### ✅ Validation Hooks
-
-| Hook | Stage | Description |
-|------|-------|-------------|
-| 📝 `commit-msg-format` | commit-msg | Validates commit message format |
-| 🌿 `branch-name-format` | pre-commit | Validates branch naming convention |
-
-### 📝 Commit Message Format
-
-Valid formats:
-
-```bash
-# Standard format
-OPV-[task_number]([commit_type]): message
-
-# With ticket reference
-OPV-[task_number]_Ticket-[ticket_number]([commit_type]): message
-
-# Version release
-Version [X.X.X]
-
-# Merge commits
-Merge branch 'opv_[task]-[desc]' into opv_[task]-[desc]
-```
-
-**Examples:**
-
-```bash
-OPV-123(feat): add new login feature
-OPV-456(fix): resolve authentication bug
-OPV-123_Ticket-789(feat): add new login feature
-Version [1.2.3]
-```
-
-**Commit types:** `feat`, `fix`, `docs`, `style`, `refactor`, `test`, `chore`
-
-### 🌿 Branch Naming Convention
-
-Valid formats:
-
-```bash
-# Standard format
-opv_[task_number]-[description]
-
-# With ticket reference
-opv_[task_number]-ticket_[ticket_number]-[description]
-
-# Protected branches
-main, master, develop, staging
-```
-
-**Examples:**
-
-```bash
-opv_123-user_authentication
-opv_123-ticket_456-login_page
-opv_789-fix-login-bug
-```
-
-### ⚡ Smart Execution
-
-All hooks include **smart file detection**:
-
-- ✅ Only run when relevant files are changed
-- ✅ Skip automatically if project not found
-- ✅ Skip if dependencies not installed
-- ✅ Auto-fix issues when possible
-
-**Example output:**
-
-```
-🔍 Running PHPStan static analysis (Main API)...
-ℹ️  No Main API project files changed - skipping PHPStan
-
-🔧 Running ESLint (Angular)...
-🔧 Attempting to fix ESLint issues automatically...
-✅ ESLint passed (Angular)!
-```
-
-### 🔄 Manual Execution
-
-```bash
-# Run all hooks on all files
-pre-commit run --all-files
-
-# Run specific hook
-pre-commit run phpstan-main --all-files
-
-# Run only on staged files
-pre-commit run
-
-# Skip hooks temporarily (use with caution!)
-git commit --no-verify -m "OPV-123(wip): work in progress"
-```
-
----
-
-## ⚙️ Customization
-
-### 🌍 Adding Environment Variables
-
-Edit `containerEnv` in `devcontainer.json`:
-
-```json
-"containerEnv": {
-    "MY_VARIABLE": "value"
-}
-```
-
-### 🧩 Adding VS Code Extensions
-
-Add extension IDs to the `extensions` array in `devcontainer.json`.
-
-### 🐳 Modifying the Container Image
-
-Edit the `Dockerfile` and rebuild the container.
-
-### 📜 Adding Initialization Steps
-
-Modify `post_create.sh` (one-time setup) or `init_env.sh` (every start).
-
----
-
-## 🆘 Troubleshooting
-
-### 🐳 Container won't start
-
-1. Check Docker is running
-2. Try rebuilding: `Ctrl+Shift+P` → **"Dev Containers: Rebuild Container"**
-
-### 🔑 SSH keys not working
-
-1. Ensure `~/.ssh` exists on host
-2. Check permissions: `chmod 600 ~/.ssh/*`
-
-### 🧩 Extensions not installing
-
-1. Rebuild the container
-2. Check extension IDs are correct in `devcontainer.json`
-
-### 📜 Scripts failing
-
-Check logs in `/tmp/`:
-
-| Log File | Script |
-|----------|--------|
-| `/tmp/project_init.log` | post_create.sh |
-| `/tmp/project_init_env.log` | init_env.sh |
-| `/tmp/project_docker_startup.log` | start_docker.sh |
-
----
-
-## 🎯 Key Benefits
-
-### 🔒 Consistent Environment
-
-- Same setup across all team members
-- No more "works on my machine" issues
-- Isolated from host system
-
-### ⚡ Blazing Fast Development
-
-- Hot reload for all services
-- Optimized Docker layers
-- Cached dependencies
-
-### 🎨 Developer Experience
-
-- Rich VS Code integration
-- Intelligent autocomplete
-- Integrated debugging tools
-- Modern shell with beautiful prompt
+## 📚 Additional Documentation
+
+For detailed information on specific topics, see:
+
+- **[Installed Tools](docs/installed-tools.md)** - Shell environment, CLI tools, and aliases
+- **[VS Code Extensions](docs/vscode-extensions.md)** - Extensions and stack-based installation
+- **[AI Agent Skills](docs/ai-skills.md)** - Enhance your AI coding assistants
+- **[Claude Code Configuration](docs/claude-code.md)** - Comprehensive Claude Code setup
+- **[VS Code Configuration](docs/vscode-config.md)** - Tasks, debug configs, and profiles
+- **[Pre-commit Hooks](docs/pre-commit-hooks.md)** - Automated code quality checks
+- **[Customization](docs/customization.md)** - Customize your devcontainer
+- **[Troubleshooting](docs/troubleshooting.md)** - Common issues and solutions
+
+**Script-Specific Documentation:**
+
+- **[Claude Code CLI Installation](scripts/docs/install-claude-code.md)** - Installing and configuring Claude Code CLI
+- **[VS Code Configuration Script](scripts/docs/configure-vscode.md)** - Detailed workflow for launch.json and pre-commit configs
+- **[Environment Variables](scripts/docs/environment-variables.md)** - Complete variable reference
+- **[Script Best Practices](scripts/docs/best-practices.md)** - Script development guidelines
 
 ---
 

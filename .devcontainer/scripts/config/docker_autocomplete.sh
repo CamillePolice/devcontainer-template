@@ -1,12 +1,29 @@
 #!/bin/bash
 
+# Use env vars from devcontainer.json, with fallback for manual execution
+SCRIPT_DIR="${DEVCONTAINER_SCRIPTS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+
+# Check if docker autocomplete configuration is enabled
+USE_DOCKER_AUTOCOMPLETE="${USE_DOCKER_AUTOCOMPLETE:-true}"
+
+# Create log directory if it doesn't exist
+LOG_DIR="$PROJECT_ROOT/.devcontainer/.log"
+mkdir -p "$LOG_DIR"
+
 # Set up logging
-LOGFILE="/tmp/project_docker_autocomplete.log"
+LOGFILE="$LOG_DIR/docker_autocomplete.log"
 exec 1> >(tee -a "$LOGFILE") 2>&1
 
 function log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
+
+# Skip if disabled
+if [ "$USE_DOCKER_AUTOCOMPLETE" != "true" ]; then
+    log "Docker autocomplete configuration disabled (USE_DOCKER_AUTOCOMPLETE=false)"
+    exit 0
+fi
 
 log "=== Starting Docker autocomplete configuration script ==="
 

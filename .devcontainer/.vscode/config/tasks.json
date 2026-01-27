@@ -5,7 +5,7 @@
         {
             "label": "Init env",
             "type": "shell",
-            "command": ".devcontainer/scripts/init_env.sh",
+            "command": ".devcontainer/scripts/lifecycle/init_env.sh",
             "options": {
                 "cwd": "${workspaceFolder}"
             },
@@ -22,7 +22,7 @@
         {
             "label": "Start docker",
             "type": "shell",
-            "command": ".devcontainer/scripts/start_docker.sh",
+            "command": ".devcontainer/scripts/lifecycle/start_docker.sh",
             "options": {
                 "cwd": "${workspaceFolder}"
             },

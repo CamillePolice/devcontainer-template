@@ -1,9 +1,29 @@
 #!/bin/bash
 
+# Use env vars from devcontainer.json, with fallback for manual execution
+SCRIPT_DIR="${DEVCONTAINER_SCRIPTS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
+PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
+
+# Check if git prompt configuration is enabled
+USE_GIT_PROMPT="${USE_GIT_PROMPT:-true}"
+
+# Create log directory if it doesn't exist
+LOG_DIR="$PROJECT_ROOT/.devcontainer/.log"
+mkdir -p "$LOG_DIR"
+
 # Set up logging
+LOGFILE="$LOG_DIR/configure_git_prompt.log"
+exec 1> >(tee -a "$LOGFILE") 2>&1
+
 function log() {
     echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
+
+# Skip if disabled
+if [ "$USE_GIT_PROMPT" != "true" ]; then
+    log "Git prompt configuration disabled (USE_GIT_PROMPT=false)"
+    exit 0
+fi
 
 log "Starting Zsh and Starship installation and configuration..."
 

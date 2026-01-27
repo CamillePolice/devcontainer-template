@@ -1,11 +1,15 @@
 #!/bin/bash
 
 # Use env vars from devcontainer.json, with fallback for manual execution
-SCRIPT_DIR="${DEVCONTAINER_SCRIPTS:-$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)}"
+SCRIPT_DIR="${DEVCONTAINER_SCRIPTS:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
 PROJECT_ROOT="${PROJECT_ROOT:-$(cd "$SCRIPT_DIR/../.." && pwd)}"
 
+# Create log directory if it doesn't exist
+LOG_DIR="$PROJECT_ROOT/.devcontainer/.log"
+mkdir -p "$LOG_DIR"
+
 # Set up logging
-LOGFILE="/tmp/project_init_env.log"
+LOGFILE="$LOG_DIR/project_init_env.log"
 exec 1> >(tee -a "$LOGFILE") 2>&1
 
 function log() {
@@ -34,15 +38,15 @@ pip install pre-commit
 pre-commit install
 
 log "Configuring git prompt"
-if "$SCRIPT_DIR/configure_git_prompt.sh"; then
+if "$SCRIPT_DIR/setup/configure_git_prompt.sh"; then
     log "Successfully executed configure_git_prompt.sh script"
 else
     log "ERROR: Failed to execute configure_git_prompt.sh script"
     exit 1
 fi
 
-log "Installing CLI tools" 
-if "$SCRIPT_DIR/install_cli_tools.sh"; then
+log "Installing CLI tools"
+if "$SCRIPT_DIR/setup/install_cli_tools.sh"; then
     log "Successfully executed install_cli_tools.sh script"
 else
     log "ERROR: Failed to execute install_cli_tools.sh script"
@@ -50,16 +54,12 @@ else
 fi
 
 log "Configuring Docker autocomplete"
-if "$SCRIPT_DIR/docker_autocomplete.sh"; then
+if "$SCRIPT_DIR/config/docker_autocomplete.sh"; then
     log "Successfully executed docker_autocomplete.sh script"
 else
     log "ERROR: Failed to execute docker_autocomplete.sh script"
     exit 1
 fi
-
-log " Installation de angular cli et outils modernes"
-npm install -g @angular/cli@latest
-npm install -g @angular/devkit/build-angular@latest
 
 log "=== Environment initialization completed successfully $(date) ==="
 log "Log file available at: $LOGFILE"
