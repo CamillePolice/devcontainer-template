@@ -98,5 +98,7 @@
                 "humao.rest-client"
             ]
         }
-    }
+    },
+    // !! Set the default user for the container
+    "remoteUser": "vscode"
 }

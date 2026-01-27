@@ -45,9 +45,9 @@ set -x
 if [ "$USE_CLAUDE" = "true" ]; then
    log "=== Configuring Claude via direct repository copy ==="
    
-   # Skip if .claude folder already exists
-   if [ -d "$PROJECT_ROOT/.claude" ]; then
-      log ".claude folder already exists, skipping direct copy"
+   # Skip if .claude folder already exists AND has content
+   if [ -d "$PROJECT_ROOT/.claude" ] && [ "$(ls -A $PROJECT_ROOT/.claude 2>/dev/null)" ]; then
+      log ".claude folder already exists with content, skipping direct copy"
    else
       # Create temporary directory for cloning
       TEMP_DIR=$(mktemp -d)

@@ -16,49 +16,41 @@ function log() {
    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
-log "=== Starting Project environment initialization script ==="
+log "=== Starting Project environment initialization script (runs on every start) ==="
 
 # Enable debug mode
 set -x
 
-log "Create .ssh directory"
-mkdir -p /home/vscode/.ssh
+# Tasks that should run on every container start
+# These are lightweight and ensure the environment is correctly configured
 
-log "Copy .ssh directory from host"
-cp -r /home/vscode/.sshhost/* /home/vscode/.ssh/
-chmod -R 600 /home/vscode/.ssh/*
+log "Refreshing SSH directory from host (in case keys changed)"
+mkdir -p /home/vscode/.ssh
+if [ -d /home/vscode/.sshhost ] && [ "$(ls -A /home/vscode/.sshhost 2>/dev/null)" ]; then
+    # Only copy if source is newer or missing in target
+    rsync -au /home/vscode/.sshhost/ /home/vscode/.ssh/ 2>/dev/null || cp -ru /home/vscode/.sshhost/* /home/vscode/.ssh/ 2>/dev/null || log "Warning: Could not sync SSH files"
+    chmod -R 600 /home/vscode/.ssh/* 2>/dev/null || log "Warning: Could not set SSH permissions"
+else
+    log "No SSH files to sync"
+fi
 
 log "Setting up git config"
 git config --global pull.rebase true
 git config --global core.editor "cursor --wait"
 git config --global push.autoSetupRemote true
 
-log "Installing pre-commit"
-pip install pre-commit
-pre-commit install
-
-log "Configuring git prompt"
-if "$SCRIPT_DIR/setup/configure_git_prompt.sh"; then
-    log "Successfully executed configure_git_prompt.sh script"
+log "Ensuring pre-commit is installed in current project"
+if [ -f "$PROJECT_ROOT/.pre-commit-config.yaml" ]; then
+    log "Pre-commit config found, ensuring hooks are installed"
+    if command -v pre-commit &> /dev/null; then
+        pre-commit install 2>/dev/null || log "Warning: Could not install pre-commit hooks"
+    else
+        log "Warning: pre-commit not found, installing via pip"
+        pip install pre-commit --quiet
+        pre-commit install 2>/dev/null || log "Warning: Could not install pre-commit hooks"
+    fi
 else
-    log "ERROR: Failed to execute configure_git_prompt.sh script"
-    exit 1
-fi
-
-log "Installing CLI tools"
-if "$SCRIPT_DIR/setup/install_cli_tools.sh"; then
-    log "Successfully executed install_cli_tools.sh script"
-else
-    log "ERROR: Failed to execute install_cli_tools.sh script"
-    exit 1
-fi
-
-log "Configuring Docker autocomplete"
-if "$SCRIPT_DIR/config/docker_autocomplete.sh"; then
-    log "Successfully executed docker_autocomplete.sh script"
-else
-    log "ERROR: Failed to execute docker_autocomplete.sh script"
-    exit 1
+    log "No .pre-commit-config.yaml found, skipping pre-commit setup"
 fi
 
 log "=== Environment initialization completed successfully $(date) ==="

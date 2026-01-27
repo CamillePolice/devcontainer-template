@@ -27,7 +27,17 @@ log "Attempting to install CLI tools via apt..."
 if sudo -n true 2>/dev/null; then
     log "Sudo available without password, installing apt packages..."
     sudo apt update
-    sudo apt install -y fzf ripgrep bat fd-find httpie tldr
+    # Install packages individually to avoid failing on missing packages
+    for pkg in fzf ripgrep bat fd-find httpie; do
+        sudo apt install -y "$pkg" || log "Warning: Could not install $pkg"
+    done
+    
+    # Try to install tldr, but don't fail if it's not available
+    if sudo apt install -y tldr 2>/dev/null; then
+        log "Successfully installed tldr"
+    else
+        log "Warning: tldr package not available in repositories, skipping"
+    fi
     
     # Install eza from official repository (not in default Ubuntu repos)
     log "Adding eza repository..."
@@ -45,19 +55,37 @@ if sudo -n true 2>/dev/null; then
         log "Successfully created bat symlink"
     fi
     
-    # Update tldr database
+    # Update tldr database if installed via apt
     if command -v tldr &> /dev/null; then
         tldr --update || true
     fi
 else
     log "Sudo requires password - skipping apt packages"
     log "Run this script with sudo access, or install manually:"
-    log "  sudo apt install -y fzf ripgrep bat fd-find httpie tldr"
+    log "  sudo apt install -y fzf ripgrep bat fd-find httpie"
     log "  # For eza, add the repository first:"
     log "  sudo mkdir -p /etc/apt/keyrings"
     log "  wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg"
     log "  echo \"deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main\" | sudo tee /etc/apt/sources.list.d/gierens.list"
     log "  sudo apt update && sudo apt install -y eza"
+fi
+
+# Install tldr via npm if not already installed (fallback from apt)
+log "Installing tldr via npm..."
+if ! command -v tldr &> /dev/null; then
+    if command -v npm &> /dev/null; then
+        if npm install -g tldr; then
+            log "Successfully installed tldr via npm"
+            # Update tldr cache
+            tldr --update 2>/dev/null || log "Note: Run 'tldr --update' to download the cache"
+        else
+            log "Warning: Failed to install tldr via npm"
+        fi
+    else
+        log "Warning: npm not found, skipping tldr installation"
+    fi
+else
+    log "tldr already installed"
 fi
 
 # Install zoxide (works without sudo)
@@ -147,3 +175,6 @@ command -v fd &> /dev/null || command -v fdfind &> /dev/null && log "  - fd (bet
 command -v eza &> /dev/null && log "  - eza (better ls)"
 command -v http &> /dev/null && log "  - httpie (better curl)"
 command -v tldr &> /dev/null && log "  - tldr (simplified man pages)"
+
+# Ensure the script exits successfully
+exit 0

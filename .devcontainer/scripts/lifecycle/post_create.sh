@@ -32,15 +32,25 @@ set -x
 
 log "Create .ssh directory"
 mkdir -p /home/vscode/.ssh
-sudo chown vscode:vscode -R /commandhistory
-touch /commandhistory/.bash_history
+
+# Only attempt chown if running as root or with sudo access
+if [ "$EUID" -eq 0 ] || sudo -n true 2>/dev/null; then
+    sudo chown -R vscode:vscode /commandhistory 2>/dev/null || log "Warning: Could not change ownership of /commandhistory"
+fi
+
+touch /commandhistory/.bash_history 2>/dev/null || log "Warning: Could not create /commandhistory/.bash_history"
 
 log "Create .bash_history file"
-echo /commandhistory/.bash_history_host >> /commandhistory/.bash_history
+echo /commandhistory/.bash_history_host >> /commandhistory/.bash_history 2>/dev/null || log "Warning: Could not write to bash_history"
 
 log "Copy .ssh directory from host"
-cp -r /home/vscode/.sshhost/* /home/vscode/.ssh/
-chmod -R 600 /home/vscode/.ssh/*
+# Check if source directory exists and has files
+if [ -d /home/vscode/.sshhost ] && [ "$(ls -A /home/vscode/.sshhost 2>/dev/null)" ]; then
+    cp -r /home/vscode/.sshhost/* /home/vscode/.ssh/ 2>/dev/null || log "Warning: Could not copy some SSH files"
+    chmod -R 600 /home/vscode/.ssh/* 2>/dev/null || log "Warning: Could not set SSH permissions"
+else
+    log "Warning: No SSH files found in /home/vscode/.sshhost"
+fi
 
 log "Create project status file"
 touch .devcontainer/scripts/project_status
