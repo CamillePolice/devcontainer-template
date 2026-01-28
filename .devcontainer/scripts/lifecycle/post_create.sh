@@ -104,6 +104,13 @@ else
     exit 1
 fi
 
+log "Installing Ollama local LLM"
+if "$SCRIPT_DIR/ollama/install_ollama.sh"; then
+    log "Successfully executed install_ollama.sh script"
+else
+    log "WARNING: Failed to execute install_ollama.sh script (non-critical)"
+fi
+
 log "Updating project status initialization to true"
 echo "project_status_initialization=true" > .devcontainer/scripts/project_status
 

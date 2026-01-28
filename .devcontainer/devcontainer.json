@@ -1,104 +1,122 @@
 // For format details, see https://aka.ms/devcontainer.json. For config options, see the
 // README at: https://github.com/devcontainers/templates/tree/main/src/php
 {
-    "name": "Project Example",
-    "build": {
-        "context": "..",
-        "dockerfile": "Dockerfile"
+  "name": "Project Example",
+  "build": {
+    "context": "..",
+    "dockerfile": "Dockerfile"
+  },
+  // !! Features to add to the dev container. More info: https://containers.dev/features.
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {
+      "version": "latest"
     },
-    // !! Features to add to the dev container. More info: https://containers.dev/features.
-    "features": {
-        "ghcr.io/devcontainers/features/git:1": {
-            "version": "latest"
-        },
-        "ghcr.io/devcontainers/features/python:1": {
-            "version": "3.14.2"
-        }
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.14.2"
+    }
+  },
+  // !! Use 'forwardPorts' to make a list of ports inside the container available locally.
+  "forwardPorts": [
+    8080,
+    8081,
+    11434
+  ],
+  "portsAttributes": {
+    "8080": {
+      "label": "Application",
+      "onAutoForward": "notify"
     },
-    // !! Use 'forwardPorts' to make a list of ports inside the container available locally.
-    "forwardPorts": [
-        8080,
-        8081
-    ],
-    "portsAttributes": {
-        "8080": {
-            "label": "Application",
-            "onAutoForward": "notify"
-        },
-        "8081": {
-            "label": "Service",
-            "onAutoForward": "silent"
-        }
+    "8081": {
+      "label": "Service",
+      "onAutoForward": "silent"
     },
-    "containerEnv": {
-        "REMOTE_CONTAINERS": "true",
-        "DEVCONTAINER": "true",
-        "DEBIAN_FRONTEND": "noninteractive",
-        "PROJECT_ROOT": "${containerWorkspaceFolder}",
-        "PROJECT_NAME": "PROJECT_NAME",
-        "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts",
-        "USE_CLAUDE": "true",
-        "USE_CLAUDE_MARKETPLACE": "true",
-        "USE_GIT_PROMPT": "true",
-        "USE_DOCKER_AUTOCOMPLETE": "true",
-        "USE_CLAUDE_CODE": "true",
-        "USE_VSCODE_CONFIG": "true",
-        "CLAUDE_CODE_CHANNEL": "latest"
-    },
-    // !! Share SSH keys and command history
-    "runArgs": [
-        "-e",
-        "TZ=Europe/Paris",
-        "--mount",
-        "type=volume,source=bash_history_volume,target=/commandhistory",
-        "--mount",
-        "type=bind,source=${localEnv:HOME}/.bash_history,target=/commandhistory/.bash_history_host",
-        "-e",
-        "HISTFILE=/commandhistory/.bash_history",
-        "--mount",
-        "type=bind,source=${localEnv:HOME}/.ssh,target=/home/vscode/.sshhost/"
-    ],
-    // !! Initialize environment
-    "postStartCommand": ".devcontainer/scripts/lifecycle/init_env.sh",
-    "postCreateCommand": ".devcontainer/scripts/lifecycle/post_create.sh",
-    // !! Generic extensions for development
-    "customizations": {
-        "vscode": {
-            "workspace": {
-                "filepath": "../.vscode/project.code-workspace"
-            },
-            "extensions": [
-                // AI & Productivity (Claude Code)
-                "Anthropic.claude-code",
-                // Code Quality
-                "esbenp.prettier-vscode",
-                "dbaeumer.vscode-eslint",
-                "editorconfig.editorconfig",
-                "streetsidesoftware.code-spell-checker",
-                // Git
-                "eamodio.gitlens",
-                "mhutchie.git-graph",
-                // Docker & DevOps
-                "ms-azuretools.vscode-docker",
-                "ms-vscode-remote.remote-containers",
-                "ms-vscode-remote.remote-ssh",
-                // Utilities
-                "christian-kohler.path-intellisense",
-                "formulahendry.auto-rename-tag",
-                "gruntfuggly.todo-tree",
-                "aaron-bond.better-comments",
-                "usernamehw.errorlens",
-                "pkief.material-icon-theme",
-                // Language Support
-                "redhat.vscode-yaml",
-                // Documentation
-                "yzhang.markdown-all-in-one",
-                "bierner.markdown-mermaid",
-                // REST Client
-                "humao.rest-client"
-            ]
-        }
-    },
-    // !! Set the default user for the container
-    "remoteUser": "vscode"
+    "11434": {
+      "label": "Ollama API",
+      "onAutoForward": "silent"
+    }
+  },
+  "containerEnv": {
+    "REMOTE_CONTAINERS": "true",
+    "DEVCONTAINER": "true",
+    "DEBIAN_FRONTEND": "noninteractive",
+    "PROJECT_ROOT": "${containerWorkspaceFolder}",
+    "PROJECT_NAME": "PROJECT_NAME",
+    "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts",
+    "USE_CLAUDE": "true",
+    "USE_CLAUDE_MARKETPLACE": "true",
+    "USE_GIT_PROMPT": "true",
+    "USE_DOCKER_AUTOCOMPLETE": "true",
+    "USE_CLAUDE_CODE": "true",
+    "USE_VSCODE_CONFIG": "true",
+    "CLAUDE_CODE_CHANNEL": "latest",
+    "USE_OLLAMA": "false",
+    "OLLAMA_REPO": "CamillePolice/ollama",
+    "OLLAMA_DEFAULT_MODEL": "qwen2.5-coder:7b",
+    "OLLAMA_GPU_ENABLED": "auto",
+    "OLLAMA_KEEP_ALIVE": "5m",
+    "OLLAMA_MEMORY_LIMIT": "8G"
+  },
+  // !! Share SSH keys and command history
+  "runArgs": [
+    "-e",
+    "TZ=Europe/Paris",
+    "--mount",
+    "type=volume,source=bash_history_volume,target=/commandhistory",
+    "--mount",
+    "type=bind,source=${localEnv:HOME}/.bash_history,target=/commandhistory/.bash_history_host",
+    "-e",
+    "HISTFILE=/commandhistory/.bash_history",
+    "--mount",
+    "type=bind,source=${localEnv:HOME}/.ssh,target=/home/vscode/.sshhost/",
+    // Audio passthrough (Linux with PulseAudio)
+    "-e",
+    "PULSE_SERVER=unix:${localEnv:XDG_RUNTIME_DIR}/pulse/native",
+    "--mount",
+    "type=bind,source=${localEnv:XDG_RUNTIME_DIR}/pulse/native,target=${localEnv:XDG_RUNTIME_DIR}/pulse/native",
+    "--mount",
+    "type=bind,source=${localEnv:HOME}/.config/pulse/cookie,target=/home/vscode/.config/pulse/cookie"
+  ],
+  // !! Initialize environment
+  "postStartCommand": ".devcontainer/scripts/lifecycle/init_env.sh",
+  "postCreateCommand": ".devcontainer/scripts/lifecycle/post_create.sh",
+  // !! Generic extensions for development
+  "customizations": {
+    "vscode": {
+      "workspace": {
+        "filepath": "../.vscode/project.code-workspace"
+      },
+      "extensions": [
+        // AI & Productivity (Claude Code)
+        "Anthropic.claude-code",
+        // Code Quality
+        "esbenp.prettier-vscode",
+        "dbaeumer.vscode-eslint",
+        "editorconfig.editorconfig",
+        "streetsidesoftware.code-spell-checker",
+        // Git
+        "eamodio.gitlens",
+        "mhutchie.git-graph",
+        // Docker & DevOps
+        "ms-azuretools.vscode-docker",
+        "ms-vscode-remote.remote-containers",
+        "ms-vscode-remote.remote-ssh",
+        // Utilities
+        "christian-kohler.path-intellisense",
+        "formulahendry.auto-rename-tag",
+        "gruntfuggly.todo-tree",
+        "aaron-bond.better-comments",
+        "usernamehw.errorlens",
+        "pkief.material-icon-theme",
+        // Language Support
+        "redhat.vscode-yaml",
+        // Documentation
+        "yzhang.markdown-all-in-one",
+        "bierner.markdown-mermaid",
+        // REST Client
+        "humao.rest-client"
+      ]
+    }
+  },
+  // !! Set the default user for the container
+  "remoteUser": "vscode"
 }
