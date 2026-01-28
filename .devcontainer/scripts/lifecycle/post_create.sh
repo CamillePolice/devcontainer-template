@@ -16,16 +16,14 @@ function log() {
    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
 }
 
+log "=== Starting Project initialization script ==="
+
+# Clean up status file on rebuild to ensure fresh installation
 PROJECT_STATUS_FILE=".devcontainer/scripts/project_status"
 if [ -f "$PROJECT_STATUS_FILE" ]; then
-    INIT_STATUS=$(grep "project_status_initialization" "$PROJECT_STATUS_FILE" | cut -d'=' -f2)
-    if [ "$INIT_STATUS" = "true" ]; then
-        log "Project already initialized. Skipping initialization."
-        exit 0
-    fi
+    log "Removing previous status file to ensure fresh installation"
+    rm -f "$PROJECT_STATUS_FILE"
 fi
-
-log "=== Starting Project initialization script ==="
 
 # Enable debug mode
 set -x

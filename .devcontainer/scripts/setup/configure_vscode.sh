@@ -49,15 +49,15 @@ if [ ! -d "$TARGET_VSCODE_DIR" ]; then
     mkdir -p "$TARGET_VSCODE_DIR"
 fi
 
-# Function to safely copy file, creating backup if target exists
-copy_with_backup() {
+# Function to safely copy file, skipping if target exists
+copy_if_not_exists() {
     local src="$1"
     local dest="$2"
     local file_name=$(basename "$src")
     
     if [ -f "$dest" ]; then
-        log "⚠️  File exists: $dest - creating backup"
-        cp "$dest" "$dest.backup.$(date +%Y%m%d_%H%M%S)"
+        log "ℹ️  File already exists, skipping: $file_name"
+        return 0
     fi
     
     cp "$src" "$dest"
@@ -84,7 +84,7 @@ copy_directory() {
 log ""
 log "📝 Copying VS Code settings..."
 if [ -f "$SOURCE_DIR/settings.json" ]; then
-    copy_with_backup "$SOURCE_DIR/settings.json" "$TARGET_VSCODE_DIR/settings.json"
+    copy_if_not_exists "$SOURCE_DIR/settings.json" "$TARGET_VSCODE_DIR/settings.json"
 else
     log "⚠️  settings.json not found in source directory"
 fi
@@ -93,7 +93,7 @@ fi
 log ""
 log "📋 Copying VS Code tasks..."
 if [ -f "$SOURCE_DIR/config/tasks.json" ]; then
-    copy_with_backup "$SOURCE_DIR/config/tasks.json" "$TARGET_VSCODE_DIR/tasks.json"
+    copy_if_not_exists "$SOURCE_DIR/config/tasks.json" "$TARGET_VSCODE_DIR/tasks.json"
 else
     log "⚠️  tasks.json not found in config directory"
 fi
@@ -103,7 +103,7 @@ log ""
 log "🐛 Copying debug configurations..."
 if [ -f "$SOURCE_DIR/config/launch.json" ]; then
     # User has created their own launch.json from the example
-    copy_with_backup "$SOURCE_DIR/config/launch.json" "$TARGET_VSCODE_DIR/launch.json"
+    copy_if_not_exists "$SOURCE_DIR/config/launch.json" "$TARGET_VSCODE_DIR/launch.json"
     log "✅ Using user-created launch.json"
 elif [ -f "$SOURCE_DIR/config/launch.json.example" ]; then
     log "ℹ️  Found launch.json.example only (no user-created launch.json)"
@@ -117,7 +117,7 @@ fi
 log ""
 log "🧩 Copying VS Code extensions recommendations..."
 if [ -f "$SOURCE_DIR/extensions/extensions.json" ]; then
-    copy_with_backup "$SOURCE_DIR/extensions/extensions.json" "$TARGET_VSCODE_DIR/extensions.json"
+    copy_if_not_exists "$SOURCE_DIR/extensions/extensions.json" "$TARGET_VSCODE_DIR/extensions.json"
 else
     log "⚠️  extensions.json not found in extensions directory"
 fi
@@ -127,19 +127,19 @@ log ""
 log "📏 Copying linting configuration files..."
 
 if [ -f "$SOURCE_DIR/linting/.editorconfig" ]; then
-    copy_with_backup "$SOURCE_DIR/linting/.editorconfig" "$PROJECT_ROOT/.editorconfig"
+    copy_if_not_exists "$SOURCE_DIR/linting/.editorconfig" "$PROJECT_ROOT/.editorconfig"
 else
     log "⚠️  .editorconfig not found in linting directory"
 fi
 
 if [ -f "$SOURCE_DIR/linting/.prettierrc" ]; then
-    copy_with_backup "$SOURCE_DIR/linting/.prettierrc" "$PROJECT_ROOT/.prettierrc"
+    copy_if_not_exists "$SOURCE_DIR/linting/.prettierrc" "$PROJECT_ROOT/.prettierrc"
 else
     log "⚠️  .prettierrc not found in linting directory"
 fi
 
 if [ -f "$SOURCE_DIR/linting/.prettierignore" ]; then
-    copy_with_backup "$SOURCE_DIR/linting/.prettierignore" "$PROJECT_ROOT/.prettierignore"
+    copy_if_not_exists "$SOURCE_DIR/linting/.prettierignore" "$PROJECT_ROOT/.prettierignore"
 else
     log "⚠️  .prettierignore not found in linting directory"
 fi
@@ -149,7 +149,7 @@ log ""
 log "🪝 Copying Git pre-commit configuration..."
 if [ -f "$SOURCE_DIR/git/.pre-commit-config.yaml" ]; then
     # User has created their own .pre-commit-config.yaml from the example
-    copy_with_backup "$SOURCE_DIR/git/.pre-commit-config.yaml" "$PROJECT_ROOT/.pre-commit-config.yaml"
+    copy_if_not_exists "$SOURCE_DIR/git/.pre-commit-config.yaml" "$PROJECT_ROOT/.pre-commit-config.yaml"
     log "✅ Using user-created .pre-commit-config.yaml"
 elif [ -f "$SOURCE_DIR/git/.pre-commit-config.yaml.example" ]; then
     # Only example file exists
@@ -165,18 +165,17 @@ else
     log "⚠️  No .pre-commit-config.yaml or .pre-commit-config.yaml.example found"
 fi
 
-# 7. Copy workspace file if it exists
+# 7. Copy workspace file to .vscode folder
 log ""
 log "📁 Copying VS Code workspace file..."
 WORKSPACE_FILENAME="${PROJECT_NAME}.code-workspace"
 if [ -f "$SOURCE_DIR/config/project.code-workspace" ]; then
-    # Workspace files typically stay in .devcontainer or are symlinked
-    # We'll create a symlink in the project root for convenience with PROJECT_NAME
-    if [ ! -f "$PROJECT_ROOT/$WORKSPACE_FILENAME" ] && [ ! -L "$PROJECT_ROOT/$WORKSPACE_FILENAME" ]; then
-        ln -s ".devcontainer/.vscode/config/project.code-workspace" "$PROJECT_ROOT/$WORKSPACE_FILENAME"
-        log "✅ Created symlink: $WORKSPACE_FILENAME"
+    # Copy workspace file to .vscode directory instead of project root
+    if [ ! -f "$TARGET_VSCODE_DIR/$WORKSPACE_FILENAME" ]; then
+        cp "$SOURCE_DIR/config/project.code-workspace" "$TARGET_VSCODE_DIR/$WORKSPACE_FILENAME"
+        log "✅ Copied workspace file to .vscode/$WORKSPACE_FILENAME"
     else
-        log "ℹ️  $WORKSPACE_FILENAME already exists in workspace root"
+        log "ℹ️  Workspace file already exists in .vscode/"
     fi
 else
     log "⚠️  project.code-workspace not found in config directory"

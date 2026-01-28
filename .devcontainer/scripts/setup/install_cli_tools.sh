@@ -31,14 +31,14 @@ if sudo -n true 2>/dev/null; then
     for pkg in fzf ripgrep bat fd-find httpie; do
         sudo apt install -y "$pkg" || log "Warning: Could not install $pkg"
     done
-    
+
     # Try to install tldr, but don't fail if it's not available
     if sudo apt install -y tldr 2>/dev/null; then
         log "Successfully installed tldr"
     else
         log "Warning: tldr package not available in repositories, skipping"
     fi
-    
+
     # Install eza from official repository (not in default Ubuntu repos)
     log "Adding eza repository..."
     sudo mkdir -p /etc/apt/keyrings
@@ -48,13 +48,13 @@ if sudo -n true 2>/dev/null; then
     sudo chmod 644 /etc/apt/sources.list.d/gierens.list
     sudo apt update
     sudo apt install -y eza
-    
+
     # Create bat symlink (Debian/Ubuntu installs it as batcat)
     if command -v batcat &> /dev/null && ! command -v bat &> /dev/null; then
         sudo ln -sf /usr/bin/batcat /usr/local/bin/bat
         log "Successfully created bat symlink"
     fi
-    
+
     # Update tldr database if installed via apt
     if command -v tldr &> /dev/null; then
         tldr --update || true
@@ -130,7 +130,7 @@ fi
 # Quick file editing with fzf
 if command -v fzf &> /dev/null; then
     alias v='vim $(fzf)'
-    
+
     # Custom function: vf - fuzzy find git files and open in vim
     function vf() {
         local file
@@ -140,7 +140,7 @@ if command -v fzf &> /dev/null; then
         file=$(git ls-files | fzf --preview "$preview_cmd" --preview-window=right:60%:wrap)
         [ -n "$file" ] && vim "$file"
     }
-    
+
     # Source fzf completions
     [ -f ~/.fzf.bash ] && source ~/.fzf.bash
     [ -f ~/.fzf.zsh ] && source ~/.fzf.zsh
