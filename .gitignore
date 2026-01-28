@@ -1,0 +1,82 @@
+# ====================================
+# Personal DevContainer Configuration
+# ====================================
+# These files are created by the devcontainer setup scripts
+# and should not be committed to avoid affecting other developers
+
+# Claude AI Configuration
+.claude/
+CLAUDE.md
+
+# VS Code Personal Settings
+.vscode/
+*.code-workspace
+
+# Editor Configuration (copied by devcontainer)
+.editorconfig
+.prettierrc
+.prettierignore
+
+# Git Hooks (optional, user-specific)
+.pre-commit-config.yaml
+
+# DevContainer Logs
+.devcontainer/.log/
+.devcontainer/scripts/project_status
+
+# ====================================
+# Standard Development Files
+# ====================================
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# OS Files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+*~
+
+# IDE
+.idea/
+*.swp
+*.swo
+*~
+.project
+.classpath
+.settings/
+*.sublime-project
+*.sublime-workspace
+
+# Build Output
+dist/
+build/
+out/
+*.log
+
+# Testing
+coverage/
+.nyc_output/
+*.lcov
+
+# Temporary Files
+tmp/
+temp/
+*.tmp
