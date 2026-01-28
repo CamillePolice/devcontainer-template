@@ -148,14 +148,31 @@ if [ -f "$MCP_CONFIG" ]; then
    else
       log "MCP servers already configured in settings.json"
    fi
-
-   log ""
-   log "MCP Servers configured:"
-   log "  - Context7: Enhanced context management (requires CONTEXT7_API_KEY)"
-   log "  - Playwright: Browser automation and E2E testing"
 else
    log "No MCP configuration found at $MCP_CONFIG"
+   # Ensure mcpServers key exists so we can add Chrome DevTools
+   if command -v jq &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
+      if ! grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+         log "Adding mcpServers section for Chrome DevTools MCP"
+         jq '.mcpServers = {}' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+      fi
+   fi
 fi
+
+# Ensure Chrome DevTools MCP is always configured (browser automation, debugging, performance)
+if command -v jq &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
+   if grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+      log "Ensuring Chrome DevTools MCP is configured"
+      jq '.mcpServers = ((.mcpServers // {}) + {"chrome-devtools": {"command": "npx", "args": ["-y", "chrome-devtools-mcp@latest"]}})' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+      log "Chrome DevTools MCP added/updated in settings"
+   fi
+fi
+
+log ""
+log "MCP Servers configured:"
+log "  - Context7: Enhanced context management (requires CONTEXT7_API_KEY)"
+log "  - Playwright: Browser automation and E2E testing"
+log "  - Chrome DevTools: Browser control, debugging, performance analysis"
 
 # Add Permissions
 if [ -f "$PERMISSIONS_CONFIG" ]; then

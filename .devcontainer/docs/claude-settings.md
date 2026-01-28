@@ -57,7 +57,7 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 
 ### 2. MCP Servers
 
-**Configured in**: `.claude/mcp/mcp.json` (copied to `~/.claude/settings.json` during setup)
+**Configured in**: `.claude/mcp/mcp.json` (copied to `~/.claude/settings.json` during setup). **Chrome DevTools MCP** is always added by the script, even when `mcp.json` is absent.
 
 #### Context7 MCP Server
 **Purpose**: Enhanced context management and retrieval
@@ -109,6 +109,28 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 
 **No setup required** - works out of the box!
 
+#### Chrome DevTools MCP Server
+**Purpose**: Browser control, debugging, and performance analysis (official Google MCP)
+
+**Configuration**: Added automatically by `configure_claude.sh` to `~/.claude/settings.json` (even when `.claude/mcp/mcp.json` is absent):
+```json
+{
+  "command": "npx",
+  "args": ["-y", "chrome-devtools-mcp@latest"]
+}
+```
+
+**Features**:
+- Browser automation (click, fill, navigate, screenshots)
+- Performance traces and insights
+- Network request inspection
+- Console message listing and script evaluation
+- DevTools-based debugging
+
+**Requirements**: Node.js v20.19+, Chrome (stable or newer), npm. No API key needed.
+
+**No setup required** - the script ensures it is always configured.
+
 ---
 
 ## 🚀 Setup Process
@@ -116,8 +138,9 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 The devcontainer automatically configures everything during initialization:
 
 1. **Clone plugin**: `.devcontainer/scripts/setup/configure_claude.sh` copies everything-claude-code to `.claude/`
-2. **Copy MCP config**: Copies `.claude/mcp/mcp.json` to `~/.claude/settings.json`
-3. **Auto-detection**: Claude Code automatically loads plugin from `.claude/.claude-plugin/plugin.json`
+2. **Copy MCP config**: Copies `.claude/mcp/mcp.json` to `~/.claude/settings.json` (if present)
+3. **Chrome DevTools MCP**: The script always adds or updates the Chrome DevTools MCP server in settings
+4. **Auto-detection**: Claude Code automatically loads plugin from `.claude/.claude-plugin/plugin.json`
 
 ### Manual Setup (if needed)
 
@@ -363,6 +386,18 @@ Open the app and click the signup button
 Take a screenshot of the dashboard
 ```
 
+#### Chrome DevTools:
+```
+# Performance analysis
+Check the performance of https://example.com
+
+# Take screenshot
+Take a screenshot of the current page
+
+# Inspect network
+List network requests for the page
+```
+
 ---
 
 ## 🔧 Customization
@@ -419,6 +454,11 @@ Add to the `mcpServers` section:
 - Install dependencies: `npx playwright install`
 - Check logs: Look in `~/.claude/debug/` folder
 
+#### Chrome DevTools Not Working
+- Ensure Node.js v20.19+ and Chrome are installed
+- The MCP starts the browser on first tool use; ensure no sandbox is blocking Chrome
+- To connect to an existing Chrome: use `--browser-url=http://127.0.0.1:9222` in args (start Chrome with `--remote-debugging-port=9222 --user-data-dir=/tmp/chrome-profile`)
+
 ### General Debugging
 - Enable debug logging: Add `"debug": true` to settings.json
 - Check logs: `~/.claude/debug/`
@@ -431,6 +471,7 @@ Add to the `mcpServers` section:
 - **Everything Claude Code**: https://github.com/affaan-m/everything-claude-code
 - **Context7 MCP**: https://context7.com
 - **Playwright MCP**: https://github.com/executeautomation/playwright-mcp-server
+- **Chrome DevTools MCP**: https://github.com/ChromeDevTools/chrome-devtools-mcp
 - **Claude Code Docs**: https://code.claude.com/docs/
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
@@ -445,6 +486,7 @@ Add to the `mcpServers` section:
 5. **Check TypeScript errors** immediately after edits
 6. **Set CONTEXT7_API_KEY** for enhanced context features
 7. **Use Playwright MCP** for browser automation tasks
+8. **Use Chrome DevTools MCP** for performance traces, screenshots, and DevTools-based debugging
 
 ---
 
