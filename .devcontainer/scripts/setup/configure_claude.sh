@@ -33,6 +33,13 @@ if [ "$USE_CLAUDE" != "true" ] && [ "$USE_CLAUDE_MARKETPLACE" != "true" ]; then
    exit 0
 fi
 
+# Require jq for JSON operations (installed via Dockerfile)
+if ! command -v jq &> /dev/null; then
+   log "ERROR: jq is required but not found. Install with: apt install jq"
+   log "The devcontainer Dockerfile includes jq - rebuild the container if running inside one."
+   exit 1
+fi
+
 log "=== Starting Project Claude configuration script ==="
 log "Configuration mode: USE_CLAUDE_CODE=$USE_CLAUDE_CODE, USE_CLAUDE=$USE_CLAUDE, USE_CLAUDE_MARKETPLACE=$USE_CLAUDE_MARKETPLACE"
 
@@ -101,8 +108,6 @@ fi
 ##############################################
 # MCP Servers Configuration
 ##############################################
-log "=== Configuring MCP servers ==="
-
 CLAUDE_SETTINGS="$HOME/.claude/settings.json"
 MCP_CONFIG="$PROJECT_ROOT/.claude/mcp/mcp.json"
 PERMISSIONS_CONFIG="$PROJECT_ROOT/.claude/permissions/permissions.json"
@@ -113,10 +118,13 @@ mkdir -p "$HOME/.claude"
 # Initialize settings.json if it doesn't exist
 if [ ! -f "$CLAUDE_SETTINGS" ]; then
    log "Creating new Claude settings.json"
-   echo '{' > "$CLAUDE_SETTINGS"
-   echo '  "$schema": "https://json.schemastore.org/claude-code-settings.json"' >> "$CLAUDE_SETTINGS"
-   echo '}' >> "$CLAUDE_SETTINGS"
+   if ! jq -n '{} | .["$schema"] = "https://json.schemastore.org/claude-code-settings.json"' > "$CLAUDE_SETTINGS"; then
+      log "ERROR: Failed to create settings.json"
+      exit 1
+   fi
 fi
+
+log "=== Configuring MCP servers (disabled by default - enable via /config or settings.json) ==="
 
 # Add MCP servers
 if [ -f "$MCP_CONFIG" ]; then
@@ -125,54 +133,57 @@ if [ -f "$MCP_CONFIG" ]; then
    # Check if mcpServers section exists
    if ! grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
       log "Adding MCP servers to settings.json"
-
-      # Use jq if available for proper JSON merging
-      if command -v jq &> /dev/null; then
-         # Merge using jq
-         MCP_CONTENT=$(cat "$MCP_CONFIG")
-         jq --argjson mcp "$MCP_CONTENT" '. + $mcp' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"
-         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
-         log "MCP servers merged using jq"
+      MCP_CONTENT=$(cat "$MCP_CONFIG")
+      if ! jq --argjson mcp "$MCP_CONTENT" '. + $mcp' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+         log "ERROR: Failed to merge MCP config. Check $MCP_CONFIG is valid JSON."
+         rm -f "${CLAUDE_SETTINGS}.tmp"
       else
-         log "Warning: jq not available, using basic merge"
-         # Remove closing brace from existing settings
-         sed -i '$d' "$CLAUDE_SETTINGS" 2>/dev/null || sed -i '' '$d' "$CLAUDE_SETTINGS" 2>/dev/null
-         echo ',' >> "$CLAUDE_SETTINGS"
-
-         # Extract and append mcpServers section from mcp.json
-         sed -n '/"mcpServers":/,/^}/p' "$MCP_CONFIG" | sed '$d' >> "$CLAUDE_SETTINGS"
-         echo '}' >> "$CLAUDE_SETTINGS"
+         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+         # Add disabled: true to each server (enable manually via /config or settings.json)
+         if ! jq '.mcpServers |= (to_entries | map(.value + {"disabled": true}) | from_entries)' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+            log "ERROR: Failed to set MCP servers as disabled"
+            rm -f "${CLAUDE_SETTINGS}.tmp"
+         else
+            mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+         fi
+         log "MCP servers added to $CLAUDE_SETTINGS (disabled by default)"
       fi
-
-      log "MCP servers added to $CLAUDE_SETTINGS"
    else
       log "MCP servers already configured in settings.json"
    fi
 else
    log "No MCP configuration found at $MCP_CONFIG"
    # Ensure mcpServers key exists so we can add Chrome DevTools
-   if command -v jq &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
-      if ! grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
-         log "Adding mcpServers section for Chrome DevTools MCP"
-         jq '.mcpServers = {}' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+   if [ -f "$CLAUDE_SETTINGS" ] && ! grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+      log "Adding mcpServers section for Chrome DevTools MCP"
+      if ! jq '.mcpServers = {}' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+         log "ERROR: Failed to add mcpServers section"
+         rm -f "${CLAUDE_SETTINGS}.tmp"
+      else
+         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
       fi
    fi
 fi
 
 # Ensure Chrome DevTools MCP is always configured (browser automation, debugging, performance)
-if command -v jq &> /dev/null && [ -f "$CLAUDE_SETTINGS" ]; then
-   if grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
-      log "Ensuring Chrome DevTools MCP is configured"
-      jq '.mcpServers = ((.mcpServers // {}) + {"chrome-devtools": {"command": "npx", "args": ["-y", "chrome-devtools-mcp@latest"]}})' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp" && mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+if [ -f "$CLAUDE_SETTINGS" ] && grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+   log "Ensuring Chrome DevTools MCP is configured"
+   CHROME_MCP='{"command": "npx", "args": ["-y", "chrome-devtools-mcp@latest"], "disabled": true}'
+   if ! jq --argjson chrome "$CHROME_MCP" '.mcpServers = ((.mcpServers // {}) + {"chrome-devtools": $chrome})' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+      log "ERROR: Failed to add Chrome DevTools MCP"
+      rm -f "${CLAUDE_SETTINGS}.tmp"
+   else
+      mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
       log "Chrome DevTools MCP added/updated in settings"
    fi
 fi
 
 log ""
-log "MCP Servers configured:"
+log "MCP Servers configured (disabled by default):"
 log "  - Context7: Enhanced context management (requires CONTEXT7_API_KEY)"
 log "  - Playwright: Browser automation and E2E testing"
 log "  - Chrome DevTools: Browser control, debugging, performance analysis"
+log "  Enable via /config or edit ~/.claude/settings.json"
 
 # Add Permissions
 if [ -f "$PERMISSIONS_CONFIG" ]; then
@@ -182,26 +193,14 @@ if [ -f "$PERMISSIONS_CONFIG" ]; then
    # Check if permissions section exists
    if ! grep -q '"permissions"' "$CLAUDE_SETTINGS" 2>/dev/null; then
       log "Adding permissions to settings.json"
-
-      # Use jq if available for proper JSON merging
-      if command -v jq &> /dev/null; then
-         # Merge using jq
-         PERM_CONTENT=$(cat "$PERMISSIONS_CONFIG")
-         jq --argjson perm "$PERM_CONTENT" '. + $perm' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"
-         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
-         log "Permissions merged using jq"
+      PERM_CONTENT=$(cat "$PERMISSIONS_CONFIG")
+      if ! jq --argjson perm "$PERM_CONTENT" '. + $perm' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+         log "ERROR: Failed to merge permissions. Check $PERMISSIONS_CONFIG is valid JSON."
+         rm -f "${CLAUDE_SETTINGS}.tmp"
       else
-         log "Warning: jq not available, using basic merge"
-         # Remove closing brace from existing settings
-         sed -i '$d' "$CLAUDE_SETTINGS" 2>/dev/null || sed -i '' '$d' "$CLAUDE_SETTINGS" 2>/dev/null
-         echo ',' >> "$CLAUDE_SETTINGS"
-
-         # Extract and append permissions section
-         sed -n '/"permissions":/,/^}/p' "$PERMISSIONS_CONFIG" | sed '$d' >> "$CLAUDE_SETTINGS"
-         echo '}' >> "$CLAUDE_SETTINGS"
+         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+         log "Permissions added to $CLAUDE_SETTINGS"
       fi
-
-      log "Permissions added to $CLAUDE_SETTINGS"
    else
       log "Permissions already configured in settings.json"
    fi
@@ -239,33 +238,44 @@ if [ "$USE_CLAUDE_MARKETPLACE" = "true" ]; then
         "source": "github",
         "repo": "affaan-m/everything-claude-code"
       }
+    },
+    "claude-mem": {
+      "source": {
+        "source": "github",
+        "repo": "thedotmack/claude-mem"
+      }
     }
   },
   "enabledPlugins": {
-    "everything-claude-code@everything-claude-code": true
+    "everything-claude-code@everything-claude-code": true,
+    "claude-mem@claude-mem": true
   }
 }
 EOF
       log "Claude settings.json created"
    else
       log "Claude settings.json already exists"
-      log "To enable the marketplace manually, add this to ~/.claude/settings.json:"
-      log ""
-      log "  \"extraKnownMarketplaces\": {"
-      log "    \"everything-claude-code\": {"
-      log "      \"source\": {"
-      log "        \"source\": \"github\","
-      log "        \"repo\": \"affaan-m/everything-claude-code\""
-      log "      }"
-      log "    }"
-      log "  },"
-      log "  \"enabledPlugins\": {"
-      log "    \"everything-claude-code@everything-claude-code\": true"
-      log "  }"
-      log ""
-      log "Or run these commands in Claude Code:"
-      log "  /plugin marketplace add affaan-m/everything-claude-code"
-      log "  /plugin install everything-claude-code@everything-claude-code"
+      log "Adding marketplace plugins (everything-claude-code, claude-mem) to existing settings"
+      if ! jq '
+         .extraKnownMarketplaces = ((.extraKnownMarketplaces // {}) + {
+           "everything-claude-code": {
+             "source": { "source": "github", "repo": "affaan-m/everything-claude-code" }
+           },
+           "claude-mem": {
+             "source": { "source": "github", "repo": "thedotmack/claude-mem" }
+           }
+         }) |
+         .enabledPlugins = ((.enabledPlugins // {}) + {
+           "everything-claude-code@everything-claude-code": true,
+           "claude-mem@claude-mem": true
+         })
+      ' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+         log "ERROR: Failed to merge marketplace plugins. Check $CLAUDE_SETTINGS is valid JSON."
+         rm -f "${CLAUDE_SETTINGS}.tmp"
+      else
+         mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+         log "Marketplace plugins added to settings.json"
+      fi
    fi
 fi
 
@@ -276,8 +286,8 @@ log "Summary:"
 if [ "$USE_CLAUDE" = "true" ]; then
    log "✓ Direct copy: Configurations copied to $PROJECT_ROOT/.claude/"
 fi
-if [ -f "$PROJECT_ROOT/.claude/mcp/mcp.json" ]; then
-   log "✓ MCP Servers: Configured in $CLAUDE_SETTINGS"
+if [ -f "$PROJECT_ROOT/.claude/mcp/mcp.json" ] || grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+   log "✓ MCP Servers: Configured in $CLAUDE_SETTINGS (disabled by default)"
 fi
 if [ -f "$PROJECT_ROOT/.claude/permissions/permissions.json" ]; then
    log "✓ Permissions: Pre-approved commands configured"

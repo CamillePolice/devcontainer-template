@@ -16,7 +16,7 @@ Control Claude Code setup via environment variables in `devcontainer.json`:
 "containerEnv": {
     "USE_CLAUDE_CODE": "true",         // Master toggle
     "USE_CLAUDE": "true",              // Direct repository copy
-    "USE_CLAUDE_MARKETPLACE": "true"   // Plugin marketplace setup
+    "USE_CLAUDE_MARKETPLACE": "true",  // Plugin marketplace setup
 }
 ```
 
@@ -131,8 +131,8 @@ When `USE_CLAUDE_MARKETPLACE=true`:
 
 ### What It Does
 - Creates/updates `~/.claude/settings.json`
-- Registers everything-claude-code marketplace
-- Enables plugin automatically
+- Registers everything-claude-code and claude-mem marketplaces
+- Enables both plugins automatically
 
 ### Pros
 - ✅ Easy to update (just update the plugin)
@@ -155,10 +155,17 @@ If `~/.claude/settings.json` already exists, add manually:
         "source": "github",
         "repo": "affaan-m/everything-claude-code"
       }
+    },
+    "claude-mem": {
+      "source": {
+        "source": "github",
+        "repo": "thedotmack/claude-mem"
+      }
     }
   },
   "enabledPlugins": {
-    "everything-claude-code@everything-claude-code": true
+    "everything-claude-code@everything-claude-code": true,
+    "claude-mem@claude-mem": true
   }
 }
 ```
@@ -167,6 +174,8 @@ Or use Claude Code commands:
 ```bash
 /plugin marketplace add affaan-m/everything-claude-code
 /plugin install everything-claude-code@everything-claude-code
+/plugin marketplace add thedotmack/claude-mem
+/plugin install claude-mem
 ```
 
 ---
@@ -196,12 +205,14 @@ rm -rf .claude/
 ```bash
 # In Claude Code
 /plugin update everything-claude-code@everything-claude-code
+/plugin update claude-mem@claude-mem
 ```
 
 ---
 
 ## 📚 Resources
 
-- **Repository**: [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)
+- **everything-claude-code**: [affaan-m/everything-claude-code](https://github.com/affaan-m/everything-claude-code)
+- **claude-mem**: [thedotmack/claude-mem](https://github.com/thedotmack/claude-mem) — Persistent memory across sessions, web viewer at http://localhost:37777
 - **Quick Guide**: [The Shorthand Guide](https://x.com/affaanmustafa/status/2012378465664745795)
 - **Advanced Guide**: [The Longform Guide](https://x.com/affaanmustafa/status/2014040193557471352)

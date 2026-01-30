@@ -19,7 +19,8 @@
   "forwardPorts": [
     8080,
     8081,
-    11434
+    11434,
+    37777
   ],
   "portsAttributes": {
     "8080": {
@@ -32,6 +33,10 @@
     },
     "11434": {
       "label": "Ollama API",
+      "onAutoForward": "silent"
+    },
+    "37777": {
+      "label": "Claude-Mem Web Viewer",
       "onAutoForward": "silent"
     }
   },

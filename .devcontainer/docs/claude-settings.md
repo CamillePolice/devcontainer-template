@@ -59,6 +59,8 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 
 **Configured in**: `.claude/mcp/mcp.json` (copied to `~/.claude/settings.json` during setup). **Chrome DevTools MCP** is always added by the script, even when `mcp.json` is absent.
 
+**All MCP servers are disabled by default.** Enable via `/config` in Claude Code or by editing `~/.claude/settings.json` (remove `"disabled": true` or set to `false`).
+
 #### Context7 MCP Server
 **Purpose**: Enhanced context management and retrieval
 
@@ -196,7 +198,9 @@ export CONTEXT7_API_KEY="your-api-key-here"
 
 ### Disabling MCP Servers
 
-In `.claude/mcp/mcp.json`:
+MCP servers are **installed disabled by default**. Enable via `/config` in Claude Code or by editing `~/.claude/settings.json` (remove `"disabled": true` or set to `false`).
+
+**Per-server override** in `.claude/mcp/mcp.json`:
 ```json
 "server-name": {
   "disabled": true

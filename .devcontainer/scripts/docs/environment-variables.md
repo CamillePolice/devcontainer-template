@@ -230,6 +230,7 @@ CLAUDE_CODE_CHANNEL=stable .devcontainer/scripts/setup/install_claude_code.sh
 # Test Claude with only marketplace
 USE_CLAUDE=false USE_CLAUDE_MARKETPLACE=true .devcontainer/scripts/setup/configure_claude.sh
 
+
 # Test with all disabled
 USE_CLAUDE_CODE=false .devcontainer/scripts/setup/configure_claude.sh
 
@@ -250,4 +251,4 @@ USE_VSCODE_CONFIG=true .devcontainer/scripts/setup/configure_vscode.sh
 - Try manual execution with the variable set
 
 ### Default Values
-All feature control variables default to `"true"` if not specified, ensuring backwards compatibility.
+Most feature control variables default to `"true"` if not specified.
