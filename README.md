@@ -8,6 +8,7 @@
 [![Oh My Zsh](https://img.shields.io/badge/Oh_My_Zsh-enabled-1A2C34?style=flat-square&logo=zsh)](https://ohmyz.sh)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-enabled-D97757?style=flat-square&logo=anthropic)](https://claude.ai)
 [![VS Code](https://img.shields.io/badge/VS_Code-optimized-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com)
+[![tmux](https://img.shields.io/badge/tmux-enabled-1BB91F?style=flat-square&logo=tmux)](https://github.com/tmux/tmux)
 
 ## 🚀 Quick Start
 
@@ -49,6 +50,7 @@ bash .devcontainer/scripts/tests/run_tests.sh
 - [Environment Variables](.devcontainer/scripts/docs/environment-variables.md)
 - [Claude Code Installation](.devcontainer/scripts/docs/install-claude-code.md)
 - [VS Code Configuration](.devcontainer/scripts/docs/configure-vscode.md)
+- [Tmux](.devcontainer/docs/tmux.md)
 - [Test Suite](.devcontainer/scripts/tests/README.md)
 - [Troubleshooting](.devcontainer/docs/troubleshooting.md)
 
