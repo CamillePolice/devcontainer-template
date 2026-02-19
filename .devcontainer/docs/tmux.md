@@ -92,6 +92,14 @@ sudo apt-get update && sudo apt-get install -y tmux xclip
   git clone https://github.com/tmux-plugins/tpm ~/.tmux/plugins/tpm
   ```
 
+- **Clone Catppuccin theme** once (status bar / appearance):
+
+  ```bash
+  mkdir -p ~/.config/tmux/plugins/catppuccin
+  git clone -b v2.1.3 https://github.com/catppuccin/tmux.git \
+    ~/.config/tmux/plugins/catppuccin/tmux
+  ```
+
 - **Install plugins** (no key binding by default): run once from a shell:
 
   ```bash
