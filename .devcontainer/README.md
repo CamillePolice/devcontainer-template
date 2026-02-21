@@ -9,6 +9,7 @@
 [![Starship](https://img.shields.io/badge/Starship-prompt-DD0B78?style=flat-square&logo=starship)](https://starship.rs)
 [![Claude Code](https://img.shields.io/badge/Claude_Code-enabled-D97757?style=flat-square&logo=anthropic)](https://claude.ai)
 [![VS Code](https://img.shields.io/badge/VS_Code-optimized-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com)
+[![Supabase](https://img.shields.io/badge/Supabase-RAG_optional-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com)
 
 ---
 
