@@ -32,7 +32,7 @@
 
 2. **Configure Your Environment**
 
-   - Review environment variables in `devcontainer.json`:
+   - Copy and edit `.devcontainer/.env` (create from `.env.example`):
      - Set `PROJECT_NAME` to your project name
      - Toggle features (`USE_CLAUDE_CODE`, `USE_GIT_PROMPT`, etc.)
      - See [Environment Variables](scripts/docs/environment-variables.md) for details
@@ -85,6 +85,7 @@
 ```
 .devcontainer/
 ├── 📄 devcontainer.json      # Main configuration file
+├── 📄 .env                   # Environment variables (copy from .env.example)
 ├── 🐳 Dockerfile             # Container image definition
 ├── 📖 README.md              # This documentation
 ├── 🔧 bin/                   # Binary tools (php-cs-fixer, etc.)
@@ -124,6 +125,8 @@
 | 🔧 **Git** | Latest | Version control |
 
 ### 🌍 Environment Variables
+
+Variables are configured in `.devcontainer/.env` (copy from `.env.example`). A few core paths are set in `devcontainer.json`.
 
 | Variable | Description |
 |----------|-------------|
@@ -270,7 +273,7 @@ scripts/
 
 ### Script Control Variables
 
-All scripts can be individually controlled via environment variables in `devcontainer.json`:
+All scripts can be individually controlled via environment variables in `.devcontainer/.env` (copy from `.env.example`):
 
 | Variable | Controls | Default |
 |----------|----------|---------|
