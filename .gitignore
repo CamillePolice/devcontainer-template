@@ -5,8 +5,8 @@
 # and should not be committed to avoid affecting other developers
 
 # Claude AI Configuration
-.claude/
-CLAUDE.md
+#.claude/
+#CLAUDE.md
 
 # VS Code Personal Settings
 .vscode/
@@ -80,3 +80,9 @@ coverage/
 tmp/
 temp/
 *.tmp
+
+# Environment Variables
+.env
+.env.local
+.env.*.local
+*.env

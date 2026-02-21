@@ -94,6 +94,31 @@ else
     exit 1
 fi
 
+# -----------------------------------------------------------------------------
+# RAG (Retrieval-Augmented Generation) — Supabase-backed agent context
+# -----------------------------------------------------------------------------
+# When USE_RAG=true and RAG_DSN is set, agents/skills/rules can be stored in
+# Supabase and retrieved at runtime for Claude/Cursor (RAG-First agents).
+#
+# Scripts:
+#   setup_rag.sh  — Run at init: checks Supabase connection (non-blocking).
+#   seed_rag.py   — Run once manually: indexes any .md/.py files into
+#                   rag_agent_instructions for a given --agent and --project.
+#
+# Env (devcontainer.json / host): USE_RAG, RAG_DSN, RAG_PROJECT (optional).
+#
+# Verify connection:  .devcontainer/scripts/ai/setup_rag.sh
+# Index agents once:  RAG_PROJECT="global" python3 .devcontainer/scripts/ai/seed_rag.py \
+#                       --file angular-expert-rag.md --agent angular-expert
+# Inspect index:      psql "$RAG_DSN" -c "SELECT * FROM rag_audit;"
+# -----------------------------------------------------------------------------
+log "Setting up RAG connection"
+if "$SCRIPT_DIR/ai/setup_rag.sh"; then
+    log "Successfully connected to RAG"
+else
+    log "WARNING: RAG setup failed (non-critical, continuing)"
+fi
+
 log "Configuring VS Code environment"
 if "$SCRIPT_DIR/setup/configure_vscode.sh"; then
     log "Successfully executed configure_vscode.sh script"

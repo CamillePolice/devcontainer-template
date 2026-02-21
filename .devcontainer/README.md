@@ -44,6 +44,16 @@
      cp .devcontainer/.vscode/git/.pre-commit-config.yaml.example .devcontainer/.vscode/git/.pre-commit-config.yaml
      ```
 
+   - Configure RAG (optional, for AI-powered agents):
+     ```bash
+     # Add to your host ~/.zshrc
+     export RAG_DSN="postgresql://postgres.[ref]:[password]@aws-1-eu-west-1.pooler.supabase.com:6543/postgres"
+
+     # Create local env file (gitignored)
+     cp .devcontainer/.env.example .devcontainer/.env
+     # Edit .env: set USE_RAG=true, RAG_PROJECT=your-project
+     ```
+
 3. **Launch Container**
 
    - Press `Ctrl+Shift+P` (or `Cmd+Shift+P` on Mac)
@@ -89,6 +99,9 @@
     │   ├── configure_claude.sh       # Claude Code configuration
     │   ├── configure_git_prompt.sh   # Oh My Zsh + Starship setup
     │   └── install_cli_tools.sh      # Modern CLI tools installation
+    ├── ai/                   # AI & RAG scripts
+    │   ├── setup_rag.sh          # Supabase connection check (runs at init)
+    │   └── seed_rag.py           # Generic knowledge indexing script
     ├── config/               # Configuration scripts
     │   └── docker_autocomplete.sh    # Docker bash/zsh completion
     ├── tests/                # Test scripts
@@ -124,6 +137,9 @@
 | `USE_CLAUDE_MARKETPLACE` | Enable Claude Code plugin marketplace (`true`/`false`) |
 | `USE_GIT_PROMPT` | Enable Oh My Zsh + Starship prompt (`true`/`false`) |
 | `USE_DOCKER_AUTOCOMPLETE` | Enable Docker autocomplete (`true`/`false`) |
+| `USE_RAG` | Enable RAG-First agents via Supabase (`true`/`false`) |
+| `RAG_DSN` | Supabase connection string (set on host, never in repo) |
+| `RAG_PROJECT` | Project scope for RAG indexing (e.g. `opvigil`, `global`) |
 
 ### 🔌 Forwarded Ports
 
@@ -155,6 +171,7 @@
 - ✅ Builds Docker base images
 - ✅ Generates SSL keys
 - ✅ Configures Claude Code (if enabled)
+- ✅ Verifies Supabase RAG connection (if `USE_RAG=true`)
 
 ### ⚡ `init_env.sh` (runs on every start)
 
@@ -170,6 +187,52 @@
 ### 🐳 `start_docker.sh`
 
 > Starts Docker Compose services after initialization is complete
+
+---
+
+## 🤖 RAG-First AI Agents
+
+This devcontainer supports **RAG-First agents**: lightweight Claude Code agent files (~30 lines) that load their detailed knowledge from Supabase at runtime. This reduces token consumption by ~70% while keeping agent knowledge persistent and cross-project.
+
+### How It Works
+
+```
+.claude/agents/angular-expert.md  (~30 lines)
+    └── psql "$RAG_DSN" → Supabase ──► sections loaded on demand
+                                        (signals, standalone, Bootstrap 5...)
+
+capture-learning skill → auto-captures discoveries during tasks
+    └── project='global'    → shared across ALL projects
+    └── project='opvigil'   → scoped to current project only
+```
+
+### Setup
+
+```bash
+# 1. Add to host ~/.zshrc
+export RAG_DSN="postgresql://..."
+
+# 2. Configure .devcontainer/.env
+USE_RAG=true
+RAG_PROJECT=opvigil
+
+# 3. Index knowledge for your agents (run once, then after updates)
+RAG_PROJECT="global" python3 .devcontainer/scripts/ai/seed_rag.py \
+  --file angular-expert-rag.md --agent angular-expert
+
+# 4. Check what's indexed
+psql "$RAG_DSN" -c "SELECT * FROM rag_audit;"
+```
+
+### Available Agents
+
+| Agent | Project | Sections | Knowledge |
+|-------|---------|----------|-----------|
+| `angular-expert` | global | 16 | Angular 20, signals, standalone, Bootstrap 5, HttpWrapper |
+| `symfony-expert` | global | 7 | Symfony 7, PHP 8.3, strict types, test migration |
+| `archforge` | archforge | 197 | Full upgrade automation procedure |
+
+> 📚 See [docs/rag.md](docs/rag.md) for complete RAG documentation.
 
 ---
 
@@ -193,6 +256,10 @@ scripts/
 │   ├── configure_vscode.sh      # VS Code environment setup
 │   └── install_cli_tools.sh     # Modern CLI tools installation
 │
+├── ai/                  # AI & RAG scripts
+│   ├── setup_rag.sh         # Supabase connection check
+│   └── seed_rag.py          # Generic knowledge indexing (any project)
+│
 ├── config/              # Configuration scripts
 │   └── docker_autocomplete.sh   # Docker bash/zsh completion
 │
@@ -214,6 +281,7 @@ All scripts can be individually controlled via environment variables in `devcont
 | `USE_GIT_PROMPT` | Oh My Zsh and Starship prompt installation | `true` |
 | `USE_DOCKER_AUTOCOMPLETE` | Docker and Docker Compose autocomplete | `true` |
 | `USE_VSCODE_CONFIG` | VS Code settings, tasks, extensions configuration | `true` |
+| `USE_RAG` | RAG-First agents via Supabase | `false` |
 
 ### Log Files
 
@@ -230,6 +298,7 @@ All scripts log their output to `.devcontainer/.log/` for troubleshooting:
 | `configure_git_prompt.sh` | `.devcontainer/.log/configure_git_prompt.log` |
 | `install_cli_tools.sh` | `.devcontainer/.log/cli_tools_install.log` |
 | `docker_autocomplete.sh` | `.devcontainer/.log/docker_autocomplete.log` |
+| `setup_rag.sh` | `.devcontainer/.log/rag_setup.log` |
 
 ### Manual Execution
 
@@ -241,6 +310,13 @@ Scripts can be run manually when needed:
 
 # Re-configure Claude Code
 .devcontainer/scripts/setup/configure_claude.sh
+
+# Verify RAG connection
+.devcontainer/scripts/ai/setup_rag.sh
+
+# Reindex knowledge after changes
+RAG_PROJECT="opvigil" python3 .devcontainer/scripts/ai/seed_rag.py \
+  --dir . --agent my-agent --force
 
 # With environment variables
 USE_CLAUDE=true .devcontainer/scripts/setup/configure_claude.sh
@@ -282,6 +358,7 @@ For detailed information on specific topics, see:
 - **[VS Code Extensions](docs/vscode-extensions.md)** - Extensions and stack-based installation
 - **[AI Agent Skills](docs/ai-skills.md)** - Enhance your AI coding assistants
 - **[Claude Code Configuration](docs/claude-code.md)** - Comprehensive Claude Code setup
+- **[RAG-First Agents](docs/rag.md)** - Supabase knowledge base for AI agents
 - **[VS Code Configuration](docs/vscode-config.md)** - Tasks, debug configs, and profiles
 - **[Pre-commit Hooks](docs/pre-commit-hooks.md)** - Automated code quality checks
 - **[Customization](docs/customization.md)** - Customize your devcontainer

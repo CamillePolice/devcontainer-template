@@ -41,25 +41,9 @@
     }
   },
   "containerEnv": {
-    "REMOTE_CONTAINERS": "true",
-    "DEVCONTAINER": "true",
-    "DEBIAN_FRONTEND": "noninteractive",
+    // !! Core (chemins résolus par devcontainer, ne peuvent pas aller dans .env)
     "PROJECT_ROOT": "${containerWorkspaceFolder}",
-    "PROJECT_NAME": "PROJECT_NAME",
-    "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts",
-    "USE_CLAUDE": "true",
-    "USE_CLAUDE_MARKETPLACE": "true",
-    "USE_GIT_PROMPT": "true",
-    "USE_DOCKER_AUTOCOMPLETE": "true",
-    "USE_CLAUDE_CODE": "true",
-    "USE_VSCODE_CONFIG": "true",
-    "CLAUDE_CODE_CHANNEL": "latest",
-    "USE_OLLAMA": "false",
-    "OLLAMA_REPO": "CamillePolice/ollama",
-    "OLLAMA_DEFAULT_MODEL": "qwen2.5-coder:7b",
-    "OLLAMA_GPU_ENABLED": "auto",
-    "OLLAMA_KEEP_ALIVE": "5m",
-    "OLLAMA_MEMORY_LIMIT": "8G"
+    "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts"
   },
   // !! Share SSH keys and command history
   "runArgs": [
