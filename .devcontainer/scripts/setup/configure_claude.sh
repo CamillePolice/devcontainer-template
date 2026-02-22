@@ -178,11 +178,25 @@ if [ -f "$CLAUDE_SETTINGS" ] && grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev
    fi
 fi
 
+# Ensure Exa MCP is always configured (web search, code search, company research)
+if [ -f "$CLAUDE_SETTINGS" ] && grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
+   log "Ensuring Exa MCP is configured"
+   EXA_MCP='{"url": "https://mcp.exa.ai/mcp", "disabled": true}'
+   if ! jq --argjson exa "$EXA_MCP" '.mcpServers = ((.mcpServers // {}) + {"exa": $exa})' "$CLAUDE_SETTINGS" > "${CLAUDE_SETTINGS}.tmp"; then
+      log "ERROR: Failed to add Exa MCP"
+      rm -f "${CLAUDE_SETTINGS}.tmp"
+   else
+      mv "${CLAUDE_SETTINGS}.tmp" "$CLAUDE_SETTINGS"
+      log "Exa MCP added/updated in settings"
+   fi
+fi
+
 log ""
 log "MCP Servers configured (disabled by default):"
 log "  - Context7: Enhanced context management (requires CONTEXT7_API_KEY)"
 log "  - Playwright: Browser automation and E2E testing"
 log "  - Chrome DevTools: Browser control, debugging, performance analysis"
+log "  - Exa: Web search, code search, company research (https://exa.ai)"
 log "  Enable via /config or edit ~/.claude/settings.json"
 
 # Add Permissions

@@ -57,7 +57,7 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 
 ### 2. MCP Servers
 
-**Configured in**: `.claude/mcp/mcp.json` (copied to `~/.claude/settings.json` during setup). **Chrome DevTools MCP** is always added by the script, even when `mcp.json` is absent.
+**Configured in**: `.claude/mcp/mcp.json` (copied to `~/.claude/settings.json` during setup). **Chrome DevTools MCP** and **Exa MCP** are always added by the script, even when `mcp.json` is absent.
 
 **All MCP servers are disabled by default.** Enable via `/config` in Claude Code or by editing `~/.claude/settings.json` (remove `"disabled": true` or set to `false`).
 
@@ -129,7 +129,22 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 - Console message listing and script evaluation
 - DevTools-based debugging
 
-**Requirements**: Node.js v20.19+, Chrome (stable or newer), npm. No API key needed.
+#### Exa MCP Server
+**Purpose**: Web search, code search, and company research ([exa.ai](https://exa.ai))
+
+**Configuration**: Added automatically by `configure_claude.sh` to `~/.claude/settings.json`:
+```json
+{
+  "url": "https://mcp.exa.ai/mcp"
+}
+```
+
+**Features** (enabled by default on the remote server):
+- `web_search_exa`: Search the web and get clean, ready-to-use content
+- `get_code_context_exa`: Find code examples and docs (GitHub, Stack Overflow)
+- `company_research_exa`: Research companies (business info, news)
+
+**Optional**: Add your [Exa API key](https://dashboard.exa.ai/api-keys) to the URL to overcome free plan rate limits: `https://mcp.exa.ai/mcp?exaApiKey=YOUR_EXA_KEY`
 
 **No setup required** - the script ensures it is always configured.
 
@@ -141,7 +156,7 @@ The devcontainer automatically configures everything during initialization:
 
 1. **Clone plugin**: `.devcontainer/scripts/setup/configure_claude.sh` copies everything-claude-code to `.claude/`
 2. **Copy MCP config**: Copies `.claude/mcp/mcp.json` to `~/.claude/settings.json` (if present)
-3. **Chrome DevTools MCP**: The script always adds or updates the Chrome DevTools MCP server in settings
+3. **Chrome DevTools MCP** and **Exa MCP**: The script always adds or updates these MCP servers in settings
 4. **Auto-detection**: Claude Code automatically loads plugin from `.claude/.claude-plugin/plugin.json`
 
 ### Manual Setup (if needed)
@@ -476,6 +491,7 @@ Add to the `mcpServers` section:
 - **Context7 MCP**: https://context7.com
 - **Playwright MCP**: https://github.com/executeautomation/playwright-mcp-server
 - **Chrome DevTools MCP**: https://github.com/ChromeDevTools/chrome-devtools-mcp
+- **Exa MCP**: https://exa.ai/docs/reference/exa-mcp
 - **Claude Code Docs**: https://code.claude.com/docs/
 - **MCP Protocol**: https://modelcontextprotocol.io/
 
@@ -491,6 +507,7 @@ Add to the `mcpServers` section:
 6. **Set CONTEXT7_API_KEY** for enhanced context features
 7. **Use Playwright MCP** for browser automation tasks
 8. **Use Chrome DevTools MCP** for performance traces, screenshots, and DevTools-based debugging
+9. **Use Exa MCP** for web search, code search, and company research
 
 ---
 
