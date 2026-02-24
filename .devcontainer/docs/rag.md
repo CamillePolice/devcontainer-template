@@ -93,15 +93,58 @@ GROUP BY project, agent_name ORDER BY project, sections DESC;
 
 ## Scripts
 
-| Script                 | When                                    | Purpose                                                                                                 |
-| ---------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| **setup_rag.sh** | At devcontainer init (post_create)      | Verifies Supabase connection; installs `psql`if needed. Non-blocking on failure.                      |
-| **seed_rag.py**  | Manual, after adding/updating knowledge | Indexes `.md`and `.py`files into `rag_agent_instructions`. Generic script usable for any project. |
+| Script                      | When                                    | Purpose                                                                                                 |
+| --------------------------- | --------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| **setup_rag.sh**            | At devcontainer init (post_create)      | Verifies Supabase connection; installs `psql` if needed. Non-blocking on failure.                      |
+| **setup_editor_rag_mcp.sh** | At devcontainer init (post_create)      | When `USE_RAG=true`: installs MCP server deps, copies Cursor/VSCode MCP config and editor rules.        |
+| **seed_rag.py**             | Manual, after adding/updating knowledge | Indexes `.md` and `.py` files into `rag_agent_instructions`. Generic script usable for any project.    |
 
 Paths:
 
 * `.devcontainer/scripts/ai/setup_rag.sh`
+* `.devcontainer/scripts/ai/setup_editor_rag_mcp.sh`
 * `.devcontainer/scripts/ai/seed_rag.py`
+
+---
+
+## Editor MCP (Cursor / VSCode)
+
+When `USE_RAG=true`, the devcontainer configures an **MCP (Model Context Protocol) server** so Cursor or VS Code can call the RAG knowledge base directly. No need to run `psql` from the editor — the AI uses MCP tools.
+
+### Layout
+
+All RAG MCP assets live under `.devcontainer/mcp/rag/`:
+
+| File                         | Purpose                                                                 |
+| ----------------------------- | ----------------------------------------------------------------------- |
+| `mcp-rag-server.js`          | Node.js MCP server (Supabase/pg); exposes tools to the editor.         |
+| `cursor-mcp.json`            | Cursor MCP config template (copied to `.cursor/mcp.json` if missing).   |
+| `vscode-mcp.json`             | VS Code MCP config template (copied to `.vscode/mcp.json` if missing).  |
+| `rag-cursor-rules.mdc`       | Cursor rules for when to call RAG tools (→ `.cursor/rules-rag.mdc`).    |
+| `rag-copilot-instructions.md`| GitHub Copilot instructions (→ `.github/copilot-instructions.md`).      |
+| `package.json`                | Node deps for the server (e.g. `pg`).                                  |
+
+### Environment
+
+| Variable       | Description                                                                 |
+| -------------- | --------------------------------------------------------------------------- |
+| `USE_RAG`      | Must be `"true"` for the MCP setup to run.                                  |
+| `WHICH_EDITOR` | `cursor` \| `vscode` \| `both`. Chooses which editor gets the MCP config. Default: `cursor`. |
+
+Set in `.devcontainer/.env` (see `.env.example`). `RAG_DSN` and `RAG_PROJECT` are passed to the MCP server via the copied config.
+
+### MCP tools
+
+Once configured, the editor can use:
+
+| Tool                | Description                                              |
+| ------------------- | -------------------------------------------------------- |
+| `rag_load`          | Load agent instructions from Supabase for a given agent/project. |
+| `rag_save_learning` | Persist a learned skill to Supabase (e.g. from capture-learning). |
+| `rag_audit`         | List indexed agents and section counts.                 |
+| `rag_search`        | Keyword search across RAG sections.                     |
+
+Logs: `.devcontainer/.log/editor_mcp.log`
 
 ---
 
@@ -282,14 +325,23 @@ ORDER BY section_type, section_title;"
 ```
 .devcontainer/
 ├── devcontainer.json              # RAG_DSN via ${localEnv:RAG_DSN}
-├── .env                           # USE_RAG=true, RAG_PROJECT=opvigil (gitignored)
+├── .env                           # USE_RAG, RAG_PROJECT, WHICH_EDITOR (gitignored)
 ├── .env.example                   # Template (committed)
+├── mcp/
+│   └── rag/                       # RAG MCP server and editor configs
+│       ├── mcp-rag-server.js      # Node MCP server (Supabase)
+│       ├── cursor-mcp.json        # Cursor MCP config template
+│       ├── vscode-mcp.json        # VS Code MCP config template
+│       ├── rag-cursor-rules.mdc   # Cursor rules for RAG tools
+│       ├── rag-copilot-instructions.md
+│       └── package.json           # pg, etc.
 ├── scripts/
 │   ├── lifecycle/
-│   │   └── post_create.sh         # Calls setup_rag.sh at init
+│   │   └── post_create.sh         # Calls setup_rag.sh + setup_editor_rag_mcp.sh at init
 │   └── ai/
 │       ├── setup_rag.sh           # Connection check
-│       └── seed_rag.py            # Generic indexing script
+│       ├── setup_editor_rag_mcp.sh # Cursor/VSCode MCP config (when USE_RAG=true)
+│       └── seed_rag.py             # Generic indexing script
 └── docs/
     └── rag.md                     # This file
 

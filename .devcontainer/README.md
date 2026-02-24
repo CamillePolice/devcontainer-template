@@ -91,7 +91,7 @@
 ├── 📖 README.md              # This documentation
 ├── 🔧 bin/                   # Binary tools (php-cs-fixer, etc.)
 ├── 📋 linter-conf/           # Linter configuration files
-└── 📜 scripts/               # Initialization and utility scripts
+├── 📜 scripts/               # Initialization and utility scripts
     ├── lifecycle/            # Container lifecycle hooks
     │   ├── post_create.sh        # Runs once after container creation
     │   ├── init_env.sh           # Runs on every container start
@@ -103,12 +103,15 @@
     │   └── install_cli_tools.sh      # Modern CLI tools installation
     ├── ai/                   # AI & RAG scripts
     │   ├── setup_rag.sh          # Supabase connection check (runs at init)
+    │   ├── setup_editor_rag_mcp.sh  # Cursor/VSCode MCP RAG config (when USE_RAG=true)
     │   └── seed_rag.py           # Generic knowledge indexing script
     ├── config/               # Configuration scripts
     │   └── docker_autocomplete.sh    # Docker bash/zsh completion
     ├── tests/                # Test scripts
     ├── docs/                 # Script documentation
     └── INDEX.md              # Scripts quick reference
+└── mcp/                      # MCP server configs (e.g. RAG for Cursor/VSCode)
+    └── rag/                  # RAG MCP server, configs, editor rules
 ```
 
 > 📚 **Scripts Documentation**: See [scripts/INDEX.md](scripts/INDEX.md) for detailed script documentation and [scripts/docs/](scripts/docs/) for specific guides.
@@ -141,9 +144,10 @@ Variables are configured in `.devcontainer/.env` (copy from `.env.example`). A f
 | `USE_CLAUDE_MARKETPLACE` | Enable Claude Code plugin marketplace (`true`/`false`) |
 | `USE_GIT_PROMPT` | Enable Oh My Zsh + Starship prompt (`true`/`false`) |
 | `USE_DOCKER_AUTOCOMPLETE` | Enable Docker autocomplete (`true`/`false`) |
-| `USE_RAG` | Enable RAG-First agents via Supabase (`true`/`false`) |
+| `USE_RAG` | Enable RAG-First agents and editor MCP via Supabase (`true`/`false`) |
 | `RAG_DSN` | Supabase connection string (set on host, never in repo) |
 | `RAG_PROJECT` | Project scope for RAG indexing (e.g. `opvigil`, `global`) |
+| `WHICH_EDITOR` | For RAG MCP: `cursor` \| `vscode` \| `both` (default: `cursor`) |
 
 ### 🔌 Forwarded Ports
 
@@ -176,6 +180,7 @@ Variables are configured in `.devcontainer/.env` (copy from `.env.example`). A f
 - ✅ Generates SSL keys
 - ✅ Configures Claude Code (if enabled)
 - ✅ Verifies Supabase RAG connection (if `USE_RAG=true`)
+- ✅ Configures Cursor/VSCode RAG MCP (if `USE_RAG=true`; see `WHICH_EDITOR`)
 
 ### ⚡ `init_env.sh` (runs on every start)
 
@@ -209,6 +214,8 @@ capture-learning skill → auto-captures discoveries during tasks
     └── project='global'    → shared across ALL projects
     └── project='opvigil'   → scoped to current project only
 ```
+
+When `USE_RAG=true`, the **RAG MCP server** (`.devcontainer/mcp/rag/`) is configured for Cursor or VS Code. The editor gets tools: `rag_load`, `rag_save_learning`, `rag_audit`, `rag_search`. Set `WHICH_EDITOR=cursor|vscode|both` in `.devcontainer/.env`.
 
 ### Setup
 
@@ -262,6 +269,7 @@ scripts/
 │
 ├── ai/                  # AI & RAG scripts
 │   ├── setup_rag.sh         # Supabase connection check
+│   ├── setup_editor_rag_mcp.sh  # Cursor/VSCode MCP RAG (when USE_RAG=true)
 │   └── seed_rag.py          # Generic knowledge indexing (any project)
 │
 ├── config/              # Configuration scripts
@@ -303,6 +311,7 @@ All scripts log their output to `.devcontainer/.log/` for troubleshooting:
 | `install_cli_tools.sh` | `.devcontainer/.log/cli_tools_install.log` |
 | `docker_autocomplete.sh` | `.devcontainer/.log/docker_autocomplete.log` |
 | `setup_rag.sh` | `.devcontainer/.log/rag_setup.log` |
+| `setup_editor_rag_mcp.sh` | `.devcontainer/.log/editor_mcp.log` |
 
 ### Manual Execution
 
@@ -317,6 +326,9 @@ Scripts can be run manually when needed:
 
 # Verify RAG connection
 .devcontainer/scripts/ai/setup_rag.sh
+
+# Reconfigure RAG MCP for Cursor/VSCode (e.g. after changing WHICH_EDITOR)
+USE_RAG=true WHICH_EDITOR=cursor .devcontainer/scripts/ai/setup_editor_rag_mcp.sh
 
 # Reindex knowledge after changes
 RAG_PROJECT="opvigil" python3 .devcontainer/scripts/ai/seed_rag.py \

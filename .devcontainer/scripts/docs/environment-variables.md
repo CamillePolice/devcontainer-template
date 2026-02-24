@@ -152,6 +152,45 @@ Complete reference for all environment variables used in devcontainer scripts.
 "USE_VSCODE_CONFIG": "false",  // Manual VS Code setup
 ```
 
+### USE_RAG
+- **Type**: Boolean string
+- **Default**: `"false"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Enable RAG-First agents and editor MCP (Supabase-backed knowledge)
+- **Affects**: `ai/setup_rag.sh`, `ai/setup_editor_rag_mcp.sh`
+- **When enabled**: Verifies Supabase connection; configures Cursor or VS Code with RAG MCP server (tools: `rag_load`, `rag_save_learning`, `rag_audit`, `rag_search`)
+- **Requires**: `RAG_DSN` set on the **host** (e.g. in `~/.zshrc`), never in the repo
+
+**Example**:
+```bash
+USE_RAG=true
+```
+
+### RAG_PROJECT
+- **Type**: String
+- **Default**: `PROJECT_NAME` or `global`
+- **Purpose**: Project scope for RAG indexing and queries (e.g. `opvigil`, `archforge`, `global`)
+- **Used by**: `seed_rag.py`, RAG MCP server, agents
+
+**Example**:
+```bash
+RAG_PROJECT=opvigil
+```
+
+### WHICH_EDITOR
+- **Type**: String
+- **Default**: `"cursor"`
+- **Values**: `"cursor"` | `"vscode"` | `"both"`
+- **Purpose**: When `USE_RAG=true`, selects which editor(s) get the RAG MCP config and rules
+- **Affects**: `ai/setup_editor_rag_mcp.sh`
+- **Cursor**: Copies `.devcontainer/mcp/rag/cursor-mcp.json` → `.cursor/mcp.json`, `rag-cursor-rules.mdc` → `.cursor/rules-rag.mdc`
+- **VSCode**: Copies `vscode-mcp.json` → `.vscode/mcp.json`, `rag-copilot-instructions.md` → `.github/copilot-instructions.md`
+
+**Example**:
+```bash
+WHICH_EDITOR=cursor   # or vscode, both
+```
+
 ## Configuration Examples
 
 ### Minimal Setup
@@ -188,6 +227,14 @@ Complete reference for all environment variables used in devcontainer scripts.
     "USE_DOCKER_AUTOCOMPLETE": "true",
     "USE_VSCODE_CONFIG": "true"
 }
+```
+
+### RAG + Editor MCP
+Set in `.devcontainer/.env` (and `RAG_DSN` on the host only):
+```bash
+USE_RAG=true
+RAG_PROJECT=my-project
+WHICH_EDITOR=cursor   # or vscode, both
 ```
 
 ### Enterprise/Team Setup

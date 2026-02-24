@@ -119,6 +119,29 @@ else
     log "WARNING: RAG setup failed (non-critical, continuing)"
 fi
 
+# -----------------------------------------------------------------------------
+# Editor MCP Configuration (Cursor / VSCode RAG integration)
+# -----------------------------------------------------------------------------
+# Copies the appropriate MCP config for rag-supabase to .cursor/ or .vscode/
+# based on WHICH_EDITOR env var. Requires USE_RAG=true.
+#
+# Env vars:
+#   WHICH_EDITOR  cursor|vscode  (set in .devcontainer/.env)
+#   USE_RAG       true|false
+#
+# Tools exposed to the editor via MCP:
+#   rag_load            — load agent instructions from Supabase
+#   rag_save_learning   — persist a learned skill to Supabase
+#   rag_audit           — list all indexed agents
+#   rag_search          — keyword search across all RAG sections
+# -----------------------------------------------------------------------------
+log "Setting up editor RAG MCP configuration"
+if "$SCRIPT_DIR/ai/setup_editor_rag_mcp.sh"; then
+    log "Successfully configured RAG MCP for $WHICH_EDITOR"
+else
+    log "WARNING: Editor RAG MCP setup failed (non-critical, continuing)"
+fi
+
 log "Configuring VS Code environment"
 if "$SCRIPT_DIR/setup/configure_vscode.sh"; then
     log "Successfully executed configure_vscode.sh script"
