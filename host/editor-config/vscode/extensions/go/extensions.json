@@ -1,0 +1,9 @@
+{
+    "$schema": "https://json.schemastore.org/vscode-extensions",
+    "recommendations": [
+        // === Go Core ===
+        "golang.go",
+        // === Utilities ===
+        "chakrounanas.turbo-console-log"
+    ]
+}

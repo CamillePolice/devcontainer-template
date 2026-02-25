@@ -1,0 +1,122 @@
+# GitHub Copilot Instructions — RAG-First Development
+
+## MCP RAG Integration
+
+You have access to a Supabase RAG knowledge base via the `rag-supabase` MCP server.
+Always use these tools at the right moment — do not wait to be asked.
+
+---
+
+## rag_load — When to call
+
+Call `rag_load` automatically at the start of any task when you can identify
+the relevant agent from context:
+
+| Context                                                            | Agent to load                                        |
+| ------------------------------------------------------------------ | ---------------------------------------------------- |
+| TypeScript / Angular files (`*.ts`,`*.html`,`angular.json`)  | `angular-expert`                                   |
+| PHP / Symfony files (`*.php`,`composer.json`,`symfony.lock`) | `symfony-expert`                                   |
+| Git operations, commit, branch, push                               | `git-smart-commit`                                 |
+| ArchForge upgrade plans, CRT generation                            | `archforge`                                        |
+| Unknown or mixed context                                           | call `rag_audit`first to discover available agents |
+
+**How to call:**
+
+```
+rag_load(agent_name="angular-expert", project="<RAG_PROJECT>")
+```
+
+Load BEFORE writing any code or making suggestions. The instructions contain
+patterns, conventions, and gotchas specific to this project — ignore them and
+you will produce suboptimal or incorrect code.
+
+If the agent returns no results, proceed with your general knowledge and
+note that the RAG may not be seeded for this agent yet.
+
+---
+
+## rag_search — When to call
+
+Call `rag_search` when:
+
+* You encounter an error or unexpected behavior and want to check if a known
+  solution exists in the knowledge base
+* The user references a pattern, service, or convention you don't recognize
+* You are unsure which approach to use for a specific problem
+
+**How to call:**
+
+```
+rag_search(keyword="<relevant term>", project="<RAG_PROJECT>")
+```
+
+Examples of good triggers:
+
+* Error message keywords: `rag_search(keyword="DateTimeInterface")`
+* Pattern names: `rag_search(keyword="linkedSignal")`
+* Service names: `rag_search(keyword="HttpWrapperService")`
+
+---
+
+## rag_audit — When to call
+
+Call `rag_audit` when:
+
+* Starting a session on an unfamiliar project to discover available agents
+* The user asks what knowledge is available
+* You are unsure which agent to load for the current context
+
+**How to call:**
+
+```
+rag_audit()
+```
+
+---
+
+## rag_save_learning — When to call
+
+Call `rag_save_learning` after completing a non-trivial task when you have
+discovered something reusable. Do not wait to be asked.
+
+**Triggers:**
+
+* You solved an unexpected error or edge case
+* You found a pattern that differs from the RAG instructions
+* You discovered a project-specific convention not yet documented
+* You optimized a multi-step process
+
+**Scope decision — always apply this rule:**
+
+| Discovery type                           | project value     |
+| ---------------------------------------- | ----------------- |
+| Generic Angular/TypeScript pattern       | `global`        |
+| Generic Symfony/PHP pattern              | `global`        |
+| Specific to this project's services/APIs | `<RAG_PROJECT>` |
+| Tooling or workflow pattern              | `global`        |
+| When in doubt                            | `global`        |
+
+**How to call:**
+
+```
+rag_save_learning(
+  agent_name="angular-expert",  // or symfony-expert, git-smart-commit...
+  project="global",             // or RAG_PROJECT for project-specific
+  section_title="<Descriptive title>",
+  content="<Full markdown content of the discovery>",
+  tags=["<tag1>", "<tag2>"]
+)
+```
+
+After saving, briefly inform the user:
+
+> "💾 Saved to RAG: '`<title>`' → `<agent_name>` / `<project>`"
+
+---
+
+## General Principles
+
+* **Load first, code second** — always check RAG before writing code in a known domain
+* **Save discoveries** — if you learned something non-trivial, persist it
+* **Never block on RAG** — if MCP tools fail or return empty, continue with general knowledge
+* **One load per session** — don't reload the same agent multiple times in the same conversation

@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "rag-supabase": {
+      "command": "node",
+      "args": ["${workspaceFolder}/.devcontainer/mcp/rag/mcp-rag-server.js"],
+      "env": {
+        "RAG_DSN": "${env:RAG_DSN}",
+        "RAG_PROJECT": "${env:RAG_PROJECT}"
+      }
+    }
+  }
+}
