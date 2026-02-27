@@ -91,4 +91,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ---
 
+## AI Agent Behavior
+
+### Auto-capture
+
+After every non-trivial task, invoke the `capture-learning` skill before responding "done".
+Do not wait to be asked. A task is non-trivial if it involved:
+- Solving an unexpected error or edge case
+- Discovering a project-specific convention
+- Finding a pattern worth reusing across sessions
+
+### RAG Context
+
+At the start of any task, load the relevant agent instructions from the RAG knowledge base
+before writing code or making suggestions.
+
 **Note:** This file helps Claude Code understand your project better. Keep it updated as your project evolves.
