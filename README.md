@@ -32,7 +32,7 @@ The devcontainer configures the environment **when you open the project in a con
 4. **First run:** post-create scripts install automatically (zsh, Oh My Zsh, Starship, tmux, Claude Code, VS Code settings, etc.).  
    Optional check: `bash .devcontainer/scripts/tests/run_tests.sh`.
 
-**What you get in the container:** Zsh + Oh My Zsh + Starship, tmux (TPM, Catppuccin), Node/npm, Claude Code CLI, VS Code settings and extensions, Docker autocomplete, Git prompt.
+**What you get in the container:** Zsh + Oh My Zsh + Starship, tmux (TPM, Catppuccin), Node/npm, Claude Code CLI, [rtk](https://github.com/rtk-ai/rtk) (LLM token optimizer), VS Code settings and extensions, Docker autocomplete, Git prompt.
 
 ### Host (your machine, outside the container)
 
@@ -70,7 +70,7 @@ git clone <your-repo> && cd your-project && code .
 
 ## ✨ Features
 
-- ✅ **Automated Setup** - Claude Code CLI, VS Code settings, Git prompt, CLI tools
+- ✅ **Automated Setup** - Claude Code CLI, VS Code settings, Git prompt, CLI tools, rtk (token optimizer)
 - ✅ **Customizable** - Toggle features via environment variables
 - ✅ **Claude Code Integration** - Auto-generates CLAUDE.md for project context
 - ✅ **Modern Shell** - Oh My Zsh + Starship prompt with Git integration
@@ -92,6 +92,7 @@ git clone <your-repo> && cd your-project && code .
 - [Claude Code Installation](.devcontainer/scripts/docs/install-claude-code.md)
 - [VS Code Configuration](.devcontainer/scripts/docs/configure-vscode.md)
 - [Tmux](.devcontainer/docs/tmux.md)
+- [rtk (Rust Token Killer)](.devcontainer/docs/rtk.md)
 - [Test Suite](.devcontainer/scripts/tests/README.md)
 - [Troubleshooting](.devcontainer/docs/troubleshooting.md)
 
@@ -105,6 +106,7 @@ git clone <your-repo> && cd your-project && code .
 | VS Code Settings | ✅ Yes | `USE_VSCODE_CONFIG` |
 | Docker Autocomplete | ✅ Yes | `USE_DOCKER_AUTOCOMPLETE` |
 | Claude Config/Marketplace | ✅ Yes | `USE_CLAUDE`, `USE_CLAUDE_MARKETPLACE` |
+| rtk (Rust Token Killer) | ✅ Yes | `USE_RTK` |
 
 For **host** options, see [host/README.md](host/README.md).
 

@@ -7,6 +7,7 @@ This folder configures your **machine and both editors (VSCode and Cursor)** glo
 - **Both VSCode and Cursor**: user-level settings, recommended extensions, keybindings. RAG MCP is configured for both when `USE_RAG=true`.
 - **CLI and shell**: zsh, Starship, fzf, ripgrep, bat, eza, zoxide, tldr (Unix). On Windows: optional winget CLI tools.
 - **Claude Code**: CLI install and optional global `.claude` config.
+- **rtk** (optional): [Rust Token Killer](https://github.com/rtk-ai/rtk) — reduces LLM token consumption 60–90%; installs hook in `~/.claude/settings.json`.
 - **Ollama**: optional local LLM (Docker on Linux; on macOS/Windows you install from [ollama.com](https://ollama.com)).
 - **Session**: global git config and optional pre-commit.
 
@@ -53,6 +54,7 @@ See `.env.example`. Main options:
 
 - `USE_GIT_PROMPT`, `USE_TMUX`, `USE_DOCKER_AUTOCOMPLETE`, `USE_VSCODE_CONFIG` — enable/disable steps.
 - `USE_CLAUDE_CODE`, `USE_CLAUDE`, `USE_CLAUDE_MARKETPLACE` — Claude CLI and config.
+- **USE_RTK** — [rtk](https://github.com/rtk-ai/rtk) (Rust Token Killer): reduces LLM token use 60–90%; hook in `~/.claude/settings.json`.
 - `USE_OLLAMA`, `OLLAMA_REPO`, `OLLAMA_DEFAULT_MODEL` — Ollama (Docker on Linux).
 - `USE_RAG`, `RAG_DSN`, `RAG_PROJECT`, `WHICH_EDITOR` — RAG MCP for Cursor/VSCode.
 

@@ -374,6 +374,7 @@ For detailed information on specific topics, see:
 - **[VS Code Extensions](docs/vscode-extensions.md)** - Extensions and stack-based installation
 - **[AI Agent Skills](docs/ai-skills.md)** - Enhance your AI coding assistants
 - **[Claude Code Configuration](docs/claude-code.md)** - Comprehensive Claude Code setup
+- **[rtk (Rust Token Killer)](docs/rtk.md)** - LLM token optimizer (60–90% reduction)
 - **[RAG-First Agents](docs/rag.md)** - Supabase knowledge base for AI agents
 - **[VS Code Configuration](docs/vscode-config.md)** - Tasks, debug configs, and profiles
 - **[Pre-commit Hooks](docs/pre-commit-hooks.md)** - Automated code quality checks

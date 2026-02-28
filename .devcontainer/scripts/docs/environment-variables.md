@@ -108,6 +108,20 @@ Complete reference for all environment variables used in devcontainer scripts.
 "USE_CLAUDE_MARKETPLACE": "true",  // Use plugin marketplace
 ```
 
+### USE_RTK
+- **Type**: Boolean string
+- **Default**: `"true"`
+- **Values**: `"true"` | `"false"`
+- **Purpose**: Install [rtk](https://github.com/rtk-ai/rtk) (Rust Token Killer) — CLI proxy that reduces LLM token consumption by 60–90%
+- **Affects**: `setup/install_rtk.sh` (runs after `configure_claude.sh`)
+- **When enabled**: Installs rtk to `~/.local/bin`, runs `rtk init -g --auto-patch` (hook in `~/.claude/settings.json`)
+- **When disabled**: Skips rtk installation and hook setup
+
+**Example**:
+```json
+"USE_RTK": "false",  // Disable rtk token optimizer
+```
+
 ### USE_GIT_PROMPT
 - **Type**: Boolean string
 - **Default**: `"true"`
@@ -223,6 +237,7 @@ WHICH_EDITOR=cursor   # or vscode, both
     "CLAUDE_CODE_CHANNEL": "latest",
     "USE_CLAUDE": "true",
     "USE_CLAUDE_MARKETPLACE": "true",
+    "USE_RTK": "true",
     "USE_GIT_PROMPT": "true",
     "USE_DOCKER_AUTOCOMPLETE": "true",
     "USE_VSCODE_CONFIG": "true"

@@ -60,6 +60,9 @@ if [ "${USE_CLAUDE:-false}" = "true" ] || [ "${USE_CLAUDE_MARKETPLACE:-false}" =
     run_script "$HOST_SCRIPTS/setup/configure_claude.sh" || log "WARNING: configure_claude failed (non-critical)"
 fi
 
+# rtk (Rust Token Killer — reduces LLM token consumption 60–90%)
+run_script "$HOST_SCRIPTS/setup/install_rtk.sh" || log "WARNING: install_rtk failed (non-critical)"
+
 # RAG connection check
 run_script "$HOST_SCRIPTS/ai/setup_rag.sh" || true
 

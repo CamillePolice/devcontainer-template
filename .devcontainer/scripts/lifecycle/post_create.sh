@@ -94,6 +94,13 @@ else
     exit 1
 fi
 
+log "Installing rtk (Rust Token Killer — LLM token optimizer)"
+if "$SCRIPT_DIR/setup/install_rtk.sh"; then
+    log "Successfully executed install_rtk.sh script"
+else
+    log "WARNING: install_rtk.sh failed (non-critical)"
+fi
+
 # -----------------------------------------------------------------------------
 # RAG (Retrieval-Augmented Generation) — Supabase-backed agent context
 # -----------------------------------------------------------------------------
