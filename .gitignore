@@ -1,4 +1,11 @@
 # ====================================
+# Host machine setup (separate repository)
+# ====================================
+# Host setup lives in: git@github.com:CamillePolice/host-template.git
+# Clone it where you want (e.g. ~/dev-setup or ./host) and run from there.
+host/
+
+# ====================================
 # Personal DevContainer Configuration
 # ====================================
 # These files are created by the devcontainer setup scripts

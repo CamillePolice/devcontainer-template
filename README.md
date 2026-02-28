@@ -11,6 +11,15 @@
 [![VS Code](https://img.shields.io/badge/VS_Code-optimized-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com)
 [![tmux](https://img.shields.io/badge/tmux-enabled-1BB91F?style=flat-square&logo=tmux)](https://github.com/tmux/tmux)
 
+## 📦 Repositories
+
+| Repository | Purpose |
+|------------|---------|
+| **This repo** (devcontainer-template) | DevContainer, Dockerfile, VS Code config, lifecycle scripts |
+| **[host-template](https://github.com/CamillePolice/host-template)** | Host machine setup: terminal (zsh, Starship, tmux), CLI tools, editor config, optional Claude Code & RAG |
+
+The `host/` directory is excluded from this repo (see `.gitignore`). Clone host-template where you need it (e.g. `~/dev-setup` or `./host`).
+
 ## 📦 Installation
 
 ### DevContainer (inside the container)
@@ -36,29 +45,35 @@ The devcontainer configures the environment **when you open the project in a con
 
 ### Host (your machine, outside the container)
 
-The **`host/`** folder lets you install the **same terminal and tooling** on your host (Linux/macOS): zsh, Starship, tmux, CLI tools, optional Claude Code and editor config. Useful for working outside the container or for a single setup across machines.
+The **host setup** is in a **separate repository** so you can use it independently (e.g. on multiple machines or outside any devcontainer project):
 
-1. **Copy the `host/` folder** wherever you want (e.g. `~/dev-setup`, or keep it inside this repo).
+- **Repository:** [github.com/CamillePolice/host-template](https://github.com/CamillePolice/host-template)
+- Same tooling as in the container: zsh, Starship, tmux, CLI tools, optional Claude Code and editor config.
+
+1. **Clone the host-template repo** where you want (e.g. `~/dev-setup` or `./host` next to this project):
+   ```bash
+   git clone git@github.com:CamillePolice/host-template.git ~/dev-setup
+   # or: git clone git@github.com:CamillePolice/host-template.git host
+   ```
 
 2. **Configure (optional)**  
-   Copy `host/.env.example` to `host/.env` and set options (`USE_GIT_PROMPT`, `USE_TMUX`, `USE_CLAUDE_CODE`, etc.).
+   Copy `host-template/.env.example` to `.env` in that folder and set options (`USE_GIT_PROMPT`, `USE_TMUX`, `USE_CLAUDE_CODE`, etc.).
 
 3. **Run setup**
    - **Full setup** (terminal + CLI tools + Claude Code + editor config + optional RAG/Ollama):  
      ```bash
-     cd host
+     cd ~/dev-setup   # or: cd host
      ./run_post_create.sh
      ```
    - **Terminal only** (zsh, Oh My Zsh, Starship, tmux, fzf/ripgrep/bat/eza/zoxide/tldr):  
      ```bash
-     cd host
      ./run_terminal_setup.sh
      ```
 
 4. **Optional session init** (after a fresh clone or to refresh git/pre-commit):  
    `./run_init_env.sh`
 
-Details, env vars and layout: **[host/README.md](host/README.md)**.
+Details, env vars and layout: **[host-template README](https://github.com/CamillePolice/host-template)**.
 
 ## 🚀 Quick Start (DevContainer)
 
@@ -85,7 +100,7 @@ git clone <your-repo> && cd your-project && code .
 | Scope | Doc |
 |-------|-----|
 | **DevContainer** (structure, features, scripts) | [.devcontainer/README.md](.devcontainer/README.md) |
-| **Host** (machine setup, terminal, editors) | [host/README.md](host/README.md) |
+| **Host** (machine setup, terminal, editors) | [host-template](https://github.com/CamillePolice/host-template) |
 
 **DevContainer quick links:**
 - [Environment Variables](.devcontainer/scripts/docs/environment-variables.md)
@@ -108,7 +123,7 @@ git clone <your-repo> && cd your-project && code .
 | Claude Config/Marketplace | ✅ Yes | `USE_CLAUDE`, `USE_CLAUDE_MARKETPLACE` |
 | rtk (Rust Token Killer) | ✅ Yes | `USE_RTK` |
 
-For **host** options, see [host/README.md](host/README.md).
+For **host** options, see the [host-template](https://github.com/CamillePolice/host-template) repository.
 
 ## 🛠️ Customization
 
