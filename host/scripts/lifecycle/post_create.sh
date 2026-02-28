@@ -38,6 +38,8 @@ run_script() {
 # Git prompt (zsh + Starship) — Linux/macOS; skip on Windows or if disabled
 if [ "${USE_GIT_PROMPT:-true}" = "true" ] && [ "$OS" != "windows" ]; then
     run_script "$HOST_SCRIPTS/setup/configure_git_prompt.sh" || log "WARNING: configure_git_prompt failed (non-critical)"
+    # Tmux (same config as devcontainer: TPM, Catppuccin)
+    run_script "$HOST_SCRIPTS/setup/install_tmux.sh" || log "WARNING: install_tmux failed (non-critical)"
 fi
 
 # CLI tools (fzf, ripgrep, bat, eza, zoxide, tldr)

@@ -26,6 +26,10 @@ Anywhere you like: `~/dev-setup`, `~/.config/dev-setup`, or a dotfiles repo. **H
    - **Unix (Linux/macOS)**: `./run_post_create.sh`
    - **Windows**: `.\run_post_create.ps1`
 
+To install **only** the same terminal customizations as the devcontainer (zsh, Oh My Zsh, Starship, tmux + TPM + Catppuccin):
+
+- **Unix**: `./run_terminal_setup.sh`
+
 ## Session init (optional)
 
 Run after a fresh clone or when you want to refresh global git/pre-commit:
@@ -47,7 +51,7 @@ On Windows you can also use WSL and run the Unix scripts from the host folder.
 
 See `.env.example`. Main options:
 
-- `USE_GIT_PROMPT`, `USE_DOCKER_AUTOCOMPLETE`, `USE_VSCODE_CONFIG` — enable/disable steps.
+- `USE_GIT_PROMPT`, `USE_TMUX`, `USE_DOCKER_AUTOCOMPLETE`, `USE_VSCODE_CONFIG` — enable/disable steps.
 - `USE_CLAUDE_CODE`, `USE_CLAUDE`, `USE_CLAUDE_MARKETPLACE` — Claude CLI and config.
 - `USE_OLLAMA`, `OLLAMA_REPO`, `OLLAMA_DEFAULT_MODEL` — Ollama (Docker on Linux).
 - `USE_RAG`, `RAG_DSN`, `RAG_PROJECT`, `WHICH_EDITOR` — RAG MCP for Cursor/VSCode.
@@ -59,6 +63,7 @@ Logs are written to `host/.log/` (e.g. `post_create.log`, `init_env.log`).
 ## Structure (summary)
 
 - `run_post_create.sh` / `.ps1` — one-time setup entrypoint.
+- `run_terminal_setup.sh` — terminal only (zsh, Starship, tmux; same as devcontainer).
 - `run_init_env.sh` / `.ps1` — session init entrypoint.
 - `scripts/lifecycle/` — post_create and init_env (Unix + PowerShell).
 - `scripts/setup/` — git prompt, CLI tools, Docker autocomplete, Claude Code, Claude config, editor config (both Cursor and VSCode).
