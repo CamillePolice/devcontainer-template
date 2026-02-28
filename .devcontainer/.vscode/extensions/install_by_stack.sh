@@ -1,8 +1,9 @@
 #!/bin/bash
 
-# Extension installation script by stack
+# Extension installation script by stack (Cursor and VS Code compatible)
 # Usage: ./install_by_stack.sh [stack1] [stack2] ...
 # Example: ./install_by_stack.sh angular symfony
+# Editor: uses WHICH_EDITOR (cursor|vscode) from .devcontainer/.env, or auto-detects (cursor if in PATH, else code)
 
 set -e
 
@@ -13,6 +14,38 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
+
+# Load .devcontainer/.env so WHICH_EDITOR is available when set
+SCRIPT_DIR_ABS="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+for try in ".devcontainer/.env" "$SCRIPT_DIR_ABS/../../.env" "$SCRIPT_DIR_ABS/../../../.devcontainer/.env"; do
+    if [ -f "$try" ]; then
+        set -a
+        # shellcheck source=/dev/null
+        source "$try"
+        set +a
+        break
+    fi
+done
+
+# Editor CLI: cursor or code (VS Code uses same extension IDs)
+if [ -n "$WHICH_EDITOR" ]; then
+    case "$WHICH_EDITOR" in
+        cursor) EDITOR_CMD="cursor" ; EDITOR_NAME="Cursor" ;;
+        vscode) EDITOR_CMD="code"   ; EDITOR_NAME="VS Code" ;;
+        *)     EDITOR_CMD="cursor" ; EDITOR_NAME="Cursor" ;;  # default
+    esac
+else
+    if command -v cursor &> /dev/null; then
+        EDITOR_CMD="cursor"
+        EDITOR_NAME="Cursor"
+    elif command -v code &> /dev/null; then
+        EDITOR_CMD="code"
+        EDITOR_NAME="VS Code"
+    else
+        echo -e "${RED}Neither 'cursor' nor 'code' CLI found in PATH. Install Cursor or VS Code CLI.${NC}" >&2
+        exit 1
+    fi
+fi
 
 VSCODE_DIR=".vscode"
 INSTALLED_COUNT=0
@@ -45,7 +78,7 @@ install_from_json() {
         # Fallback without jq
         grep -oP '"[^"]+\.[^"]+"' "$json_file" | tr -d '"' | while read -r ext; do
             echo -e "   Installing: ${CYAN}$ext${NC}"
-            if cursor --install-extension "$ext" > /dev/null 2>&1; then
+            if $EDITOR_CMD --install-extension "$ext" > /dev/null 2>&1; then
                 echo -e "   ${GREEN}✓${NC} Installed: $ext"
                 ((INSTALLED_COUNT++))
             else
@@ -57,12 +90,12 @@ install_from_json() {
         # With jq
         jq -r '.recommendations[]' "$json_file" | while read -r ext; do
             # Check if already installed
-            if cursor --list-extensions | grep -qi "^$ext$"; then
+            if $EDITOR_CMD --list-extensions 2>/dev/null | grep -qi "^$ext$"; then
                 echo -e "   ${YELLOW}⊘${NC} Already installed: ${CYAN}$ext${NC}"
                 ((SKIPPED_COUNT++))
             else
                 echo -e "   ${BLUE}↓${NC} Installing: ${CYAN}$ext${NC}"
-                if cursor --install-extension "$ext" > /dev/null 2>&1; then
+                if $EDITOR_CMD --install-extension "$ext" > /dev/null 2>&1; then
                     echo -e "   ${GREEN}✓${NC} Installed: $ext"
                     ((INSTALLED_COUNT++))
                 else
@@ -221,6 +254,6 @@ fi
 echo ""
 echo -e "${GREEN}✅ Installation complete!${NC}"
 echo ""
-echo -e "${BLUE}💡 Tip:${NC} Restart Cursor to activate all extensions"
+echo -e "${BLUE}💡 Tip:${NC} Restart ${EDITOR_NAME} to activate all extensions"
 echo -e "   ${CYAN}Ctrl+Shift+P${NC} → ${CYAN}'Developer: Reload Window'${NC}"
 echo ""

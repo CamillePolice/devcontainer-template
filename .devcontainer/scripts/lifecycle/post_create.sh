@@ -54,6 +54,13 @@ log "Create project status file"
 touch .devcontainer/scripts/project_status
 echo "project_status_initialization=false" > .devcontainer/scripts/project_status
 
+log "Cloning repositories (REPO_URLS from .devcontainer/.env)"
+if "$SCRIPT_DIR/lifecycle/clone_repos.sh"; then
+    log "Successfully executed clone_repos.sh script"
+else
+    log "WARNING: clone_repos.sh failed or skipped (non-critical)"
+fi
+
 log "Configuring git prompt"
 if "$SCRIPT_DIR/setup/configure_git_prompt.sh"; then
     log "Successfully executed configure_git_prompt.sh script"

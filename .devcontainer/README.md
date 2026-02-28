@@ -148,6 +148,7 @@ Variables are configured in `.devcontainer/.env` (copy from `.env.example`). A f
 | `RAG_DSN` | Supabase connection string (set on host, never in repo) |
 | `RAG_PROJECT` | Project scope for RAG indexing (e.g. `opvigil`, `global`) |
 | `WHICH_EDITOR` | For RAG MCP: `cursor` \| `vscode` \| `both` (default: `cursor`) |
+| `REPO_URLS` | Repos to clone at workspace root (e.g. `opvigil/opvigil-frontend,opvigil/opvigil-backend`). Each clone: README removed; `CLAUDE.md`, `.claude`, `.vscode` added to that repo's `.gitignore`. |
 
 ### 🔌 Forwarded Ports
 
@@ -302,6 +303,7 @@ All scripts log their output to `.devcontainer/.log/` for troubleshooting:
 | Script | Log File |
 |--------|----------|
 | `post_create.sh` | `.devcontainer/.log/project_init.log` |
+| `clone_repos.sh` | `.devcontainer/.log/clone_repos.log` |
 | `init_env.sh` | `.devcontainer/.log/project_init_env.log` |
 | `start_docker.sh` | `.devcontainer/.log/project_docker_startup.log` |
 | `install_claude_code.sh` | `.devcontainer/.log/claude_code_install.log` |

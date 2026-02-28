@@ -31,6 +31,19 @@ Complete reference for all environment variables used in devcontainer scripts.
 "PROJECT_NAME": "my-awesome-project"
 ```
 
+### REPO_URLS
+- **Type**: String (list)
+- **Set By**: `.devcontainer/.env` (sourced by `clone_repos.sh`)
+- **Default**: Empty (no clone)
+- **Purpose**: Repositories to clone at workspace root (same level as `.devcontainer`). Each clone is post-processed: README removed; `CLAUDE.md`, `.claude`, `.vscode` added to that repo's `.gitignore`.
+- **Format**: Comma or space separated. Short form: `owner/repo` (GitHub). Full URL: `https://github.com/owner/repo` or `git@github.com:owner/repo.git`.
+- **Used By**: `lifecycle/clone_repos.sh` (called from `post_create.sh`)
+
+**Example** (in `.devcontainer/.env`):
+```bash
+REPO_URLS=opvigil/opvigil-frontend,opvigil/opvigil-backend
+```
+
 ### REMOTE_CONTAINERS
 - **Type**: Boolean string
 - **Set By**: devcontainer.json
