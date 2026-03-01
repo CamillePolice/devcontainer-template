@@ -222,7 +222,7 @@ script_name.sh && script_name.sh && \
 # Purpose: Configure Claude Code with agents, skills, and commands
 # Environment Variables:
 #   - USE_CLAUDE_CODE: Master toggle (default: true)
-#   - USE_CLAUDE: Enable direct copy (default: true)
+#   - USE_CLAUDE: Create .claude/ structure (default: true, no clone)
 #   - USE_CLAUDE_MARKETPLACE: Enable marketplace (default: true)
 # Log File: .devcontainer/.log/claude_config.log
 ```

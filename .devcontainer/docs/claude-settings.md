@@ -154,7 +154,7 @@ Only user-specific settings (copied from `.claude/mcp/mcp.json`):
 
 The devcontainer automatically configures everything during initialization:
 
-1. **Clone plugin**: `.devcontainer/scripts/setup/configure_claude.sh` copies everything-claude-code to `.claude/`
+1. **Project structure**: `.devcontainer/scripts/setup/configure_claude.sh` creates empty `.claude/` dirs (no clone). [everything-claude-code](https://github.com/affaan-m/everything-claude-code) is a great source for content.
 2. **Copy MCP config**: Copies `.claude/mcp/mcp.json` to `~/.claude/settings.json` (if present)
 3. **Chrome DevTools MCP** and **Exa MCP**: The script always adds or updates these MCP servers in settings
 4. **Auto-detection**: Claude Code automatically loads plugin from `.claude/.claude-plugin/plugin.json`

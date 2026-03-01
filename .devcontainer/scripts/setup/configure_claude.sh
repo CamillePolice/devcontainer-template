@@ -47,61 +47,17 @@ log "Configuration mode: USE_CLAUDE_CODE=$USE_CLAUDE_CODE, USE_CLAUDE=$USE_CLAUD
 set -x
 
 ##############################################
-# Option 1: Direct Repository Copy
+# Option 1: Ensure .claude folder structure (no clone)
 ##############################################
 if [ "$USE_CLAUDE" = "true" ]; then
-   log "=== Configuring Claude via direct repository copy ==="
+   log "=== Configuring Claude project structure ==="
 
-   # Skip if .claude folder already exists AND has content
    if [ -d "$PROJECT_ROOT/.claude" ] && [ "$(ls -A $PROJECT_ROOT/.claude 2>/dev/null)" ]; then
-      log ".claude folder already exists with content, skipping direct copy"
+      log ".claude folder already exists with content, skipping"
    else
-      # Create temporary directory for cloning
-      TEMP_DIR=$(mktemp -d)
-      log "Created temporary directory: $TEMP_DIR"
-
-      # Clone repository (using HTTPS for better compatibility)
-      log "Cloning everything-claude-code repository"
-      if ! git clone https://github.com/affaan-m/everything-claude-code.git "$TEMP_DIR/everything-claude-code"; then
-         log "ERROR: Failed to clone repository"
-         rm -rf "$TEMP_DIR"
-         exit 1
-      fi
-
-      # Create .claude structure
-      log "Creating .claude folder structure"
+      log "Creating empty .claude folder structure (agents, skills, commands, hooks, rules)"
       mkdir -p "$PROJECT_ROOT/.claude"/{agents,skills,commands,hooks,rules}
-
-      # Copy only necessary components (exclude .git, tests, examples, etc.)
-      log "Copying agents"
-      cp -r "$TEMP_DIR/everything-claude-code/agents/"*.md "$PROJECT_ROOT/.claude/agents/" 2>/dev/null || true
-
-      log "Copying skills"
-      cp -r "$TEMP_DIR/everything-claude-code/skills/"* "$PROJECT_ROOT/.claude/skills/" 2>/dev/null || true
-
-      log "Copying commands"
-      cp -r "$TEMP_DIR/everything-claude-code/commands/"*.md "$PROJECT_ROOT/.claude/commands/" 2>/dev/null || true
-
-      log "Copying hooks configuration"
-      cp "$TEMP_DIR/everything-claude-code/hooks/hooks.json" "$PROJECT_ROOT/.claude/hooks/" 2>/dev/null || true
-
-      log "Copying rules (project-level)"
-      cp -r "$TEMP_DIR/everything-claude-code/rules/"*.md "$PROJECT_ROOT/.claude/rules/" 2>/dev/null || true
-
-      log "Copying scripts"
-      cp -r "$TEMP_DIR/everything-claude-code/scripts" "$PROJECT_ROOT/.claude/" 2>/dev/null || true
-
-      log "Copying contexts"
-      cp -r "$TEMP_DIR/everything-claude-code/contexts" "$PROJECT_ROOT/.claude/" 2>/dev/null || true
-
-      # Copy plugin metadata
-      log "Copying plugin metadata"
-      cp -r "$TEMP_DIR/everything-claude-code/.claude-plugin" "$PROJECT_ROOT/.claude/" 2>/dev/null || true
-      # Cleanup
-      log "Cleaning up temporary directory"
-      rm -rf "$TEMP_DIR"
-
-      log "Direct repository copy completed"
+      log "Tip: [everything-claude-code](https://github.com/affaan-m/everything-claude-code) is a great source for agents, skills, hooks, and rules — see .devcontainer/docs/claude-code.md"
    fi
 fi
 
@@ -298,7 +254,7 @@ log "Log file available at: $LOGFILE"
 log ""
 log "Summary:"
 if [ "$USE_CLAUDE" = "true" ]; then
-   log "✓ Direct copy: Configurations copied to $PROJECT_ROOT/.claude/"
+   log "✓ Project structure: $PROJECT_ROOT/.claude/ (see docs for optional content from everything-claude-code)"
 fi
 if [ -f "$PROJECT_ROOT/.claude/mcp/mcp.json" ] || grep -q '"mcpServers"' "$CLAUDE_SETTINGS" 2>/dev/null; then
    log "✓ MCP Servers: Configured in $CLAUDE_SETTINGS (disabled by default)"

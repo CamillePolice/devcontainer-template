@@ -1,10 +1,10 @@
 # Claude Code Configuration
 
-Comprehensive Claude Code setup with agents, skills, commands, hooks, and rules from [everything-claude-code](https://github.com/affaan-m/everything-claude-code).
+Claude Code setup with optional marketplace plugins. The devcontainer creates an empty `.claude/` structure by default; it does not clone external repositories.
 
 ## 📖 Overview
 
-The devcontainer includes automatic setup for [everything-claude-code](https://github.com/affaan-m/everything-claude-code) - a battle-tested collection of Claude Code configurations from an Anthropic hackathon winner.
+**Tip:** [everything-claude-code](https://github.com/affaan-m/everything-claude-code) is a great source for agents, skills, commands, hooks, and rules — a battle-tested collection from an Anthropic hackathon winner. Use it as a reference or copy content into your project's `.claude/` folder as needed.
 
 ---
 
@@ -15,7 +15,7 @@ Control Claude Code setup via environment variables in `devcontainer.json`:
 ```json
 "containerEnv": {
     "USE_CLAUDE_CODE": "true",         // Master toggle
-    "USE_CLAUDE": "true",              // Direct repository copy
+    "USE_CLAUDE": "true",              // Create .claude/ structure (no clone)
     "USE_CLAUDE_MARKETPLACE": "true",  // Plugin marketplace setup
 }
 ```
@@ -24,46 +24,25 @@ Control Claude Code setup via environment variables in `devcontainer.json`:
 
 | Mode | USE_CLAUDE | USE_CLAUDE_MARKETPLACE | Description |
 |------|------------|------------------------|-------------|
-| **Both** (recommended) | `true` | `true` | Project-level configs + marketplace plugin |
-| **Direct Copy Only** | `true` | `false` | Full offline access, manual updates |
+| **Both** (recommended) | `true` | `true` | Empty `.claude/` structure + marketplace plugin |
+| **Structure Only** | `true` | `false` | Empty `.claude/` dirs only (add content from everything-claude-code if desired) |
 | **Marketplace Only** | `false` | `true` | Lightweight, easy updates via plugin |
 | **Disabled** | `false` | `false` | No Claude configuration |
 
 ---
 
-## 📦 What's Included
+## 📦 Project structure (when USE_CLAUDE=true)
+
+Empty directories are created; add your own files or copy from [everything-claude-code](https://github.com/affaan-m/everything-claude-code):
 
 ```
 .claude/
-├── agents/              # Specialized subagents
-│   ├── planner.md           # Feature planning
-│   ├── architect.md         # System design
-│   ├── tdd-guide.md         # Test-driven development
-│   ├── code-reviewer.md     # Quality review
-│   ├── security-reviewer.md # Security analysis
-│   └── ...
-│
+├── agents/              # Specialized subagents (e.g. planner, code-reviewer)
 ├── skills/              # Workflow definitions
-│   ├── coding-standards/    # Language best practices
-│   ├── tdd-workflow/        # TDD methodology
-│   ├── continuous-learning/ # Auto-extract patterns
-│   └── ...
-│
 ├── commands/            # Slash commands
-│   ├── tdd.md              # /tdd - TDD workflow
-│   ├── plan.md             # /plan - Planning
-│   ├── code-review.md      # /code-review - Review
-│   └── ...
-│
-├── hooks/               # Event-based automation
-│   └── hooks.json          # PreToolUse, PostToolUse, etc.
-│
+├── hooks/               # hooks.json — PreToolUse, PostToolUse, etc.
 ├── rules/               # Always-follow guidelines
-│   ├── security.md         # Security checks
-│   ├── testing.md          # TDD requirements
-│   └── ...
-│
-└── scripts/             # Node.js hook scripts
+└── (optional: scripts/, contexts/, mcp/, permissions/)
 ```
 
 ---
@@ -104,24 +83,15 @@ Reusable workflow definitions:
 
 ---
 
-## ⚙️ Direct Copy Mode
+## ⚙️ Project structure (USE_CLAUDE)
 
 When `USE_CLAUDE=true`:
 
 ### What It Does
-- Clones everything-claude-code repository
-- Copies configurations to `.claude/` folder in project
-- Provides offline access to all configurations
+- Creates an empty `.claude/` folder structure (agents, skills, commands, hooks, rules)
+- Does **not** clone any repository
 
-### Pros
-- ✅ Complete offline access
-- ✅ Full control over customization
-- ✅ No dependency on Claude Code plugin system
-- ✅ Works immediately in devcontainer
-
-### Cons
-- ❌ Manual updates required (re-run script or git pull)
-- ❌ Takes up project space (~5-10MB)
+**Great source for content:** [everything-claude-code](https://github.com/affaan-m/everything-claude-code) is an excellent reference for agents, skills, hooks, and rules. Copy what you need into your project's `.claude/` or use the marketplace plugin (see below).
 
 ---
 

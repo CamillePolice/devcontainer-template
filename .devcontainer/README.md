@@ -140,7 +140,7 @@ Variables are configured in `.devcontainer/.env` (copy from `.env.example`). A f
 | `DEVCONTAINER` | Set to `true` when running in devcontainer |
 | `TZ` | Timezone (Europe/Paris) |
 | `USE_CLAUDE_CODE` | Enable Claude Code integration (`true`/`false`) |
-| `USE_CLAUDE` | Enable Claude Code direct repository copy (`true`/`false`) |
+| `USE_CLAUDE` | Create empty `.claude/` structure (`true`/`false`). See docs — everything-claude-code is a great source. |
 | `USE_CLAUDE_MARKETPLACE` | Enable Claude Code plugin marketplace (`true`/`false`) |
 | `USE_GIT_PROMPT` | Enable Oh My Zsh + Starship prompt (`true`/`false`) |
 | `USE_DOCKER_AUTOCOMPLETE` | Enable Docker autocomplete (`true`/`false`) |
@@ -289,7 +289,7 @@ All scripts can be individually controlled via environment variables in `.devcon
 |----------|----------|---------|
 | `USE_CLAUDE_CODE` | Master toggle for Claude Code CLI installation and integration | `true` |
 | `CLAUDE_CODE_CHANNEL` | Claude Code release channel or version (`latest`, `stable`, or version number) | `latest` |
-| `USE_CLAUDE` | Direct repository copy to `.claude/` folder | `true` |
+| `USE_CLAUDE` | Create empty `.claude/` structure (no clone). See [claude-code.md](docs/claude-code.md) — everything-claude-code is a great source. | `true` |
 | `USE_CLAUDE_MARKETPLACE` | Plugin marketplace setup in `~/.claude/settings.json` | `true` |
 | `USE_GIT_PROMPT` | Oh My Zsh and Starship prompt installation | `true` |
 | `USE_DOCKER_AUTOCOMPLETE` | Docker and Docker Compose autocomplete | `true` |

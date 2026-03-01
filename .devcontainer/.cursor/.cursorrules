@@ -1,0 +1,71 @@
+# Cursor Rules — ${PROJECT_NAME}
+
+## Stack
+- Frontend : Angular 20 (standalone, signals, Bootstrap 5)
+- Backend : Symfony 7+ / PHP 8.3+
+- DB : PostgreSQL / Doctrine 3+
+
+---
+
+## Security — Hard limits, never violate
+
+- Never hardcode credentials, API keys, tokens, or passwords
+- Never commit `.env` files with real values
+- Never log sensitive data (tokens, passwords, PII)
+- Never use raw SQL string concatenation — always parameterized queries
+- Never expose internal numeric IDs in public APIs — use UUIDs or slugs
+- Never disable CSRF protection
+- Never expose stack traces to the client in production
+
+---
+
+## Angular — Always enforce
+
+- Standalone components only — no NgModules
+- `inject()` over constructor injection
+- `input()` / `output()` over `@Input()` / `@Output()`
+- `@if` / `@for` / `@switch` over `*ngIf` / `*ngFor`
+- `ChangeDetectionStrategy.OnPush` everywhere
+- Signals for state — no BehaviorSubjects, no NgRx
+- No `any` in TypeScript — use proper types or `unknown`
+- HttpWrapperService for HTTP — no direct HttpClient usage
+
+---
+
+## PHP / Symfony — Always enforce
+
+- `declare(strict_types=1)` at top of every file
+- Always typed properties, parameters, and return types
+- PHPStan level 8 must pass
+- Doctrine parameterized queries only
+- Single responsibility per service class
+
+---
+
+## Code style — General
+
+- No commented-out code in commits
+- Max file length : 300 lines
+- Max function length : 40 lines
+- Prefer explicit over implicit
+- Prefer targeted file reads over reading entire files
+
+---
+
+## Model usage (Cursor Pro)
+
+| Task | Model |
+|---|---|
+| Architecture, complex reasoning | claude-opus or o1 |
+| Coding, refactoring | claude-sonnet or gpt-4o |
+| Simple edits, renaming | cursor-fast |
+
+---
+
+## Commit format (fallback si pas de Claude Code)
+
+```
+TYPE(scope): message
+
+Types: feat, fix, chore, docs, refactor, test, style, perf, ci
+```

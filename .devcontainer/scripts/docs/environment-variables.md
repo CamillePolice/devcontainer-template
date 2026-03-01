@@ -93,16 +93,13 @@ REPO_URLS=opvigil/opvigil-frontend,opvigil/opvigil-backend
 - **Type**: Boolean string
 - **Default**: `"true"`
 - **Values**: `"true"` | `"false"`
-- **Purpose**: Enable direct repository copy mode
+- **Purpose**: Ensure `.claude/` folder structure exists (agents, skills, commands, hooks, rules). No repository is cloned.
 - **Affects**: `setup/configure_claude.sh`
-- **When enabled**: 
-  - Clones everything-claude-code repository
-  - Copies to `.claude/` folder in project
-  - Provides offline access to configurations
+- **When enabled**: Creates empty `.claude/` subdirs if missing. For ready-made agents, skills, hooks, and rules, [everything-claude-code](https://github.com/affaan-m/everything-claude-code) is a great source — see `.devcontainer/docs/claude-code.md`.
 
 **Example**:
 ```json
-"USE_CLAUDE": "true",  // Copy configs to project
+"USE_CLAUDE": "true",  // Create .claude structure
 ```
 
 ### USE_CLAUDE_MARKETPLACE
@@ -113,7 +110,7 @@ REPO_URLS=opvigil/opvigil-frontend,opvigil/opvigil-backend
 - **Affects**: `setup/configure_claude.sh`
 - **When enabled**:
   - Creates/updates `~/.claude/settings.json`
-  - Registers everything-claude-code marketplace
+  - Registers the everything-claude-code marketplace (great source for agents, skills, etc.)
   - Enables plugin automatically
 
 **Example**:
@@ -285,7 +282,7 @@ WHICH_EDITOR=cursor   # or vscode, both
 ```
 USE_CLAUDE_CODE (master toggle for CLI + config)
   ├── CLAUDE_CODE_CHANNEL (version/channel selection)
-  ├── USE_CLAUDE (direct copy of configs)
+  ├── USE_CLAUDE (create .claude/ structure, no clone)
   └── USE_CLAUDE_MARKETPLACE (marketplace setup)
 ```
 

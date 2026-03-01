@@ -22,7 +22,7 @@ cd .devcontainer/scripts/tests
 - ✅ Environment variables configuration
 - ✅ Log files creation
 - ✅ Claude Code CLI installation
-- ✅ Claude configuration (marketplace/direct copy)
+- ✅ Claude configuration (marketplace / .claude structure)
 - ✅ Git prompt (Oh My Zsh + Starship)
 - ✅ Modern CLI tools (eza, bat, fd, rg, zoxide)
 - ✅ Docker autocomplete

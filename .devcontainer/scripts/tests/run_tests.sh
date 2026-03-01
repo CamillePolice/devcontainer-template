@@ -213,7 +213,7 @@ if [ "$USE_CLAUDE_CODE" = "true" ]; then
             test_fail "Claude config directory not found" "Expected: .claude/"
         fi
     else
-        test_skip "Claude direct copy (USE_CLAUDE=false)"
+        test_skip "Claude project structure (USE_CLAUDE=false)"
     fi
     
     if [ "$USE_CLAUDE_MARKETPLACE" = "true" ]; then
