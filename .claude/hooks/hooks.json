@@ -1,0 +1,26 @@
+{
+    "hooks": {
+        "PostToolUse": [
+            {
+                "matcher": "tool_name == \"Bash\" && tool_result contains \"error\" || tool_result contains \"Error\"",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "echo '[gotcha] Build/runtime error encountered' >> /tmp/learning-notes.md"
+                    }
+                ]
+            }
+        ],
+        "Stop": [
+            {
+                "matcher": "",
+                "hooks": [
+                    {
+                        "type": "command",
+                        "command": "if [ -s /tmp/learning-notes.md ]; then echo '[session-end] Learning notes present - run capture-learning before closing' >&2; fi"
+                    }
+                ]
+            }
+        ]
+    }
+}

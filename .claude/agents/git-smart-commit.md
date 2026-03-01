@@ -2,10 +2,8 @@
 ---
 name: git-smart-commit
 description: |
-  Prépare et exécute les commits Git en respectant les conventions du projet.
-  Génère un message de commit valide, stage les fichiers appropriés, et
-  demande confirmation avant de committer et pousser.
-  Déclencher avec : "prépare un commit conventionnel" ou "smart commit" ou "@git-smart-commit"
+  Use proactively when the user wants to commit changes.
+  Triggers: "commit", "smart commit", "prépare un commit", "@git-smart-commit"
 model: sonnet
 tools: [Bash]
 ---
