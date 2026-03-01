@@ -10,6 +10,10 @@
 [![Claude Code](https://img.shields.io/badge/Claude_Code-enabled-D97757?style=flat-square&logo=anthropic)](https://claude.ai)
 [![VS Code](https://img.shields.io/badge/VS_Code-optimized-007ACC?style=flat-square&logo=visual-studio-code)](https://code.visualstudio.com)
 [![Supabase](https://img.shields.io/badge/Supabase-RAG_optional-3ECF8E?style=flat-square&logo=supabase)](https://supabase.com)
+[![tmux](https://img.shields.io/badge/tmux-multiplexer-1BB91F?style=flat-square)](docs/tmux.md)
+[![Hurl](https://img.shields.io/badge/Hurl-API_tests-FF6B35?style=flat-square)](https://hurl.dev)
+[![pre-commit](https://img.shields.io/badge/pre--commit-hooks-FAB040?style=flat-square&logo=pre-commit)](https://pre-commit.com)
+[![rtk](https://img.shields.io/badge/rtk-token_optimizer-000000?style=flat-square)](docs/rtk.md)
 
 ---
 
@@ -373,6 +377,7 @@ See **[Test Suite Documentation](scripts/tests/README.md)** for details.
 For detailed information on specific topics, see:
 
 - **[Installed Tools](docs/installed-tools.md)** - Shell environment, CLI tools, and aliases
+- **[Hurl](docs/hurl.md)** - HTTP requests in plain text (`.hurl` files), assertions, and CI
 - **[VS Code Extensions](docs/vscode-extensions.md)** - Extensions and stack-based installation
 - **[AI Agent Skills](docs/ai-skills.md)** - Enhance your AI coding assistants
 - **[Claude Code Configuration](docs/claude-code.md)** - Comprehensive Claude Code setup

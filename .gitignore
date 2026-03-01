@@ -60,7 +60,7 @@ pnpm-lock.yaml
 .Trashes
 ehthumbs.db
 Thumbs.db
-*~
+*~ 
 
 # IDE
 .idea/
