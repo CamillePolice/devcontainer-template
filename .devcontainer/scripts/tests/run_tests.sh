@@ -284,6 +284,7 @@ declare -A cli_tools=(
     ["fd"]="Modern find replacement"
     ["rg"]="Ripgrep - fast search"
     ["zoxide"]="Smart directory jumper"
+    ["hurl"]="HTTP requests in plain text"
 )
 
 installed_count=0

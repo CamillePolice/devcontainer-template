@@ -40,6 +40,7 @@ starship timings    # Show how long each module takes to render
 | 📁 `fd-find` | Better find replacement | `ffind` → `fd` |
 | 🚀 `zoxide` | Smart directory jumping | `cd` → `z` |
 | 🌐 `httpie` | Modern HTTP client | `http` |
+| 📋 `hurl` | HTTP requests defined in plain text (`.hurl` files) | `hurl` |
 | 📖 `tldr` | Simplified man pages | `help` |
 
 ## ⌨️ Aliases
@@ -95,3 +96,4 @@ To disable: Set `USE_CLI_TOOLS="false"` in devcontainer.json (if implemented).
 - **ripgrep**: https://github.com/BurntSushi/ripgrep
 - **bat**: https://github.com/sharkdp/bat
 - **zoxide**: https://github.com/ajeetdsouza/zoxide
+- **hurl**: https://hurl.dev

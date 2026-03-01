@@ -59,10 +59,23 @@ if sudo -n true 2>/dev/null; then
     if command -v tldr &> /dev/null; then
         tldr --update || true
     fi
+
+    # Hurl: fallback to official .deb if not in repos (e.g. older Debian)
+    if ! command -v hurl &> /dev/null; then
+        log "Installing hurl from official release..."
+        HURL_VERSION="7.1.0"
+        if curl -sSL -o /tmp/hurl.deb "https://github.com/Orange-OpenSource/hurl/releases/download/${HURL_VERSION}/hurl_${HURL_VERSION}_amd64.deb" && sudo apt install -y /tmp/hurl.deb; then
+            log "Successfully installed hurl ${HURL_VERSION} from GitHub release"
+            rm -f /tmp/hurl.deb
+        else
+            log "Warning: Could not install hurl from GitHub release"
+            rm -f /tmp/hurl.deb
+        fi
+    fi
 else
     log "Sudo requires password - skipping apt packages"
     log "Run this script with sudo access, or install manually:"
-    log "  sudo apt install -y fzf ripgrep bat fd-find httpie"
+    log "  sudo apt install -y fzf ripgrep bat fd-find httpie hurl"
     log "  # For eza, add the repository first:"
     log "  sudo mkdir -p /etc/apt/keyrings"
     log "  wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg"
@@ -174,6 +187,7 @@ command -v bat &> /dev/null || command -v batcat &> /dev/null && log "  - bat (b
 command -v fd &> /dev/null || command -v fdfind &> /dev/null && log "  - fd (better find)"
 command -v eza &> /dev/null && log "  - eza (better ls)"
 command -v http &> /dev/null && log "  - httpie (better curl)"
+command -v hurl &> /dev/null && log "  - hurl (HTTP requests in plain text)"
 command -v tldr &> /dev/null && log "  - tldr (simplified man pages)"
 
 # Ensure the script exits successfully
