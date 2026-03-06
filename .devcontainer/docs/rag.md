@@ -1,4 +1,3 @@
-
 # RAG (Retrieval-Augmented Generation)
 
 This document describes the RAG-First architecture: storing agent instructions in **Supabase** (pgvector) so Claude Code can retrieve them at runtime, enabling lightweight agent files (~30 lines) with rich knowledge stored in the cloud.
@@ -26,9 +25,9 @@ Configure in `devcontainer.json` and/or on the host (`~/.zshrc`):
 
 | Variable        | Required | Description                                                                                          |
 | --------------- | -------- | ---------------------------------------------------------------------------------------------------- |
-| `USE_RAG`     | No       | Set to `"true"`to enable RAG. Default:`false`.                                                   |
-| `RAG_DSN`     | Yes*     | PostgreSQL connection string for Supabase. Lives on the**host**only, never in the repo.        |
-| `RAG_PROJECT` | No       | Project name for scoping (e.g.`opvigil`,`archforge`). Defaults to `PROJECT_NAME`or `global`. |
+| `USE_RAG`     | No       | Set to `"true"` to enable RAG. Default: `false`.                                                    |
+| `RAG_DSN`     | Yes*     | PostgreSQL connection string for Supabase. Lives on the **host** only, never in the repo.           |
+| `RAG_PROJECT` | No       | Project name for scoping (e.g. `opvigil`, `archforge`). Defaults to `PROJECT_NAME` or `global`.    |
 
 * Required only when `USE_RAG=true`.
 
@@ -115,21 +114,21 @@ When `USE_RAG=true`, the devcontainer configures an **MCP (Model Context Protoco
 
 All RAG MCP assets live under `.devcontainer/mcp/rag/`:
 
-| File                         | Purpose                                                                 |
+| File                          | Purpose                                                                 |
 | ----------------------------- | ----------------------------------------------------------------------- |
-| `mcp-rag-server.js`          | Node.js MCP server (Supabase/pg); exposes tools to the editor.         |
-| `cursor-mcp.json`            | Cursor MCP config template (copied to `.cursor/mcp.json` if missing).   |
+| `mcp-rag-server.js`           | Node.js MCP server (Supabase/pg); exposes tools to the editor.         |
+| `cursor-mcp.json`             | Cursor MCP config template (copied to `.cursor/mcp.json` if missing).   |
 | `vscode-mcp.json`             | VS Code MCP config template (copied to `.vscode/mcp.json` if missing).  |
-| `rag-cursor-rules.mdc`       | Cursor rules for when to call RAG tools (→ `.cursor/rules-rag.mdc`).    |
-| `rag-copilot-instructions.md`| GitHub Copilot instructions (→ `.github/copilot-instructions.md`).      |
+| `rag-cursor-rules.mdc`        | Cursor rules for when to call RAG tools (→ `.cursor/rules-rag.mdc`).    |
+| `rag-copilot-instructions.md` | GitHub Copilot instructions (→ `.github/copilot-instructions.md`).      |
 | `package.json`                | Node deps for the server (e.g. `pg`).                                  |
 
 ### Environment
 
-| Variable       | Description                                                                 |
-| -------------- | --------------------------------------------------------------------------- |
-| `USE_RAG`      | Must be `"true"` for the MCP setup to run.                                  |
-| `WHICH_EDITOR` | `cursor` \| `vscode` \| `both`. Chooses which editor gets the MCP config. Default: `cursor`. |
+| Variable       | Description                                                                                          |
+| -------------- | ---------------------------------------------------------------------------------------------------- |
+| `USE_RAG`      | Must be `"true"` for the MCP setup to run.                                                           |
+| `WHICH_EDITOR` | `cursor` \| `vscode` \| `both`. Chooses which editor gets the MCP config. Default: `cursor`.        |
 
 Set in `.devcontainer/.env` (see `.env.example`). `RAG_DSN` and `RAG_PROJECT` are passed to the MCP server via the copied config.
 
@@ -153,23 +152,47 @@ Logs: `.devcontainer/.log/editor_mcp.log`
 Replaces the old `seed_archforge_rag.py`. Works for any project.
 
 ```bash
-# Index a full directory for an agent
-RAG_PROJECT="archforge" python3 seed_rag.py --dir . --agent archforge
-
 # Index a single file
 RAG_PROJECT="global" python3 seed_rag.py --file angular-expert-rag.md --agent angular-expert
-RAG_PROJECT="global" python3 seed_rag.py --file symfony-expert-rag.md --agent symfony-expert
+
+# Index multiple files in one pass (recommended for multi-source agents)
+RAG_PROJECT="global" python3 seed_rag.py \
+  --files SKILL.md security-expert-rag.md \
+  --agent security-expert
+
+# Add a file to an existing agent without touching other sections
+RAG_PROJECT="global" python3 seed_rag.py \
+  --file new-knowledge.md --agent security-expert --append
+
+# Index a full directory for an agent
+RAG_PROJECT="archforge" python3 seed_rag.py --dir . --agent archforge
 
 # Preview without writing
 python3 seed_rag.py --dir . --agent archforge --dry-run --preview
 
-# Reindex after source changes
-RAG_PROJECT="archforge" python3 seed_rag.py --dir . --agent archforge --force
+# Reindex after source changes (wipes and re-inserts everything)
+RAG_PROJECT="global" python3 seed_rag.py \
+  --files SKILL.md security-expert-rag.md \
+  --agent security-expert --force
 ```
+
+### Flags
+
+| Flag          | Description                                                                                  |
+| ------------- | -------------------------------------------------------------------------------------------- |
+| `--file`      | Index a single file.                                                                         |
+| `--files`     | Index multiple files in one pass. `--force` runs once before inserting all files.           |
+| `--dir`       | Index a full directory recursively.                                                          |
+| `--force`     | Deactivate **all** existing sections for the agent before reinserting. Use for full reindex. |
+| `--append`    | Insert without touching existing sections. Use to add a new file to an existing agent.      |
+| `--dry-run`   | Parse and preview without writing to the database.                                           |
+| `--preview`   | Show detail of parsed sections (combine with `--dry-run`).                                   |
+
+> `--force` and `--append` are mutually exclusive.
 
 ### What gets indexed
 
-* `*.md` files → split into semantic sections by H2/H3 headings
+* `*.md` files → split into semantic sections by H2/H3/H4 headings
 * `*.py` files → indexed as a single `reference` section (full source code)
 * `README.md` and `seed_rag.py` → always ignored
 * `.git`, `node_modules`, `__pycache__`, `.devcontainer`, `.venv`, `.claude` → always ignored
@@ -178,14 +201,37 @@ RAG_PROJECT="archforge" python3 seed_rag.py --dir . --agent archforge --force
 
 The script infers `section_type` automatically from section titles:
 
-| Pattern in title                              | section_type       |
-| --------------------------------------------- | ------------------ |
-| role, overview, objectif                      | `role`           |
-| phase N, étape N, step N, prompt N           | `process`        |
-| best practices, règles, standards, ai-rules  | `best_practices` |
-| fallback, edge case, gotcha, piège           | `edge_cases`     |
-| output, livrables, template de sortie         | `output_format`  |
-| prérequis, installation, stack, architecture | `reference`      |
+| Pattern in title                                          | section_type       |
+| --------------------------------------------------------- | ------------------ |
+| role, overview, objectif                                  | `role`             |
+| step N, phase N, étape N, prompt N, workflow              | `process`          |
+| language detection, criticality tier, anti-hallucination  | `process`          |
+| conflict resolution, security theater, exception mgmt     | `process`          |
+| best practices, règles, standards, ai-rules               | `best_practices`   |
+| SBD-N, input valid, authenticat, cryptograph, rate limit  | `best_practices`   |
+| layer N (SecureByDesign control groups)                   | `best_practices`   |
+| edge case, fallback, gotcha, false positive               | `edge_cases`       |
+| output, livrables, audit report, red flags                | `output_format`    |
+| standards mapping, compliance matrix                      | `output_format`    |
+| prérequis, installation, stack, architecture, owasp, nist | `reference`        |
+
+#### H4 support
+
+For large sections (> 4000 chars), the script now descends to H4 level. This allows proper splitting of deeply structured documents like SecureByDesign's 26 controls (each defined as `#### SBD-XX`).
+
+### Indexation report
+
+The report now shows sections **deactivated** by type when using `--force`, making it easy to compare before/after:
+
+```
+🗑  22 section(s) précédentes désactivées :
+   - best_practices                    1
+   - output_format                     1
+   - process                           8
+   - reference                        11
+   - role                              1
+✅ 38 section(s) insérées dans Supabase
+```
 
 ---
 
@@ -201,16 +247,17 @@ WHERE agent_name = 'angular-expert'
 
 This means:
 
-* `project='global'` → available in **all** projects (generic Angular/Symfony patterns)
+* `project='global'` → available in **all** projects (generic patterns)
 * `project='opvigil'` → available **only** in OPVigil (project-specific conventions)
 
 ### Current knowledge base
 
-| project   | agent_name     | sections |
-| --------- | -------------- | -------- |
-| archforge | archforge      | 197      |
-| global    | angular-expert | 16       |
-| global    | symfony-expert | 7        |
+| project   | agent_name      | sections |
+| --------- | --------------- | -------- |
+| archforge | archforge       | 197      |
+| global    | angular-expert  | 16       |
+| global    | symfony-expert  | 7        |
+| global    | security-expert | 38       |
 
 ---
 
@@ -250,7 +297,21 @@ echo "[gotcha] <edge case>" >> /tmp/learning-notes.md
 ```
 
 After task completion, invoke the `capture-learning` skill.
+```
 
+### Multi-source agents
+
+An agent can be fed from multiple files. Index them all in one pass with `--files`:
+
+```bash
+# security-expert loads both the SecureByDesign skill and its own RAG knowledge
+RAG_PROJECT="global" python3 seed_rag.py \
+  --files SKILL.md security-expert-rag.md \
+  --agent security-expert
+
+# Later, add new knowledge without touching the existing sections
+RAG_PROJECT="global" python3 seed_rag.py \
+  --file new-patterns.md --agent security-expert --append
 ```
 
 ---
@@ -263,13 +324,14 @@ After each non-trivial task, the active agent evaluates its discoveries and pers
 
 ### Global vs Project scope decision
 
-| Discovery type | Scope | Example |
-|---------------|-------|---------|
-| Generic Angular pattern | `global` | `linkedSignal` for dependent state |
-| Generic Symfony/PHP pattern | `global` | `(int)` cast for ID parameters |
-| Project-specific convention | `$RAG_PROJECT` | `HttpWrapperService` impl in OPVigil |
-| Project-specific bug/behavior | `$RAG_PROJECT` | `SpcRepository` expects int not string |
-| Tooling/workflow pattern | `global` | `seed_rag.py --force` reindexes cleanly |
+| Discovery type                   | Scope          | Example                                         |
+| -------------------------------- | -------------- | ----------------------------------------------- |
+| Generic Angular pattern          | `global`       | `linkedSignal` for dependent state              |
+| Generic Symfony/PHP pattern      | `global`       | `(int)` cast for ID parameters                  |
+| Generic security pattern         | `global`       | JWT storage gotcha, CORS false positive          |
+| Project-specific convention      | `$RAG_PROJECT` | `HttpWrapperService` impl in OPVigil            |
+| Project-specific bug/behavior    | `$RAG_PROJECT` | `SpcRepository` expects int not string          |
+| Tooling/workflow pattern         | `global`       | `seed_rag.py --files` for multi-source agents   |
 
 **When in doubt → `global`.** A generic pattern locked in a project scope is a missed reuse opportunity.
 
@@ -277,6 +339,7 @@ After each non-trivial task, the active agent evaluates its discoveries and pers
 
 - Angular discoveries → `angular-expert`
 - Symfony/PHP discoveries → `symfony-expert`
+- Security discoveries → `security-expert`
 - Project-specific conventions → `<agent-name>` with `project='$RAG_PROJECT'`
 - Cross-cutting knowledge → `learned-<descriptive-slug>`
 
@@ -299,23 +362,55 @@ psql "$RAG_DSN" -c "SELECT * FROM rag_audit;"
 ### 3. Index new knowledge
 
 ```bash
-# New agent knowledge file
+# New single-source agent
 RAG_PROJECT="global" python3 seed_rag.py --file my-agent-rag.md --agent my-agent
+
+# New multi-source agent (skill + knowledge file)
+RAG_PROJECT="global" python3 seed_rag.py \
+  --files SKILL.md my-agent-rag.md --agent my-agent
+
+# Add a file to an existing agent
+RAG_PROJECT="global" python3 seed_rag.py \
+  --file extra-knowledge.md --agent my-agent --append
 
 # Full project reindex
 RAG_PROJECT="archforge" python3 seed_rag.py --dir . --agent archforge --force
 ```
 
-### 4. Test an agent query
+### 4. Remove an agent from the database
+
+```bash
+# Soft delete (reversible — sets active=false)
+psql "$RAG_DSN" -c "
+UPDATE rag_agent_instructions SET active = false
+WHERE agent_name = 'my-agent' AND project = 'global';"
+
+# Hard delete (irreversible)
+psql "$RAG_DSN" -c "
+DELETE FROM rag_agent_instructions
+WHERE agent_name = 'my-agent' AND project = 'global';"
+```
+
+### 5. Test an agent query
 
 ```bash
 psql "$RAG_DSN" -t -A -c "
 SELECT section_type, section_title
 FROM rag_agent_instructions
-WHERE agent_name = 'angular-expert'
+WHERE agent_name = 'security-expert'
   AND project = 'global'
   AND active = true
 ORDER BY section_type, section_title;"
+```
+
+### 6. Inspect section distribution
+
+```bash
+psql "$RAG_DSN" -c "
+SELECT section_type, COUNT(*) as nb, SUM(length(content)) as total_chars
+FROM rag_agent_instructions
+WHERE agent_name = 'security-expert' AND active = true
+GROUP BY section_type ORDER BY nb DESC;"
 ```
 
 ---
@@ -349,7 +444,8 @@ ORDER BY section_type, section_title;"
 ├── agents/
 │   ├── angular-expert.md          # RAG-First agent (~30 lines)
 │   ├── symfony-expert.md          # RAG-First agent (~30 lines)
-│   └── archforge.md               # RAG-First agent (~30 lines)
+│   ├── archforge.md               # RAG-First agent (~30 lines)
+│   └── security-expert.md         # RAG-First agent — SecureByDesign skill + knowledge
 └── skills/
     └── capture-learning/
         └── SKILL.md               # Auto-learning skill (global vs project logic)
@@ -361,7 +457,9 @@ ORDER BY section_type, section_title;"
 
 **RAG setup failed (non-critical)** — Either `USE_RAG` is not `true`, `RAG_DSN` is unset on the host, or Supabase is unreachable. Agents still work with their local bootstrap content.
 
-**seed_rag.py — existing sections warning** — Use `--force` to reindex after source changes.
+**seed_rag.py — existing sections warning** — Use `--force` to fully reindex, or `--append` to add a new file without touching existing sections.
+
+**Multi-source agent wiped by second `--force`** — Use `--files` to index all sources in one pass. `--force` deactivates the entire agent before inserting, so running it twice in sequence wipes the first batch.
 
 **Wrong agent_name in base** — Happened when `--agent` wasn't specified. Fix with:
 
@@ -373,3 +471,5 @@ WHERE agent_name = 'wrong-name'
 ```
 
 **No rows in rag_audit** — Run `seed_rag.py` at least once after configuring RAG.
+
+**Too many sections in `reference`** — The script infers `section_type` from heading titles. If your document uses non-standard titles, they fall back to `reference`. Check with `--dry-run --preview` and either rename headings or add patterns to `SECTION_TYPE_RULES` in `seed_rag.py`.

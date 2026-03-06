@@ -50,6 +50,7 @@ except ImportError:
 SECTION_TYPE_RULES: list[tuple[str, str]] = [
     # Rôle / présentation
     (r"^role$|rôle|vue\s+d.ensemble|objectif|présentation|overview|who\s+you\s+are", "role"),
+
     # Process / procédure
     (r"phase\s+\d|étape\s+\d|step\s+\d|phase\s+[a-z]|partie\s+[a-g]", "process"),
     (r"phase\s+0|initialisation|démarrage|setup", "process"),
@@ -61,21 +62,48 @@ SECTION_TYPE_RULES: list[tuple[str, str]] = [
     (r"prompt\s+\d|itérat|workflow|process|methodology|méthodologie", "process"),
     (r"arbre\s+de\s+décision|question\s+\d|choix|migration\s+priority", "process"),
     (r"comment\s+utiliser|quand\s+utiliser|when\s+to\s+use", "process"),
-    # Best practices
+    # SecureByDesign — STEP (process procédural du skill)
+    (r"^step\s+\d|^étape\s+\d", "process"),
+    (r"language\s+detection|criticality\s+tier|anti.hallucination", "process"),
+    (r"conflict\s+resol|security\s+theater|exception\s+manag", "process"),
+
+    # Best practices — contrôles SBD et patterns de sécurité
     (r"best[\s_]practic|bonnes?\s+pratiques?|règles?\s+transversales?|standards?", "best_practices"),
     (r"ai.rules|code\s+style|conventions?|guidelines?", "best_practices"),
     (r"testing\s+standard|test\s+organ|mock\s+pattern", "best_practices"),
     (r"logging|error\s+handling|gestion\s+d.erreur", "best_practices"),
     (r"prohibited|forbidden|what\s+not\s+to|ne\s+pas\s+utiliser", "best_practices"),
     (r"typescript.*native|native.*typescript|ramda", "best_practices"),
+    # SecureByDesign — contrôles SBD individuels
+    (r"^sbd-\d+|sbd\s+\d+", "best_practices"),
+    (r"input\s+valid|output\s+encod|prompt\s+inject", "best_practices"),
+    (r"authenticat|authoriz|least\s+privil", "best_practices"),
+    (r"secrets?\s+manag|cryptograph|key\s+manag", "best_practices"),
+    (r"data\s+minimiz|rate\s+limit|ssrf", "best_practices"),
+    (r"depend.*scan|ci.cd\s+integ|supply\s+chain", "best_practices"),
+    (r"llm\s+integr|rag\s+secur|system\s+prompt", "best_practices"),
+    (r"network|cors|secure\s+design|governance", "best_practices"),
+    (r"asset\s+inventor|incident\s+response|privacy", "best_practices"),
+    (r"frontend\s+framework|angular.*secur|react.*secur|vue.*secur", "best_practices"),
+    # SecureByDesign — LAYER groupings (H3 sous les 26 contrôles)
+    (r"layer\s+\d|couche\s+\d", "best_practices"),
+
     # Edge cases
     (r"edge\s+case|cas\s+limite|fallback|mode\s+manuel|reprise|interruption", "edge_cases"),
     (r"breaking.changes|dépréciat|migration\s+note|gotcha|piège|problème", "edge_cases"),
     (r"common\s+diff|type\s+evolution|known\s+issue", "edge_cases"),
-    # Output format
+    # SecureByDesign — faux positifs et exceptions
+    (r"false\s+positive|exception.*valid|acceptable.*deviation", "edge_cases"),
+    (r"security\s+theater|decorative|bypass.*acceptable", "edge_cases"),
+
+    # Output format — rapports et templates
     (r"output|sortie\s+attendue|livrables?|template\s+de\s+sortie|format\s+de\s+sortie", "output_format"),
     (r"résultat\s+attendu|exemple\s+de\s+sortie|checklist", "output_format"),
-    # Reference
+    # SecureByDesign — rapport d'audit et quick reference
+    (r"audit\s+report|rapport\s+d.audit|quick\s+reference|red\s+flags?", "output_format"),
+    (r"standards?\s+mapping|compliance\s+matrix|scope\s+of\s+assurance", "output_format"),
+
+    # Reference — architecture, stack, standards
     (r"prérequis|installation|dépendances|outils|stack|technology", "reference"),
     (r"architecture|structure|infrastructure", "reference"),
     (r"scripts?|convert_|merge_|generate_", "reference"),
@@ -83,6 +111,9 @@ SECTION_TYPE_RULES: list[tuple[str, str]] = [
     (r"contribuer|licence|changelog|readme", "reference"),
     (r"guide\s+spécialisé|articulation|index|table\s+of\s+contents", "reference"),
     (r"scss|bootstrap|css|styling", "reference"),
+    # SecureByDesign — standards et mappings
+    (r"owasp|nist|iso.*27001|cis\s+control|gdpr|hipaa|ccpa|pci", "reference"),
+    (r"version.*changelog|skill\s+v\d|released", "reference"),
 ]
 
 DEFAULT_SECTION_TYPE = "reference"
@@ -253,19 +284,60 @@ def split_into_sections(
                     h3_content = section_content[h3_start:h3_end].strip()
                     h3_type = infer_section_type(h3_title, section_type)
 
-                    sections.append(RagSection(
-                        agent_name=agent_name,
-                        project=project,
-                        section_type=h3_type,
-                        section_title=f"{section_title} — {h3_title}",
-                        content=h3_content,
-                        source_file=source_file,
-                        metadata={
-                            "source_file": source_file,
-                            "heading_level": 3,
-                            "parent_section": section_title,
-                        },
-                    ))
+                    if len(h3_content) <= MAX_CHARS:
+                        sections.append(RagSection(
+                            agent_name=agent_name,
+                            project=project,
+                            section_type=h3_type,
+                            section_title=f"{section_title} — {h3_title}",
+                            content=h3_content,
+                            source_file=source_file,
+                            metadata={
+                                "source_file": source_file,
+                                "heading_level": 3,
+                                "parent_section": section_title,
+                            },
+                        ))
+                    else:
+                        # H3 encore trop grande → découpage sur H4 (ex: contrôles SBD)
+                        h4_pattern = re.compile(r"^#{4}\s+(.+)$", re.MULTILINE)
+                        h4_splits = list(h4_pattern.finditer(h3_content))
+
+                        if not h4_splits:
+                            sections.append(RagSection(
+                                agent_name=agent_name,
+                                project=project,
+                                section_type=h3_type,
+                                section_title=f"{section_title} — {h3_title}",
+                                content=h3_content,
+                                source_file=source_file,
+                                metadata={
+                                    "source_file": source_file,
+                                    "heading_level": 3,
+                                    "parent_section": section_title,
+                                },
+                            ))
+                        else:
+                            for k, h4_match in enumerate(h4_splits):
+                                h4_title = h4_match.group(1).strip()
+                                h4_start = h4_match.start()
+                                h4_end = h4_splits[k + 1].start() if k + 1 < len(h4_splits) else len(h3_content)
+                                h4_content = h3_content[h4_start:h4_end].strip()
+                                h4_type = infer_section_type(h4_title, h3_type)
+
+                                sections.append(RagSection(
+                                    agent_name=agent_name,
+                                    project=project,
+                                    section_type=h4_type,
+                                    section_title=h4_title,
+                                    content=h4_content,
+                                    source_file=source_file,
+                                    metadata={
+                                        "source_file": source_file,
+                                        "heading_level": 4,
+                                        "parent_section": f"{section_title} — {h3_title}",
+                                    },
+                                ))
 
     return sections
 
@@ -392,14 +464,23 @@ def count_existing(conn, agent_name: str, project: str) -> int:
         return cur.fetchone()[0]
 
 
-def delete_existing(conn, agent_name: str, project: str) -> int:
+def delete_existing(conn, agent_name: str, project: str) -> tuple:
+    """Désactive les sections existantes et retourne (total, répartition par type)."""
     with conn.cursor() as cur:
+        cur.execute(
+            "SELECT section_type, COUNT(*) FROM rag_agent_instructions "
+            "WHERE agent_name = %s AND project = %s AND active = true "
+            "GROUP BY section_type ORDER BY section_type",
+            (agent_name, project),
+        )
+        by_type = {row[0]: row[1] for row in cur.fetchall()}
         cur.execute(
             "UPDATE rag_agent_instructions SET active = false "
             "WHERE agent_name = %s AND project = %s AND active = true",
             (agent_name, project),
         )
-        return cur.rowcount
+        return cur.rowcount, by_type
+
 
 
 def insert_sections(conn, sections: list[RagSection]) -> int:
@@ -439,7 +520,7 @@ def print_preview(sections: list[RagSection]) -> None:
             print(f"    • {s.section_title[:70]:<70} ({s.char_count()} chars) [{s.source_file}]")
 
 
-def print_report(sections: list[RagSection], inserted: int, deleted: int, dry_run: bool) -> None:
+def print_report(sections: list[RagSection], inserted: int, deleted: int, deleted_by_type: dict, dry_run: bool) -> None:
     print()
     print(SEP)
     print("  RAPPORT D'INDEXATION → SUPABASE RAG")
@@ -473,7 +554,9 @@ def print_report(sections: list[RagSection], inserted: int, deleted: int, dry_ru
         print("  🔍 DRY RUN — Aucune modification en base")
     else:
         if deleted:
-            print(f"  🗑  {deleted} section(s) précédentes désactivées")
+            print(f"  🗑  {deleted} section(s) précédentes désactivées :")
+            for stype, count in sorted(deleted_by_type.items()):
+                print(f"     - {stype:<30} {count:>4}")
         print(f"  ✅ {inserted} section(s) insérées dans Supabase")
     print(SEP)
     print()
@@ -491,13 +574,15 @@ def parse_args() -> argparse.Namespace:
 Exemples :
   python seed_rag.py --dir . --agent archforge
   python seed_rag.py --file angular-expert-rag.md --agent angular-expert
-  python seed_rag.py --file symfony-expert-rag.md --agent symfony-expert --project global
+  python seed_rag.py --files SKILL.md expert-rag.md --agent security-expert --force
+  python seed_rag.py --file new-knowledge.md --agent security-expert --append
   python seed_rag.py --dir ./docs --agent mon-agent --dry-run --preview
   python seed_rag.py --dir . --agent archforge --force
         """,
     )
-    parser.add_argument("--dir",  "-d", type=Path, help="Dossier à indexer récursivement")
-    parser.add_argument("--file", "-f", type=Path, help="Fichier unique à indexer")
+    parser.add_argument("--dir",   "-d", type=Path, help="Dossier à indexer récursivement")
+    parser.add_argument("--file",  "-f", type=Path, help="Fichier unique à indexer")
+    parser.add_argument("--files", "-F", type=Path, nargs="+", help="Plusieurs fichiers à indexer en une passe")
     parser.add_argument(
         "--agent", "-a", required=True,
         help="Nom de l'agent dans Supabase (ex: archforge, angular-expert)",
@@ -508,7 +593,8 @@ Exemples :
         help="Projet RAG (défaut: $RAG_PROJECT ou 'global')",
     )
     parser.add_argument("--dry-run",  action="store_true", help="Prévisualise sans écrire en base")
-    parser.add_argument("--force",    action="store_true", help="Réindexe en désactivant l'existant")
+    parser.add_argument("--force",    action="store_true", help="Désactive tout l'agent puis réindexe")
+    parser.add_argument("--append",   action="store_true", help="Ajoute sans toucher aux sections existantes")
     parser.add_argument("--preview",  action="store_true", help="Affiche le détail des sections parsées")
     return parser.parse_args()
 
@@ -520,8 +606,12 @@ Exemples :
 def main() -> int:
     args = parse_args()
 
-    if not args.dir and not args.file:
-        print("❌ Spécifier --dir ou --file", file=sys.stderr)
+    if not args.dir and not args.file and not args.files:
+        print("❌ Spécifier --dir, --file ou --files", file=sys.stderr)
+        return 1
+
+    if args.force and args.append:
+        print("❌ --force et --append sont incompatibles", file=sys.stderr)
         return 1
 
     dsn = os.environ.get("RAG_DSN")
@@ -537,13 +627,18 @@ def main() -> int:
     print(f"  Projet   : {args.project}")
     print(f"  Mode     : {'DRY RUN' if args.dry_run else 'ÉCRITURE'}")
     if args.force:
-        print("  ⚠  --force : sections existantes désactivées avant insertion")
+        print("  ⚠  --force : toutes les sections existantes désactivées avant insertion")
+    if args.append:
+        print("  ➕ --append : ajout sans toucher aux sections existantes")
     print()
 
     # Découverte des fichiers
     files: list[tuple[Path, str]] = []
 
-    if args.file:
+    if args.files:
+        for f in args.files:
+            files.append((f, args.agent))
+    elif args.file:
         files.append((args.file, args.agent))
     else:
         print(f"🔍 Recherche dans : {args.dir}")
@@ -577,7 +672,7 @@ def main() -> int:
         print_preview(all_sections)
 
     if args.dry_run:
-        print_report(all_sections, inserted=0, deleted=0, dry_run=True)
+        print_report(all_sections, inserted=0, deleted=0, deleted_by_type={}, dry_run=True)
         return 0
 
     # Connexion Supabase
@@ -591,14 +686,17 @@ def main() -> int:
 
     # Vérification / suppression existant
     deleted = 0
+    deleted_by_type: dict = {}
     existing = count_existing(conn, args.agent, args.project)
     if existing > 0:
         if args.force:
             print(f"🗑  Désactivation de {existing} sections existantes pour '{args.agent}' / '{args.project}'...")
-            deleted = delete_existing(conn, args.agent, args.project)
+            deleted, deleted_by_type = delete_existing(conn, args.agent, args.project)
+        elif args.append:
+            print(f"  ➕ {existing} sections existantes conservées — ajout par-dessus")
         else:
             print(f"\n⚠  {existing} sections existent déjà pour '{args.agent}' / projet '{args.project}'")
-            print("   Utiliser --force pour réindexer")
+            print("   Utiliser --force pour tout réindexer, ou --append pour ajouter")
             conn.close()
             return 1
 
@@ -627,7 +725,7 @@ def main() -> int:
             print(f"  {stype:<30} {count:>4} sections")
 
     conn.close()
-    print_report(all_sections, inserted=inserted, deleted=deleted, dry_run=False)
+    print_report(all_sections, inserted=inserted, deleted=deleted, deleted_by_type=deleted_by_type, dry_run=False)
     return 0
 
 
