@@ -43,7 +43,12 @@
   "containerEnv": {
     // !! Core (chemins résolus par devcontainer, ne peuvent pas aller dans .env)
     "PROJECT_ROOT": "${containerWorkspaceFolder}",
-    "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts"
+    "DEVCONTAINER_SCRIPTS": "${containerWorkspaceFolder}/.devcontainer/scripts",
+
+    // !! Beads — git-backed graph issue tracker for AI agents
+    // Set to "true" to install the `bd` CLI and initialize Beads in the project.
+    // See: https://github.com/steveyegge/beads
+    "USE_BEADS": "true"
   },
   // !! Share SSH keys and command history
   "runArgs": [

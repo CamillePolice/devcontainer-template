@@ -54,13 +54,6 @@ log "Create project status file"
 touch .devcontainer/scripts/project_status
 echo "project_status_initialization=false" > .devcontainer/scripts/project_status
 
-log "Cloning repositories (REPO_URLS from .devcontainer/.env)"
-if "$SCRIPT_DIR/lifecycle/clone_repos.sh"; then
-    log "Successfully executed clone_repos.sh script"
-else
-    log "WARNING: clone_repos.sh failed or skipped (non-critical)"
-fi
-
 log "Configuring git prompt"
 if "$SCRIPT_DIR/setup/configure_git_prompt.sh"; then
     log "Successfully executed configure_git_prompt.sh script"
@@ -101,11 +94,22 @@ else
     exit 1
 fi
 
-log "Installing rtk (Rust Token Killer — LLM token optimizer)"
-if "$SCRIPT_DIR/setup/install_rtk.sh"; then
-    log "Successfully executed install_rtk.sh script"
+# -----------------------------------------------------------------------------
+# Beads — git-backed graph issue tracker for AI agents
+# -----------------------------------------------------------------------------
+# When USE_BEADS=true, installs the `bd` CLI (via npm) and runs `bd init`
+# in the project root. Beads provides persistent, structured task memory
+# for coding agents, replacing flat markdown plans with a dependency-aware
+# graph backed by Dolt (versioned SQL).
+#
+# See: https://github.com/steveyegge/beads
+# Commands: bd ready | bd create "Title" -p 0 | bd update <id> --claim
+# -----------------------------------------------------------------------------
+log "Installing Beads task tracker"
+if "$SCRIPT_DIR/setup/install_beads.sh"; then
+    log "Successfully installed Beads"
 else
-    log "WARNING: install_rtk.sh failed (non-critical)"
+    log "WARNING: Beads installation failed (non-critical, continuing)"
 fi
 
 # -----------------------------------------------------------------------------
