@@ -7,6 +7,20 @@
 
 ---
 
+## Task Tracking (Beads)
+
+Use `bd` for task tracking and persistent memory across sessions.
+
+- **Before starting any task** — run `bd ready` to see available tasks with no blockers
+- **Claim before working** — run `bd update <id> --claim`
+- **Create if missing** — run `bd create "Title" -p <0-3>` (0 = critical, 3 = low)
+- **Link dependencies** — run `bd dep add <child> <parent>`
+- **Complete** — run `bd update <id> --status done`
+
+Never work on a blocked task. Always claim before starting to avoid multi-agent conflicts.
+
+---
+
 ## Security — Hard limits, never violate
 
 - Never hardcode credentials, API keys, tokens, or passwords
