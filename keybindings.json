@@ -1,0 +1,375 @@
+[
+  {
+      "key": "cmd+shift+/",
+      "command": "editor.action.commentLine",
+      "when": "editorTextFocus && !editorReadonly"
+  },
+  {
+      "key": "cmd+/",
+      "command": "-editor.action.commentLine",
+      "when": "editorTextFocus && !editorReadonly"
+  },
+  {
+      "key": "cmd+enter",
+      "command": "editor.action.autoFix",
+      "when": "editorTextFocus && !editorReadonly && supportedCodeAction =~ /(\\s|^)quickfix\\b/"
+  },
+  {
+      "key": "shift+alt+.",
+      "command": "-editor.action.autoFix",
+      "when": "editorTextFocus && !editorReadonly && supportedCodeAction =~ /(\\s|^)quickfix\\b/"
+  },
+  {
+      "key": "cmd+shift+n",
+      "command": "workbench.action.quickOpen"
+  },
+  {
+      "key": "cmd+e",
+      "command": "-workbench.action.quickOpen"
+  },
+  {
+      "key": "cmd+k",
+      "command": "git.commit"
+  },
+  {
+      "key": "cmd+alt+l",
+      "command": "editor.action.reindentlines"
+  },
+  {
+      "key": "shift+alt+l",
+      "command": "editor.action.reindentselectedlines"
+  },
+  {
+      "key": "cmd+shift+alt+l",
+      "command": "prettier.forceFormatDocument"
+  },
+  {
+      "key": "alt+<",
+      "command": "editor.action.smartSelect.shrink",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "shift+alt+left",
+      "command": "-editor.action.smartSelect.shrink",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "shift+alt+<",
+      "command": "editor.action.smartSelect.expand",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "shift+alt+right",
+      "command": "-editor.action.smartSelect.expand",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "alt+m",
+      "command": "turboConsoleLog.displayLogMessage"
+  },
+  {
+      "key": "cmd+alt+l",
+      "command": "-turboConsoleLog.displayLogMessage"
+  },
+  {
+      "key": "cmd+alt+1",
+      "command": "workbench.action.terminal.focusNextPane",
+      "when": "terminalFocus && terminalProcessSupported"
+  },
+  {
+      "key": "alt+down",
+      "command": "-workbench.action.terminal.focusNextPane",
+      "when": "terminalFocus && terminalProcessSupported"
+  },
+  {
+      "key": "shift+alt+k",
+      "command": "extension.updateSettings"
+  },
+  {
+      "key": "shift+alt+u",
+      "command": "-extension.updateSettings"
+  },
+  {
+      "key": "shift+alt+m",
+      "command": "extension.downloadSettings"
+  },
+  {
+      "key": "shift+alt+d",
+      "command": "-extension.downloadSettings"
+  },
+  {
+      "key": "cmd+shift+up",
+      "command": "editor.action.insertCursorAbove",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+alt+up",
+      "command": "-editor.action.insertCursorAbove",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+shift+down",
+      "command": "editor.action.insertCursorBelow",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+alt+down",
+      "command": "-editor.action.insertCursorBelow",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+shift+x",
+      "command": "workbench.view.scm",
+      "when": "workbench.scm.active && !gitlens:disabled && config.gitlens.keymap == 'chorded'"
+  },
+  {
+      "key": "cmd+shift+g g",
+      "command": "-workbench.view.scm",
+      "when": "workbench.scm.active && !gitlens:disabled && config.gitlens.keymap == 'chorded'"
+  },
+  {
+      "key": "cmd+alt+x",
+      "command": "workbench.action.quickOpenTerm"
+  },
+  {
+      "key": "cmd+alt+d",
+      "command": "workbench.action.addComment"
+  },
+  {
+      "key": "cmd+pageup",
+      "command": "bookmarks.jumpToNext",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+alt+l",
+      "command": "-bookmarks.jumpToNext",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+pagedown",
+      "command": "bookmarks.jumpToPrevious",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "cmd+alt+j",
+      "command": "-bookmarks.jumpToPrevious",
+      "when": "editorTextFocus"
+  },
+  {
+      "key": "alt+\\",
+      "command": "codesnap.start"
+  },
+  {
+      "key": "cmd+alt+b",
+      "command": "workbench.action.toggleAuxiliaryBar"
+  },
+  {
+      "key": "cmd+shift+alt+a",
+      "command": "vscode-chatgpt.explain",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+4",
+      "command": "-vscode-chatgpt.explain",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+z",
+      "command": "vscode-chatgpt.findProblems",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+2",
+      "command": "-vscode-chatgpt.findProblems",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+q",
+      "command": "vscode-chatgpt.optimize",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+3",
+      "command": "-vscode-chatgpt.optimize",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+e",
+      "command": "vscode-chatgpt.addComments",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+5",
+      "command": "-vscode-chatgpt.addComments",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+t",
+      "command": "vscode-chatgpt.adhoc",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+7",
+      "command": "-vscode-chatgpt.adhoc",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+r",
+      "command": "vscode-chatgpt.addTests",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+1",
+      "command": "-vscode-chatgpt.addTests",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+y",
+      "command": "vscode-chatgpt.completeCode",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+6",
+      "command": "-vscode-chatgpt.completeCode",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+q",
+      "command": "vscode-chatgpt.freeText"
+  },
+  {
+      "key": "cmd+shift+alt+s",
+      "command": "workbench.view.extension.vscode-chatgpt-view-container"
+  },
+  {
+      "key": "cmd+shift+alt+f",
+      "command": "editor.action.formatSelection",
+      "when": "editorHasDocumentSelectionFormattingProvider && editorTextFocus && !editorReadonly"
+  },
+  {
+      "key": "cmd+k cmd+f",
+      "command": "-editor.action.formatSelection",
+      "when": "editorHasDocumentSelectionFormattingProvider && editorTextFocus && !editorReadonly"
+  },
+  {
+      "key": "cmd+shift+alt+t",
+      "command": "chatgpt-vscode.adhoc",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+7",
+      "command": "-chatgpt-vscode.adhoc",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+e",
+      "command": "chatgpt-vscode.addComments",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+5",
+      "command": "-chatgpt-vscode.addComments",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+r",
+      "command": "chatgpt-vscode.addTests",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+1",
+      "command": "-chatgpt-vscode.addTests",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+y",
+      "command": "chatgpt-vscode.completeCode",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+6",
+      "command": "-chatgpt-vscode.completeCode",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+a",
+      "command": "chatgpt-vscode.explain",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+4",
+      "command": "-chatgpt-vscode.explain",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+z",
+      "command": "chatgpt-vscode.findProblems",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+2",
+      "command": "-chatgpt-vscode.findProblems",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+d",
+      "command": "chatgpt-vscode.generateCode",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+a",
+      "command": "-chatgpt-vscode.generateCode",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+q",
+      "command": "chatgpt-vscode.optimize",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+k cmd+shift+3",
+      "command": "-chatgpt-vscode.optimize",
+      "when": "editorHasSelection"
+  },
+  {
+      "key": "cmd+shift+alt+s",
+      "command": "chatgpt-vscode.oneShot"
+  },
+  {
+      "key": "cmd+shift+alt+i",
+      "command": "editor.action.revealDefinition",
+      "when": "editorHasDefinitionProvider && editorTextFocus && !isInEmbeddedEditor"
+  },
+  {
+      "key": "f12",
+      "command": "-editor.action.revealDefinition",
+      "when": "editorHasDefinitionProvider && editorTextFocus && !isInEmbeddedEditor"
+  },
+  {
+      "key": "shift+f12",
+      "command": "editor.action.goToImplementation",
+      "when": "editorHasImplementationProvider && editorTextFocus && !isInEmbeddedEditor"
+  },
+  {
+      "key": "cmd+f12",
+      "command": "-editor.action.goToImplementation",
+      "when": "editorHasImplementationProvider && editorTextFocus && !isInEmbeddedEditor"
+  },
+  {
+      "key": "cmd+p",
+      "command": "-workbench.action.quickOpen"
+  },
+  {
+      "key": "cmd+p",
+      "command": "editor.action.goToReferences",
+      "when": "editorHasReferenceProvider && editorTextFocus && !inReferenceSearchEditor && !isInEmbeddedEditor"
+  },
+  {
+      "key": "shift+f12", "command": "-editor.action.goToReferences", "when": "editorHasReferenceProvider && editorTextFocus && !inReferenceSearchEditor && !isInEmbeddedEditor" }, { "key": "cmd+p", "command": "goToPreviousReference", "when": "inReferenceSearchEditor || referenceSearchVisible"
+  },
+  {
+      "key": "shift+f12",
+      "command": "-goToPreviousReference",
+      "when": "inReferenceSearchEditor || referenceSearchVisible"
+  }
+]
