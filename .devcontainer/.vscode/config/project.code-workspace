@@ -55,7 +55,7 @@
             ".prettierrc": "json",
             ".eslintrc": "jsonc"
         },
-        
+
         // === Editor ===
         "editor.formatOnSave": true,
         "editor.formatOnPaste": false,
@@ -81,7 +81,7 @@
         "editor.unicodeHighlight.ambiguousCharacters": true,
         "editor.unicodeHighlight.invisibleCharacters": true,
         "editor.accessibilitySupport": "auto",
-        
+
         // === Language Specific ===
         "[typescript]": {
             "editor.defaultFormatter": "esbenp.prettier-vscode",
@@ -128,18 +128,14 @@
             "editor.wordWrap": "on",
             "editor.tabSize": 2
         },
-        "[php]": {
-            "editor.defaultFormatter": "junstyle.php-cs-fixer",
-            "editor.tabSize": 4
-        },
-        
+
         // === Terminal ===
         "terminal.integrated.cwd": "${workspaceFolder}",
         "terminal.integrated.fontSize": 14,
         "terminal.integrated.cursorBlinking": true,
         "terminal.integrated.cursorStyle": "line",
         "terminal.integrated.scrollback": 10000,
-        
+
         // === Git ===
         "git.enableSmartCommit": true,
         "git.confirmSync": false,
@@ -148,17 +144,17 @@
         "git.pruneOnFetch": true,
         "git.fetchOnPull": true,
         "git.branchProtection": ["main", "master", "develop"],
-        "git.inputValidation": "always",
+        "git.inputValidation": true,
         "git.showPushSuccessNotification": true,
-        
+
         // === Docker ===
         "docker.showStartPage": false,
-        
+
         // === Prettier ===
         "prettier.enable": true,
         "prettier.requireConfig": true,
         "prettier.useEditorConfig": true,
-        
+
         // === ESLint ===
         "eslint.enable": true,
         "eslint.format.enable": true,
@@ -169,13 +165,13 @@
             "typescript",
             "typescriptreact"
         ],
-        
+
         // === Search ===
         "search.smartCase": true,
         "search.useIgnoreFiles": true,
         "search.followSymlinks": false,
         "search.quickOpen.includeSymbols": true,
-        
+
         // === Workbench ===
         "workbench.editor.enablePreview": false,
         "workbench.editor.revealIfOpen": true,
@@ -184,16 +180,16 @@
         "workbench.settings.enableNaturalLanguageSearch": false,
         "workbench.startupEditor": "none",
         "workbench.iconTheme": "material-icon-theme",
-        
+
         // === Security ===
         "security.workspace.trust.enabled": true,
         "security.workspace.trust.untrustedFiles": "prompt",
         "security.workspace.trust.startupPrompt": "always",
-        
+
         // === Performance ===
         "extensions.ignoreRecommendations": false,
         "extensions.autoUpdate": false,
-        
+
         // === Emmet ===
         "emmet.includeLanguages": {
             "typescript": "html",
@@ -201,11 +197,11 @@
         },
         "emmet.triggerExpansionOnTab": true,
         "emmet.showExpandedAbbreviation": "inMarkupAndStylesheetFilesOnly",
-        
+
         // === Breadcrumbs ===
         "breadcrumbs.enabled": true,
         "breadcrumbs.symbolPath": "on",
-        
+
         // === Problems ===
         "problems.autoReveal": true,
         "problems.showCurrentInStatus": true
