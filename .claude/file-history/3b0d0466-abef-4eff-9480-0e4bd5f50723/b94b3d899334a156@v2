@@ -1,0 +1,34 @@
+<template>
+  <div
+    v-if="anomalies?.length"
+    class="mt-4 flex flex-col gap-2"
+  >
+    <UAlert
+      v-for="(anomaly, index) in anomalies"
+      :key="`${anomaly.type}-${index}`"
+      icon="i-heroicons-exclamation-triangle"
+      :color="anomaly.severity === 'error' ? 'error' : 'warning'"
+      variant="soft"
+      :title="t(anomaly.messageKey, anomaly.params)"
+      :closeable="false"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { LotAnomaly } from '#shared/types/anomaly'
+import type { ToFixWorklog } from '#shared/types/worklog'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
+const props = defineProps<{
+  o2i: string
+  toFixWorklogs: ToFixWorklog[] | null | undefined
+}>()
+
+const { data: anomalies } = useFetch<LotAnomaly[]>(
+  () => `/api/lots/${props.o2i}/anomalies`,
+  { watch: [() => props.toFixWorklogs] },
+)
+</script>

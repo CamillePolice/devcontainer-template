@@ -1,0 +1,43 @@
+<template>
+  <LotOverview
+    :data="currentLot"
+    :error="error"
+    :pending="loadingCurrent"
+    class="mt-8"
+    @refresh="handleRefresh"
+  />
+</template>
+
+<script setup lang="ts">
+const { t } = useI18n()
+const pageTitle = computed(() => t('pages.lot.title'))
+
+useHead({ title: pageTitle })
+
+const route = useRoute()
+watchEffect(() => {
+  route.meta.title = pageTitle.value
+})
+
+const lotO2index = computed(() => route.params.o2i as string)
+
+const { currentLot, error, loadingCurrent, fetchLotOverview } = useLot()
+
+const breadcrumb = useBreadcrumb()
+breadcrumb.setItems([
+  { label: 'ProjectFlow' },
+  { label: t('pages.lot.breadcrumb'), to: '/' },
+])
+
+await fetchLotOverview(lotO2index.value)
+
+watch(lotO2index, async (newO2i) => {
+  if (newO2i) {
+    await fetchLotOverview(newO2i)
+  }
+})
+
+async function handleRefresh() {
+  await fetchLotOverview(lotO2index.value)
+}
+</script>

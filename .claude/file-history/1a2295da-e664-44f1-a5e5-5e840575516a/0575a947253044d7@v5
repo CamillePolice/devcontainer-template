@@ -1,0 +1,32 @@
+import type { H3Event } from 'h3'
+
+/**
+ * Validates the secret of an incoming Jira automation request.
+ * Expects the secret in the `x-automation-secret` header.
+ */
+export function verifyAutomationSecret(event: H3Event): void {
+  const config = useRuntimeConfig()
+  const secret = config.webhookSecret
+
+  if (!secret) {
+    throw createError({ statusCode: 500, statusMessage: 'Automation secret not configured' })
+  }
+
+  const receivedSecret = getHeader(event, 'x-automation-secret')
+  if (!receivedSecret) {
+    throw createError({ statusCode: 401, statusMessage: 'Missing automation secret' })
+  }
+
+  if (!timingSafeEqual(secret, receivedSecret)) {
+    throw createError({ statusCode: 401, statusMessage: 'Invalid automation secret' })
+  }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= (a.codePointAt(i) ?? 0) ^ (b.codePointAt(i) ?? 0)
+  }
+  return result === 0
+}

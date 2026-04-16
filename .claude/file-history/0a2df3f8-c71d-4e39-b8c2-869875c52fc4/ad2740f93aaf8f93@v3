@@ -1,0 +1,77 @@
+import type { Collaborator } from '#shared/types/collaborator'
+import type { H3Event } from 'h3'
+import { getCollaboratorByEmail } from './collaborator'
+
+export function isAdmin(collaborator: Collaborator): boolean {
+  return collaborator.roles?.some(r => r?.trim().toLowerCase() === 'admin') ?? false
+}
+
+/**
+ * Get the current authenticated user from the user session
+ */
+export async function getCurrentUser(event: H3Event): Promise<Collaborator> {
+  const session = await getUserSession(event)
+
+  const email = (session?.user as { profile?: { email?: string } })?.profile?.email
+
+  if (!email) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+      message: 'Authentication required',
+    })
+  }
+
+  const collaborator = await getCollaboratorByEmail(email)
+  return collaborator
+}
+
+/**
+ * Require admin role for the current request
+ * Throws 403 error if user is not admin
+ */
+export async function requireAdmin(event: H3Event): Promise<Collaborator> {
+  const collaborator = await getCurrentUser(event)
+
+  if (!isAdmin(collaborator)) {
+    console.warn(`[auth] 403 Forbidden: ${collaborator.email ?? 'unknown'} lacks admin role`)
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden',
+      message: 'Admin role required to access this resource',
+    })
+  }
+
+  return collaborator
+}
+
+/**
+ * Validates the secret of an incoming Jira automation request.
+ * Expects the secret in the `x-automation-secret` header.
+ */
+export function verifyAutomationSecret(event: H3Event): void {
+  const config = useRuntimeConfig()
+  const secret = config.jira.automationToken
+
+  if (!secret) {
+    throw createError({ statusCode: 500, statusMessage: 'Automation secret not configured' })
+  }
+
+  const receivedSecret = getHeader(event, 'x-automation-secret')
+  if (!receivedSecret) {
+    throw createError({ statusCode: 401, statusMessage: 'Missing automation secret' })
+  }
+
+  if (!timingSafeEqual(secret, receivedSecret)) {
+    throw createError({ statusCode: 401, statusMessage: 'Invalid automation secret' })
+  }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= (a.codePointAt(i) ?? 0) ^ (b.codePointAt(i) ?? 0)
+  }
+  return result === 0
+}

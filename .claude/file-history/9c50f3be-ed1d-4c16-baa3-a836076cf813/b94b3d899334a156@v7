@@ -1,0 +1,48 @@
+<template>
+  <div
+    v-if="lotAnomalies.length > 0"
+    class="mt-4 flex flex-col gap-2"
+  >
+    <UAlert
+      v-for="(anomaly, index) in lotAnomalies"
+      :key="`${anomaly.type}-${index}`"
+      icon="i-heroicons-exclamation-triangle"
+      color="warning"
+      variant="soft"
+      :title="t(anomaly.messageKey, anomaly.params)"
+      :closeable="false"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { ToFixWorklog } from '#shared/types/worklog'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+
+const props = defineProps<{
+  o2i: string
+  toFixWorklogs: ToFixWorklog[] | null | undefined
+}>()
+
+const o2i = computed(() => props.o2i ?? '')
+
+const { data: anomalies, execute } = useFetchLotAnomalies(
+  o2i,
+  {
+    immediate: false,
+    watch: [() => props.toFixWorklogs],
+  },
+)
+
+watch(() => props.o2i, (val) => {
+  if (val) {
+    execute()
+  }
+}, { immediate: true })
+
+const lotAnomalies = computed(() =>
+  anomalies.value?.filter(a => a.type !== 'UO_OVERRUN') ?? [],
+)
+</script>

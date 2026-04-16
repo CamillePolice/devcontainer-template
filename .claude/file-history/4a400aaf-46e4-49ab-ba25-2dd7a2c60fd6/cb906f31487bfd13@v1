@@ -1,0 +1,45 @@
+import type { LotsAnomalySummaryMap } from '#shared/types/anomaly'
+import { detectLotAnomalies } from '~~/server/usecases/anomalies'
+import { AppError, createValidationError, handleDatabaseError } from '~~/server/utils/error'
+import { getUosByLotO2i } from '~~/server/utils/uo'
+import { getToFixWorklogsForO2i } from '~~/server/utils/worklog'
+
+export default defineEventHandler(async (event) => {
+  try {
+    const body = await readBody(event)
+    const o2is: unknown = body?.o2is
+
+    if (!Array.isArray(o2is) || o2is.length === 0) {
+      throw createValidationError('o2is must be a non-empty array')
+    }
+
+    const config = useRuntimeConfig()
+    const hoursPerWorkday = Number(config.public.hoursPerWorkday) || 7
+
+    const results = await Promise.all(
+      (o2is as string[]).map(async (o2i) => {
+        const [uos, toFixWorklogs] = await Promise.all([
+          getUosByLotO2i(o2i),
+          getToFixWorklogsForO2i(o2i),
+        ])
+        const anomalies = detectLotAnomalies({ lotO2i: o2i, hoursPerWorkday, uos, toFixWorklogs })
+        return { o2i, anomalies }
+      }),
+    )
+
+    const summaryMap: LotsAnomalySummaryMap = {}
+    for (const { o2i, anomalies } of results) {
+      if (!anomalies.length) continue
+      const maxSeverity = anomalies.some(a => a.severity === 'error') ? 'error' : 'warning'
+      summaryMap[o2i] = { maxSeverity, count: anomalies.length }
+    }
+
+    return summaryMap
+  }
+  catch (error) {
+    if (error instanceof AppError) {
+      throw error.toH3Error()
+    }
+    throw handleDatabaseError(error, 'get lots anomalies').toH3Error()
+  }
+})

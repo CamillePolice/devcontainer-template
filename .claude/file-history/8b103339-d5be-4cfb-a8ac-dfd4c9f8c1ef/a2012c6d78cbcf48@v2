@@ -1,0 +1,15 @@
+import { createError, getHeader, isError } from 'h3'
+
+const g = globalThis as Record<string, unknown>
+
+g.createError = createError
+g.isError = isError
+g.getHeader = getHeader
+
+// defineEventHandler just returns the inner handler — the router wrapper is irrelevant in unit tests
+g.defineEventHandler = (fn: unknown) => fn
+
+// Stubs overridden per-test via vi.stubGlobal
+g.readBody = vi.fn()
+g.getRouterParam = vi.fn()
+g.useRuntimeConfig = vi.fn(() => ({}))

@@ -1,0 +1,253 @@
+<template>
+  <USlideover
+    :open="open"
+    close-icon="i-lucide-x"
+    :transition="true"
+    :ui="{
+      wrapper: 'flex items-center justify-center',
+      content: 'w-full sm:max-w-2xl rounded-2xl shadow-xl p-8',
+      header: 'pb-4',
+      title: 'text-left text-xl font-semibold',
+      body: 'pt-2',
+      footer: 'pt-6 flex justify-end gap-3',
+    }"
+    @update:open="$emit('update:open', $event)"
+  >
+    <template #header>
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">
+          {{ t('title') }}
+        </h2>
+      </div>
+    </template>
+
+    <template #body>
+      <p class="text-sm text-gray-600 mb-6">
+        {{ t('description') }}
+      </p>
+
+      <div
+        v-if="pending"
+        class="flex justify-center py-8"
+      >
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="animate-spin text-gray-400 w-6 h-6"
+        />
+      </div>
+
+      <div
+        v-else-if="fixedWorklogs.length === 0"
+        class="text-sm text-gray-500 text-center py-8"
+      >
+        {{ t('empty') }}
+      </div>
+
+      <div
+        v-else
+        class="space-y-6"
+      >
+        <h3 class="text-base font-bold">
+          {{ collaboratorName }}
+        </h3>
+
+        <div
+          v-for="group in groupedWorklogs"
+          :key="group.type"
+          class="space-y-3"
+        >
+          <h4 class="text-sm font-semibold text-gray-700">
+            {{ group.type }}
+          </h4>
+          <div
+            v-for="entry in group.entries"
+            :key="entry.id"
+            class="flex items-center justify-between py-2 border-b border-gray-100"
+            :class="{ 'opacity-50 line-through': markedForDeletion.has(entry.id) }"
+          >
+            <div>
+              <p class="text-[10px] text-gray-500">
+                {{ entry.targetProductName }}
+              </p>
+              <p class="text-[12px] font-bold">
+                {{ entry.targetProductCode }}
+                ({{ entry.fixedO2i }})
+                {{ entry.targetProductCode }}
+              </p>
+              <p class="text-[12px] font-bold">
+                {{ entry.targetProductName }}
+              </p>
+            </div>
+            <div class="flex items-center gap-3">
+              <span class="text-sm font-medium">{{ formatDisplayNumber(entry.quantity) }} H</span>
+              <UBadge
+                v-if="entry.worklogStatus === 'BILLED'"
+                color="neutral"
+                variant="soft"
+                size="sm"
+              >
+                {{ t('billed') }}
+              </UBadge>
+              <UButton
+                v-else
+                icon="i-heroicons-trash"
+                variant="ghost"
+                size="xs"
+                :color="markedForDeletion.has(entry.id) ? 'error' : 'neutral'"
+                @click="toggleMark(entry.id)"
+              />
+            </div>
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template #footer>
+      <UButton
+        variant="outline"
+        color="neutral"
+        size="xl"
+        @click="cancel"
+      >
+        {{ t('cancel') }}
+      </UButton>
+      <UButton
+        color="error"
+        size="xl"
+        :loading="saving"
+        :disabled="markedForDeletion.size === 0"
+        @click="save"
+      >
+        {{ t('confirm') }}
+      </UButton>
+    </template>
+  </USlideover>
+</template>
+
+<script lang="ts" setup>
+import type { FixedWorklogDetail } from '#shared/types/worklog'
+import { useToast } from '#ui/composables/useToast'
+import { formatDisplayNumber } from '@@/shared/utils/number-formatting'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const toast = useToast()
+const { fetchFixedWorklogs, deleteFixedWorklogs } = useFixedWorklogs()
+
+const props = defineProps<{
+  open: boolean
+  lotO2i: string
+  accountId: string
+  collaboratorName: string
+  uoO2i?: string
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:open', value: boolean): void
+  (e: 'saved'): void
+}>()
+
+const fixedWorklogs = ref<FixedWorklogDetail[]>([])
+const pending = ref(false)
+const saving = ref(false)
+const markedForDeletion = ref(new Set<number>())
+
+const groupedWorklogs = computed(() => {
+  const groups = new Map<string, FixedWorklogDetail[]>()
+  for (const entry of fixedWorklogs.value) {
+    const type = entry.targetUoType ?? t('unknown')
+    if (!groups.has(type)) groups.set(type, [])
+    groups.get(type)!.push(entry)
+  }
+  return [...groups.entries()].map(([type, entries]) => ({ type, entries }))
+})
+
+const loadFixedWorklogs = async () => {
+  pending.value = true
+  try {
+    fixedWorklogs.value = await fetchFixedWorklogs(props.lotO2i, props.accountId, props.uoO2i)
+  }
+  finally {
+    pending.value = false
+  }
+}
+
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      markedForDeletion.value = new Set()
+      loadFixedWorklogs()
+    }
+  },
+  { immediate: true },
+)
+
+function toggleMark(id: number) {
+  const next = new Set(markedForDeletion.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  markedForDeletion.value = next
+}
+
+function cancel() {
+  emit('update:open', false)
+}
+
+async function save() {
+  if (markedForDeletion.value.size === 0) {
+    emit('update:open', false)
+    return
+  }
+
+  saving.value = true
+
+  const results = await deleteFixedWorklogs([...markedForDeletion.value])
+
+  saving.value = false
+
+  const hasError = results.some(result => result.status === 'rejected')
+
+  if (hasError) {
+    toast.add({
+      title: t('saveError'),
+      color: 'error',
+    })
+    // Reload the list so the user can see what remains after partial failure
+    await loadFixedWorklogs()
+  }
+  else {
+    toast.add({
+      title: t('saveSuccess'),
+      color: 'success',
+    })
+    markedForDeletion.value = new Set()
+    await loadFixedWorklogs()
+    emit('saved')
+    emit('update:open', false)
+  }
+}
+</script>
+
+<i18n lang="yaml">
+fr:
+  title: Modification de la ventilation
+  description: Gérez les re-ventilations manuelles de ce collaborateur.
+  empty: Aucune re-ventilation pour ce collaborateur.
+  billed: Comptabilisé
+  cancel: Annuler
+  confirm: Enregistre ma modification
+  saveSuccess: Re-ventilations supprimées avec succès
+  saveError: Une erreur est survenue lors de la suppression
+  unknown: Autre
+en:
+  title: Modification of ventilation
+  description: Manage manual reventilations for this collaborator.
+  empty: No reventilation for this collaborator.
+  billed: Billed
+  cancel: Cancel
+  confirm: Save my modification
+  saveSuccess: Reventilations deleted successfully
+  saveError: An error occurred during deletion
+  unknown: Other
+</i18n>

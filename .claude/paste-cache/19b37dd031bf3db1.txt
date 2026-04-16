@@ -1,0 +1,39 @@
+⚡ Recommended focus areas for reviewError Handling GapThe save function uses Promise.allSettled to batch delete material declarations, but only checks if any request failed without providing specific feedback about which deletions succeeded or failed. This could leave the UI in an inconsistent state if some deletions succeed while others fail, as the component emits all IDs regardless of individual results.const results = await Promise.allSettled(
+  ids.map(id =>
+    $fetch(`/api/uos/${props.uo.o2i}/material-quantity-declarations/${id}`, {
+      method: 'DELETE',
+    }),
+  ),
+)
+
+saving.value = false
+
+const hasError = results.some(r => r.status === 'rejected')
+
+if (hasError) {
+  toast.add({
+    title: t('saveError'),
+    color: 'error',
+  })
+}
+else {
+  toast.add({
+    title: t('saveSuccessTitle'),
+    description: t('saveSuccessDescription', { count: ids.length, o2i: props.uo.o2i }),
+    color: 'success',
+  })
+  emit('saved', ids)
+  emit('update:open', false)
+}Missing ValidationThe removeMaterialDeclarations function filters out material declarations by ID without validating whether those IDs actually exist in the array or checking if they can be safely removed (e.g., checking status). This could lead to silent failures or unexpected behavior if called with invalid IDs.function removeMaterialDeclarations(o2i: string, ids: number[]): void {
+  const uo = uoMap.get(o2i)
+  if (!uo) return
+  uo.materialDeclarations = uo.materialDeclarations.filter(m => !ids.includes(m.id))
+  recalculatePendingQuantity(uo)
+}Race Condition RiskThe component resets markedForDeletion when the slideover opens but doesn't handle the case where the slideover might be opened while a save operation is in progress. If a user quickly closes and reopens the slideover during deletion, the state could become inconsistent.watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      markedForDeletion.value = new Set()
+    }
+  },
+)

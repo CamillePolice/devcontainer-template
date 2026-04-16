@@ -1,51 +1,66 @@
+---
+name: capture-learning
+description: |
+  Après chaque tâche non-triviale, évalue les découvertes et persiste les
+  connaissances réutilisables dans Supabase RAG via seed-rag.
+  Invoquer après toute résolution de problème inattendu, découverte d'un pattern,
+  gotcha, workaround, ou optimisation de processus.
+---
 
-# Skill: capture-learning
+# Skill : capture-learning
 
 Après chaque tâche non-triviale, évalue les découvertes et persiste les
-connaissances réutilisables dans Supabase RAG.
+connaissances réutilisables dans le RAG via le skill `seed-rag`.
 
-## Quand déclencher ce skill
+---
 
-* Tu as résolu un problème inattendu
-* Tu as trouvé un workaround ou un gotcha
-* Tu as optimisé un processus multi-étapes répété
-* Tu as découvert un pattern réutilisable (Angular, Symfony, SQL...)
-* Tu as appris quelque chose sur la configuration spécifique du projet
+## Étape 0 — Filtrer les notes inutilisables
 
-## Process
+Rejeter automatiquement (décision **NONE**) toute note qui :
 
-### Étape 1 — Lire le notepad
+- Contient un placeholder non rempli : `<...>`, `<tag>`, `<description>`
+- Est trop générique : "Build/runtime error encountered", "edge case found"
+- Fait moins de 40 caractères après le tag `[xxx]`
+- Ne suit pas le format `[tag] technologie — description — solution`
+
+Signaler ces notes dans le rapport final comme `REJECTED (too generic)`.
+
+---
+
+## Étape 1 — Lire le notepad
 
 ```bash
 cat /tmp/learning-notes.md 2>/dev/null || echo "(empty)"
 ```
 
-### Étape 2 — Classifier chaque note : GLOBAL ou PROJECT ?
+---
 
-Pour chaque note dans `/tmp/learning-notes.md`, décide du scope :
+## Étape 2 — Classifier chaque note : GLOBAL ou PROJECT ?
 
 **→ `project='global'`** si la découverte est :
-
-* Un pattern Angular générique (`@if`, signals, standalone, Bootstrap 5...)
-* Un pattern Symfony/PHP générique (strict types, PHPDoc, test mocks...)
-* Une technique SQL/PostgreSQL générique
-* Un pattern de tooling (Git, Docker, psql...)
-* Toute connaissance réutilisable dans un autre projet
+- Un pattern Angular / Nuxt / Symfony générique
+- Une technique SQL / PostgreSQL / Docker générique
+- Un pattern de tooling (Git, psql, CI/CD…)
+- Toute connaissance réutilisable dans un autre projet
 
 **→ `project='$RAG_PROJECT'`** si la découverte est :
+- Spécifique à l'architecture du projet (noms de services, URLs d'API…)
+- Une convention propre au projet (ex: `HttpWrapperService` dans OPVigil)
+- Un bug ou comportement propre à ce codebase
 
-* Spécifique à l'architecture du projet (noms de services, URLs d'API...)
-* Une convention propre au projet (ex: `HttpWrapperService` dans OPVigil)
-* Un bug ou comportement propre à ce codebase
-* Des chemins de fichiers ou noms de modules spécifiques
+**En cas de doute → `global`.**
 
-En cas de doute → `global`. Une connaissance trop spécifique en global
-ne fait pas de mal ; une connaissance générique enfermée dans un projet
-est une opportunité de réutilisation perdue.
+---
 
-### Étape 3 — Vérifier la couverture existante
+## Étape 3 — Matrice de décision
 
-Pour chaque note retenue, chercher si elle est déjà couverte :
+| Décision      | Condition                                              | Action              |
+|---------------|--------------------------------------------------------|---------------------|
+| **NEW**       | Pas de couverture existante + connaissance réutilisable | Créer et indexer    |
+| **IMPROVE**   | Section existante mais incomplète                      | `--force` sur le fichier |
+| **NONE**      | Tâche triviale, déjà couverte, ou note rejetée         | Ignorer, justifier  |
+
+Vérifier la couverture existante avant d'insérer :
 
 ```bash
 psql "$RAG_DSN" -c "
@@ -53,89 +68,124 @@ SELECT agent_name, project, section_title, LEFT(content, 120) as preview
 FROM rag_agent_instructions
 WHERE active = true
   AND project IN ('global', '${RAG_PROJECT:-global}')
-  AND (
-    content ILIKE '%<keyword1>%'
-    OR content ILIKE '%<keyword2>%'
-  )
+  AND content ILIKE '%<keyword>%'
 LIMIT 5;
 "
 ```
 
-### Étape 4 — Matrice de décision
+---
 
-| Décision          | Condition                                                | Action                       |
-| ------------------ | -------------------------------------------------------- | ---------------------------- |
-| **NEW**      | Pas de couverture existante + connaissance réutilisable | Créer + insérer            |
-| **IMPROVE**  | Section existante mais incomplète                       | UPDATE du content            |
-| **OPTIMIZE** | Note `[efficiency]`+ gain significatif                 | Créer procédure optimisée |
-| **NONE**     | Tâche triviale ou déjà couverte                       | Ignorer, justifier           |
+## Étape 4 — Écrire le fichier Markdown de la connaissance
 
-### Étape 5 — Insérer la nouvelle learned-skill
-
-Déterminer l'`agent_name` approprié :
-
-* Connaissance Angular → `angular-expert`
-* Connaissance Symfony/PHP → `symfony-expert`
-* Connaissance spécifique à l'agent actif → `<nom-de-l-agent>`
-* Connaissance transversale → `learned-<slug-descriptif>`
+Pour chaque note retenue, écrire un fichier `.md` structuré dans `/tmp/` :
 
 ```bash
-SKILL_SLUG="learned-<slug-descriptif>"
-TARGET_PROJECT="global"   # ou $RAG_PROJECT si connaissance projet-spécifique
-AGENT="angular-expert"    # ou symfony-expert, archforge, etc.
+cat > /tmp/learned-<slug>.md << 'EOF'
+---
+name: <Titre descriptif de la connaissance>
+---
 
-psql "$RAG_DSN" -c "
-INSERT INTO rag_agent_instructions
-    (agent_name, project, section_type, section_title, content, metadata)
-VALUES (
-    '$AGENT',
-    '$TARGET_PROJECT',
-    'learned-skill',
-    '<Titre descriptif de la connaissance>',
-    \$\$<contenu complet de la learned-skill>\$\$,
-    '{
-        \"learned_from\": \"<nom-agent-source>\",
-        \"task_context\": \"<description courte de la tâche>\",
-        \"scope\": \"<global|project>\",
-        \"tags\": [\"<tag1>\", \"<tag2>\"]
-    }'::jsonb
-);
-"
+## <Titre descriptif>
+
+[tag] technologie — description précise — solution appliquée
+
+### Contexte
+
+<Description du problème rencontré>
+
+### Solution
+
+<Ce qui a été appliqué et pourquoi ça fonctionne>
+
+### Exemple
+
+```<lang>
+<code ou commande illustrant la solution>
+```
+EOF
 ```
 
-### Étape 6 — Améliorer une section existante (si IMPROVE)
+**Règle de nommage** : `learned-<technologie>-<slug-court>.md`
+Exemples : `learned-angular-signal-context.md`, `learned-symfony-cast-int.md`
+
+---
+
+## Étape 5 — Indexer via seed-rag
+
+Déléguer l'insertion à `seed-rag` plutôt que d'écrire du SQL manuellement :
 
 ```bash
-psql "$RAG_DSN" -c "
-UPDATE rag_agent_instructions
-SET content = \$\$<nouveau contenu enrichi>\$\$,
-    metadata = metadata || '{\"last_improved\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}'::jsonb
-WHERE id = <id-de-la-section>
-  AND active = true;
-"
+# Déterminer l'agent cible
+# Connaissance Angular → angular-expert
+# Connaissance Symfony/PHP → symfony-expert
+# Connaissance Nuxt → nuxt-expert
+# Connaissance transversale → learned-<slug>
+
+AGENT="angular-expert"          # adapter selon la technologie
+TARGET_PROJECT="global"         # ou $RAG_PROJECT si connaissance projet-spécifique
+SLUG="signal-context"
+
+# Dry-run d'abord — toujours
+python .claude/skills/seed-rag/seed_rag.py \
+  --file /tmp/learned-${SLUG}.md \
+  --agent "$AGENT" \
+  --project "$TARGET_PROJECT" \
+  --dry-run --preview
+
+# Si le dry-run est satisfaisant → insérer
+python .claude/skills/seed-rag/seed_rag.py \
+  --file /tmp/learned-${SLUG}.md \
+  --agent "$AGENT" \
+  --project "$TARGET_PROJECT" \
+  --append
 ```
 
-### Étape 7 — Vider le notepad
+---
+
+## Étape 6 — Améliorer une section existante (si IMPROVE)
+
+Si une section existante couvre déjà le sujet mais incomplètement :
+
+1. Récupérer l'`id` de la section via psql
+2. Mettre à jour le fichier `.md` source avec le contenu enrichi
+3. Relancer avec `--force` pour réindexer l'agent complet
+
+```bash
+# Réindexer tout l'agent après mise à jour du fichier source
+python .claude/skills/seed-rag/seed_rag.py \
+  --file angular-expert-rag.md \
+  --agent angular-expert \
+  --force
+```
+
+---
+
+## Étape 7 — Vider le notepad
 
 ```bash
 > /tmp/learning-notes.md
-echo "Notepad cleared after capture."
+echo "Notepad vidé après capture."
 ```
 
-### Étape 8 — Rapport
+---
 
-Afficher un résumé :
+## Étape 8 — Rapport
 
-* Décision prise (NEW / IMPROVE / OPTIMIZE / NONE) pour chaque note
-* `agent_name` et `project` de chaque section créée/modifiée
-* Justification du scope choisi (global vs project)
+Afficher :
 
-## Exemples de classification
+- Décision prise (NEW / IMPROVE / NONE) pour chaque note
+- `agent_name` et `project` de chaque section indexée
+- Fichier `.md` créé (chemin `/tmp/learned-*.md`)
+- Justification du scope (global vs project)
+- Notes rejetées avec raison
 
-| Note                                                               | Scope   | Agent                | Raison                                   |
-| ------------------------------------------------------------------ | ------- | -------------------- | ---------------------------------------- |
-| `[pattern] linkedSignal pour filtres de carte`                   | global  | angular-expert       | Pattern Angular générique              |
-| `[gotcha] HttpWrapperService ne supporte pas les headers custom` | opvigil | angular-expert       | Spécifique à l'implémentation OPVigil |
-| `[pattern] (int) cast obligatoire pour les IDs en Symfony 7`     | global  | symfony-expert       | Pattern PHP générique                  |
-| `[efficiency] seed_rag.py --force réindexe en une commande`     | global  | learned-rag-workflow | Connaissance transversale                |
-| `[gotcha] Le service SpcRepository attend un int, pas un string` | opvigil | symfony-expert       | Spécifique au repo OPVigil              |
+---
+
+## Exemples de classification rapide
+
+| Note                                                               | Scope   | Agent          |
+|--------------------------------------------------------------------|---------|----------------|
+| `[pattern] linkedSignal pour filtres de carte`                    | global  | angular-expert |
+| `[gotcha] HttpWrapperService ne supporte pas les headers custom`  | project | angular-expert |
+| `[pattern] (int) cast obligatoire pour les IDs en Symfony 7`      | global  | symfony-expert |
+| `[gotcha] Le service SpcRepository attend un int, pas un string`  | project | symfony-expert |

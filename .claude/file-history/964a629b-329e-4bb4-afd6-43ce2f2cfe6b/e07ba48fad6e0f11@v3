@@ -1,0 +1,25 @@
+import type { MappedUo } from '~/composables/useUo'
+
+export type TableRowData = UoRowData | WorklogRowData
+
+export interface UoRowData extends MappedUo {
+  type: 'uo'
+}
+
+export interface WorklogRowData {
+  type: 'worklog'
+  o2i: string
+  lotO2i: string
+  accountId: string | null
+  collaborator: string
+  email: string | null
+  pendingQuantity: number
+  billedQuantity: number
+  totalQuantity: number
+  unit: string | undefined
+  hasActiveFixedWorklogs: boolean
+  // Champs vides pour compatibilité avec les colonnes UO
+  raf?: never
+  progress?: never
+  uo?: never
+}

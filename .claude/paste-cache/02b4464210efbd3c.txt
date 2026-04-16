@@ -1,0 +1,24 @@
+npm run dev
+
+> dev
+> nuxt dev
+
+✔ Console Ninja extension is connected to Nuxt, see https://tinyurl.com/2vt8jxzw
+Current Directory: /Users/cpo/Documents/projects/self-devis/node_modules/@claranet/onion-layout-nuxt-ui                          3:00:47 PM
+│                                                                                                                                3:00:47 PM
+●  Nuxt 4.4.2 (with Nitro 2.13.1, Vite 7.3.1 and Vue 3.5.30)
+                                                                                                                                 3:00:47 PM
+  ➜ Local:    http://localhost:3000/
+  ➜ Network:  use --host to expose
+
+  ➜ DevTools: press Shift + Option + D in the browser (v3.2.3)                                                                   3:00:49 PM
+
+ℹ Nuxt Icon server bundle mode is set to local                                                                                  3:00:51 PM
+ℹ Re-optimizing dependencies because lockfile has changed                                                                       3:00:55 PM
+✔ Vite client built in 49ms                                                                                                     3:00:55 PM
+✔ Vite server built in 27ms                                                                                                     3:00:55 PM
+
+[nitro 3:00:56 PM]  ERROR  Error: Could not load /Users/cpo/Documents/projects/self-devis/i18n/app/i18n/locales/fr-FR.json (imported by virtual:#internal/i18n-options.mjs): ENOENT: no such file or directory, open '/Users/cpo/Documents/projects/self-devis/i18n/app/i18n/locales/fr-FR.json'
+
+
+undefined

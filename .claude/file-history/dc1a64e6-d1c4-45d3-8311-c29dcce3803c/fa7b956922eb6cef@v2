@@ -1,0 +1,102 @@
+# Plan : Bouton reset re-estimation UO (TimesSection)
+
+## Contexte
+
+Quand un CDP re-estime la quantité en attente d'une UO T&M (ex: de 2.24j à 3j par erreur), il n'a aucun moyen de revenir facilement à la somme des temps pointés. Il doit recalculer manuellement. On ajoute un bouton undo discret pour remettre `quantityAdjustment` à 0, et on corrige l'espacement entre l'input et le texte `(adjustment)`.
+
+## Fichiers modifiés
+
+1. **`app/composables/useUo.ts`** — ajouter `resetQuantityAdjustment(o2i)`
+2. **`app/components/uo/TimesSection.vue`** — intégrer le bouton reset + fix espacement
+
+## Étapes
+
+### 1. Ajouter `resetQuantityAdjustment` dans `useUo.ts`
+
+Après `updatePendingQuantity` (ligne 208), ajouter :
+
+```typescript
+async function resetQuantityAdjustment(o2i: string): Promise<void> {
+  const uo = uoMap.get(o2i)
+  if (!uo) return
+  try {
+    await $fetch(`/api/uos/${o2i}/quantity-adjustment`, {
+      method: 'PUT',
+      body: { quantityAdjustment: 0 },
+    })
+    uo.quantityAdjustment = 0
+  }
+  catch (error) {
+    console.error('Error resetting quantity adjustment:', error)
+  }
+}
+```
+
+- Réutilise l'endpoint existant `PUT /api/uos/{o2i}/quantity-adjustment` avec valeur 0
+- Même pattern que `updatePendingQuantity` (pas de toast, juste console.error)
+- Ajouter `resetQuantityAdjustment` au return object (ligne 403-414)
+
+### 2. Modifier `TimesSection.vue`
+
+**Script** :
+- Destructurer `resetQuantityAdjustment` depuis `useUo`
+- Ajouter handler `handleResetQuantityAdjustment(o2i: string)`
+
+**Template** — remplacer le bloc `#pendingQuantity-cell` (lignes 65-81) pour le cas `v-else` :
+
+```html
+<div v-else class="gap-1">
+  <UoPendingQuantityInput
+    :uo="row.original.uo"
+    :pending-quantity="row.original.pendingQuantity"
+    @pending-quantity-change="handlePendingQuantityChange"
+  />
+  <UTooltip
+    v-if="row.original.uo.quantityAdjustment"
+    :text="t('resetAdjustment')"
+  >
+    <UButton
+      icon="i-lucide-undo-2"
+      size="xs"
+      variant="ghost"
+      color="neutral"
+      :aria-label="t('resetAdjustment')"
+      @click="handleResetQuantityAdjustment(row.original.uo.o2i)"
+    />
+  </UTooltip>
+  <span v-if="config.public.recetteEnabled" class="ml-1">({{
+    formatDisplayNumber(row.original.uo.quantityAdjustment)
+  }})</span>
+  <UoUnit
+    class="ml-1"
+    :row="row.original"
+  />
+</div>
+```
+
+Changements clés :
+- **Bouton undo** : `UButton` ghost/neutral/xs avec icône `i-lucide-undo-2`, visible uniquement quand `quantityAdjustment` est non-nul
+- **Tooltip** : `UTooltip` avec texte i18n "Annuler la re-estimation"
+- **Fix espacement** : `class="ml-1"` sur le `<span>` de l'adjustment
+
+**i18n** — ajouter dans le bloc `<i18n>` :
+```yaml
+fr:
+  resetAdjustment: "Annuler la re-estimation"
+en:
+  resetAdjustment: "Reset re-estimation"
+```
+
+## Pas de nouveau composant
+
+Pas besoin de créer un composant wrapper — le scope est limité à TimesSection. Si le besoin s'étend à StandardBundleSection plus tard, on pourra extraire à ce moment.
+
+## Pas de changement backend
+
+L'endpoint `PUT /api/uos/{o2i}/quantity-adjustment` accepte déjà `{ quantityAdjustment: 0 }`. Aucune modification serveur nécessaire.
+
+## Vérification
+
+1. `npm run lint` — pas d'erreur ESLint
+2. `npm run typecheck` — pas d'erreur TypeScript
+3. Test manuel : re-estimer une UO T&M, vérifier que le bouton undo apparaît, cliquer dessus, vérifier que la valeur revient à la somme des temps pointés et que le bouton disparaît

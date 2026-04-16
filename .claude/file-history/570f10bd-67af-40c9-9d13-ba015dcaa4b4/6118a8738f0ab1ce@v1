@@ -1,0 +1,32 @@
+# Configuration d'authentification pour le playground onion-auth
+# Copiez ce fichier vers .env et remplissez les valeurs
+
+# Secret pour signer les sessions (générez une clé aléatoirement)
+NUXT_AUTH_SECRET=your-secret-key-here
+
+# URL de base de l'application (utilisée pour construire le returnTo du logout Auth0 SSO)
+# ⚠️ En production, doit correspondre à une URL autorisée dans votre dashboard Auth0
+NUXT_PUBLIC_AUTH_BASE_URL=http://localhost:3001
+
+# Configuration Auth0 (convention nuxt-auth-utils)
+# Obtenez ces valeurs depuis votre dashboard Auth0
+NUXT_OAUTH_AUTH0_CLIENT_ID=your-auth0-client-id
+NUXT_OAUTH_AUTH0_CLIENT_SECRET=your-auth0-client-secret
+NUXT_OAUTH_AUTH0_DOMAIN=your-domain.auth0.com
+
+# Configuration Microsoft Azure AD (convention nuxt-auth-utils)
+# Obtenez ces valeurs depuis votre Azure Portal
+NUXT_OAUTH_MICROSOFT_CLIENT_ID=your-microsoft-client-id
+NUXT_OAUTH_MICROSOFT_CLIENT_SECRET=your-microsoft-client-secret
+NUXT_OAUTH_MICROSOFT_TENANT_ID=your-tenant-id
+
+# Provider actif dans le playground : 'auth0' ou 'microsoft'
+ONION_AUTH_PROVIDER=auth0
+
+# Namespace pour les rôles Auth0 (laisser vide si rôles à la racine du token)
+# Auto-mappé depuis NUXT_AUTH0_ROLES_NAMESPACE → runtimeConfig.auth0RolesNamespace
+NUXT_AUTH0_ROLES_NAMESPACE=
+
+# URLs de redirection à configurer dans vos providers :
+# Auth0: http://localhost:3000/auth/auth0
+# Microsoft: http://localhost:3000/auth/microsoft

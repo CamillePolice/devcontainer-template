@@ -1,0 +1,26 @@
+ALTER TABLE "uo" ADD COLUMN "product_code_parent" varchar(255);--> statement-breakpoint
+ALTER TABLE "uo" ADD COLUMN "product_name_parent" varchar(255);--> statement-breakpoint
+ALTER TABLE "worklog" ADD COLUMN "o2i_reference_carte" varchar(45);--> statement-breakpoint
+DROP VIEW IF EXISTS augmented_uo_view;--> statement-breakpoint
+CREATE VIEW augmented_uo_view AS
+SELECT
+  uo.o2i, uo.o2i_parent, uo.o2i_lot, uo.product_code, uo.product_name,
+  uo.product_code_parent, uo.product_name_parent,
+  uo.type,
+  uo_status.id, uo_status.name, uo.profile,
+  pc.key AS "production_cell_key", pc.name AS "production_cell_name",
+  f.key AS "factory_key", f.name AS "factory_name",
+  uo.quantity_consumed, uo.quantity_consumed_adjustment,
+  uo.raf, uo.raf_adjustment, uo.original_quantity, uo.quantity_adjustment,
+  uo.unit, uo.price, uo.description,
+  uo.billing_date, uo.billing_trigger, uo.billing_details,
+  uo.planned_deployment_date, uo.desired_deployment_date,
+  uo.milestone_billed_at, uo.billed_milestone_id,
+  bm.name AS "billed_milestone_name",
+  bm.step_percent AS "billed_milestone_step_percent",
+  bm.index AS "billed_milestone_index"
+FROM uo
+  LEFT JOIN uo_status ON uo.status_jira_id = uo_status.jira_id
+  LEFT JOIN production_cell pc ON uo.production_cell = pc.key
+  LEFT JOIN factory f ON uo.factory = f.key
+  LEFT JOIN milestone bm ON uo.billed_milestone_id = bm.id;

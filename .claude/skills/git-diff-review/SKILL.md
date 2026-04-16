@@ -133,6 +133,29 @@ git diff --name-status "${BRANCH_A}...${BRANCH_B}" | grep '^D' \
   && echo "[INFO] Deleted files — check for orphaned references."
 ```
 
+### Version & changelog regression check
+
+**Always run this check** when `package.json` or `CHANGELOG.md` appear in the diff:
+
+```bash
+# Check for version regression in package.json
+VERSION_A=$(git show "${BRANCH_A}:package.json" 2>/dev/null | grep '"version"' | head -1)
+VERSION_B=$(git show "${BRANCH_B}:package.json" 2>/dev/null | grep '"version"' | head -1)
+echo "Version on ${BRANCH_A}: $VERSION_A"
+echo "Version on ${BRANCH_B}: $VERSION_B"
+
+# Check CHANGELOG.md line count delta
+LINES_A=$(git show "${BRANCH_A}:CHANGELOG.md" 2>/dev/null | wc -l)
+LINES_B=$(git show "${BRANCH_B}:CHANGELOG.md" 2>/dev/null | wc -l)
+echo "CHANGELOG lines — ${BRANCH_A}: $LINES_A  /  ${BRANCH_B}: $LINES_B"
+DELTA=$((LINES_A - LINES_B))
+if [ "$DELTA" -gt 0 ]; then
+  echo "[BLOCKER] CHANGELOG regression: ${BRANCH_B} is missing $DELTA lines present on ${BRANCH_A}"
+fi
+```
+
+If `BRANCH_B` has a **lower semver** than `BRANCH_A`, or if `CHANGELOG.md` **loses lines**, flag it as ⛔ BLOCKER in the report with the action: *rebase on `BRANCH_A` or manually restore the version/CHANGELOG before merge*.
+
 ---
 
 ## Step 6 — Output format
@@ -143,10 +166,24 @@ The review report must follow this structure:
 # Code Review — `<branchA>` → `<branchB>`
 
 ## Summary
-> One paragraph: what this diff does, overall quality assessment.
+> Bullet list (3-5 points): axes couverts, qualité générale, points d'attention principaux.
+> - **Axe N — Titre** : description courte
+> - **Qualité générale** : appréciation
+> - **Points d'attention** : problèmes clés avant merge
 
 ## Score: X/10 — <label>
 > Labels: Excellent (9-10) / Good (7-8) / Average (5-6) / Needs Work (3-4) / Critical (1-2)
+
+---
+
+## ⛔ Bloquants — À corriger avant merge
+
+> This section is MANDATORY if any blocker exists. Omit it entirely if there are none.
+> Typical blockers: version regression, CHANGELOG loss, breaking API change, security flaw, data loss risk.
+
+### `file` — Short title
+
+Description + required action.
 
 ---
 
@@ -175,6 +212,10 @@ The review report must follow this structure:
 1. ...
 2. ...
 3. ...
+
+---
+
+*Review done with the git-diff-reviewer skill*
 ```
 
 ---

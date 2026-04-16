@@ -1,0 +1,526 @@
+# Lot Anomaly Manager Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Build an extensible server-side anomaly detection module for lots, exposed via a dedicated API endpoint, with alert banners displayed on the lot detail page.
+
+**Architecture:** A `server/usecases/anomalies/` module contains independent detector functions registered in an orchestrator. A new `GET /api/lots/[o2i]/anomalies` endpoint runs all detectors and returns `LotAnomaly[]`. The frontend `LotAnomalyBanner` component fetches anomalies in parallel and renders one `UAlert` per anomaly inside the lot header card.
+
+**Tech Stack:** Nuxt 4, H3/Nitro server routes, Drizzle ORM (read-only queries), Vue 3 Composition API, NuxtUI v4 `UAlert`
+
+---
+
+## File Structure
+
+| File | Action | Responsibility |
+|------|--------|---------------|
+| `shared/types/anomaly.ts` | Create | Shared types: `LotAnomaly`, `AnomalySeverity` |
+| `server/usecases/anomalies/types.ts` | Create | Server-only types: `AnomalyContext`, `AnomalyDetector`, `computeUoTotalQuantity` helper |
+| `server/usecases/anomalies/lot-time-overrun.ts` | Create | Detector: lot-level time overrun |
+| `server/usecases/anomalies/uo-overrun.ts` | Create | Detector: per-UO overrun |
+| `server/usecases/anomalies/index.ts` | Create | Orchestrator: runs all detectors, exports `detectLotAnomalies` |
+| `server/api/lots/[o2i]/anomalies.get.ts` | Create | API endpoint returning `LotAnomaly[]` |
+| `app/components/lot/AnomalyBanner.vue` | Create | Fetches + renders anomaly alerts |
+| `app/components/lot/Overview.vue` | Modify | Insert `<LotAnomalyBanner>` in header card |
+
+---
+
+### Task 1: Shared Anomaly Types
+
+**Files:**
+- Create: `shared/types/anomaly.ts`
+
+- [ ] **Step 1: Create the shared types file**
+
+```ts
+// shared/types/anomaly.ts
+
+export type AnomalySeverity = 'warning' | 'error'
+
+export type LotAnomaly = {
+  type: string
+  severity: AnomalySeverity
+  message: string
+  metadata: Record<string, unknown>
+}
+```
+
+- [ ] **Step 2: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS (new file, no imports elsewhere yet)
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add shared/types/anomaly.ts
+git commit -m "feat(anomalies): add shared LotAnomaly types"
+```
+
+---
+
+### Task 2: Server-Side Anomaly Types and Orchestrator
+
+**Files:**
+- Create: `server/usecases/anomalies/types.ts`
+- Create: `server/usecases/anomalies/index.ts`
+
+- [ ] **Step 1: Create the server-side types**
+
+The `AnomalyContext` must mirror the data shape already available in the lot overview endpoint (`server/api/lots/[o2i]/index.get.ts:18-21`). The UO groups and worklogs are fetched via `getUosByLotO2i` and `getToFixWorklogsForO2i`, so `AnomalyContext` reuses the same shape.
+
+```ts
+// server/usecases/anomalies/types.ts
+
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+import type { UoDetails, UoStandardBundle, UoHistoricBundle } from '~~/shared/types/uo'
+import type { ToFixWorklog } from '~~/shared/types/worklog'
+
+export type AnomalyContext = {
+  lotO2i: string
+  uos: {
+    TIME: UoDetails[]
+    MATERIAL: UoDetails[]
+    STANDARD_BUNDLE: UoStandardBundle[]
+    HISTORIC_BUNDLE: UoHistoricBundle[]
+  }
+  toFixWorklogs: ToFixWorklog[]
+}
+
+export type AnomalyDetector = (context: AnomalyContext) => LotAnomaly[]
+
+/**
+ * Compute total consumed quantity for a UO (billed + pending).
+ * Replicates the logic from app/composables/useUo.ts:114-116.
+ * Shared across all detectors that need per-UO time totals.
+ */
+export function computeUoTotalQuantity(uo: UoDetails): number {
+  const billed = (uo.quantityConsumed ?? 0) + (uo.quantityConsumedAdjustment ?? 0)
+  const pending = (uo.pendingQuantity ?? 0) + (uo.quantityAdjustment ?? 0)
+  return Math.round((billed + pending) * 100) / 100
+}
+```
+
+- [ ] **Step 2: Create the orchestrator with empty registry**
+
+```ts
+// server/usecases/anomalies/index.ts
+
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+import type { AnomalyContext, AnomalyDetector } from './types'
+
+const detectors: AnomalyDetector[] = []
+
+export function detectLotAnomalies(context: AnomalyContext): LotAnomaly[] {
+  return detectors.flatMap((detect) => detect(context))
+}
+```
+
+- [ ] **Step 3: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/usecases/anomalies/types.ts server/usecases/anomalies/index.ts
+git commit -m "feat(anomalies): add anomaly orchestrator and context types"
+```
+
+---
+
+### Task 3: Lot Time Overrun Detector
+
+**Files:**
+- Create: `server/usecases/anomalies/lot-time-overrun.ts`
+- Modify: `server/usecases/anomalies/index.ts`
+
+This detector checks: sum of `totalQuantity` across all T&M + Forfait standard UOs + remaining `timeToReallocate` from worklogs in reventilation > sum of `originalQuantity` of those same UOs.
+
+**How `totalQuantity` is computed** (replicating `app/composables/useUo.ts:114-116`):
+- `billedQuantity = (quantityConsumed ?? 0) + (quantityConsumedAdjustment ?? 0)`
+- `pendingQuantity = (pendingQuantity ?? 0) + (quantityAdjustment ?? 0)`
+- `totalQuantity = billedQuantity + pendingQuantity`
+
+For Forfait standard, UO details live in `UoStandardBundle.uos` (the children array).
+
+- [ ] **Step 1: Create the lot time overrun detector**
+
+```ts
+// server/usecases/anomalies/lot-time-overrun.ts
+
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+import type { AnomalyContext } from './types'
+import { computeUoTotalQuantity } from './types'
+
+export function detectLotTimeOverrun(context: AnomalyContext): LotAnomaly[] {
+  const timeUos = context.uos.TIME
+  const standardBundleChildUos = context.uos.STANDARD_BUNDLE.flatMap((bundle) => bundle.uos)
+  const allUos = [...timeUos, ...standardBundleChildUos]
+
+  if (allUos.length === 0) return []
+
+  const totalSoldDays = allUos.reduce((sum, uo) => sum + (uo.originalQuantity ?? 0), 0)
+  const totalConsumed = allUos.reduce((sum, uo) => sum + computeUoTotalQuantity(uo), 0)
+
+  const timeToReallocate = context.toFixWorklogs.reduce(
+    (sum, w) => sum + (w.timeToReallocate ?? 0),
+    0
+  )
+
+  const totalWithReventilation = Math.round((totalConsumed + timeToReallocate) * 100) / 100
+
+  if (totalWithReventilation <= totalSoldDays) return []
+
+  return [
+    {
+      type: 'LOT_TIME_OVERRUN',
+      severity: 'warning',
+      message: `Le temps total imputé (${totalWithReventilation} j) dépasse les jours vendus (${totalSoldDays} j) sur ce lot.`,
+      metadata: {
+        totalConsumed: totalWithReventilation,
+        totalSoldDays,
+        timeToReallocate,
+      },
+    },
+  ]
+}
+```
+
+- [ ] **Step 2: Register the detector in the orchestrator**
+
+Modify `server/usecases/anomalies/index.ts` — add the import and register the detector:
+
+```ts
+// server/usecases/anomalies/index.ts
+
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+import type { AnomalyContext, AnomalyDetector } from './types'
+import { detectLotTimeOverrun } from './lot-time-overrun'
+
+const detectors: AnomalyDetector[] = [
+  detectLotTimeOverrun,
+]
+
+export function detectLotAnomalies(context: AnomalyContext): LotAnomaly[] {
+  return detectors.flatMap((detect) => detect(context))
+}
+```
+
+- [ ] **Step 3: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/usecases/anomalies/lot-time-overrun.ts server/usecases/anomalies/index.ts
+git commit -m "feat(anomalies): add lot time overrun detector"
+```
+
+---
+
+### Task 4: UO Overrun Detector
+
+**Files:**
+- Create: `server/usecases/anomalies/uo-overrun.ts`
+- Modify: `server/usecases/anomalies/index.ts`
+
+This detector checks each individual UO (T&M + Forfait standard children + Forfait standard parents). For parents, `totalQuantity` = sum of children `totalQuantity`.
+
+- [ ] **Step 1: Create the UO overrun detector**
+
+```ts
+// server/usecases/anomalies/uo-overrun.ts
+
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+import type { UoDetails } from '~~/shared/types/uo'
+import type { AnomalyContext } from './types'
+import { computeUoTotalQuantity } from './types'
+
+function checkUoOverrun(uo: UoDetails, label: string): LotAnomaly | null {
+  const totalQuantity = computeUoTotalQuantity(uo)
+  const originalQuantity = uo.originalQuantity ?? 0
+
+  if (originalQuantity <= 0 || totalQuantity <= originalQuantity) return null
+
+  return {
+    type: 'UO_OVERRUN',
+    severity: 'warning',
+    message: `L'UO ${label} (${uo.o2i}) est en dépassement : ${totalQuantity} j / ${originalQuantity} j prévus.`,
+    metadata: {
+      o2i: uo.o2i,
+      totalQuantity,
+      originalQuantity,
+    },
+  }
+}
+
+export function detectUoOverrun(context: AnomalyContext): LotAnomaly[] {
+  const anomalies: LotAnomaly[] = []
+
+  // T&M UOs
+  for (const uo of context.uos.TIME) {
+    const anomaly = checkUoOverrun(uo, uo.productName ?? uo.o2i)
+    if (anomaly) anomalies.push(anomaly)
+  }
+
+  // Forfait standard: children + parent
+  for (const bundle of context.uos.STANDARD_BUNDLE) {
+    // Check each child UO
+    for (const childUo of bundle.uos) {
+      const anomaly = checkUoOverrun(childUo, childUo.productName ?? childUo.o2i)
+      if (anomaly) anomalies.push(anomaly)
+    }
+
+    // Check parent: totalQuantity = sum of children
+    const parentTotalQuantity = bundle.uos.reduce(
+      (sum, child) => sum + computeUoTotalQuantity(child),
+      0
+    )
+    const parentOriginal = bundle.originalQuantity ?? 0
+
+    if (parentOriginal > 0 && Math.round(parentTotalQuantity * 100) / 100 > parentOriginal) {
+      anomalies.push({
+        type: 'UO_OVERRUN',
+        severity: 'warning',
+        message: `L'UO ${bundle.productName ?? bundle.o2i} (${bundle.o2i}) est en dépassement : ${Math.round(parentTotalQuantity * 100) / 100} j / ${parentOriginal} j prévus.`,
+        metadata: {
+          o2i: bundle.o2i,
+          totalQuantity: Math.round(parentTotalQuantity * 100) / 100,
+          originalQuantity: parentOriginal,
+        },
+      })
+    }
+  }
+
+  return anomalies
+}
+```
+
+- [ ] **Step 2: Register the detector in the orchestrator**
+
+Modify `server/usecases/anomalies/index.ts`:
+
+```ts
+// server/usecases/anomalies/index.ts
+
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+import type { AnomalyContext, AnomalyDetector } from './types'
+import { detectLotTimeOverrun } from './lot-time-overrun'
+import { detectUoOverrun } from './uo-overrun'
+
+const detectors: AnomalyDetector[] = [
+  detectLotTimeOverrun,
+  detectUoOverrun,
+]
+
+export function detectLotAnomalies(context: AnomalyContext): LotAnomaly[] {
+  return detectors.flatMap((detect) => detect(context))
+}
+```
+
+- [ ] **Step 3: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/usecases/anomalies/uo-overrun.ts server/usecases/anomalies/index.ts
+git commit -m "feat(anomalies): add UO overrun detector"
+```
+
+---
+
+### Task 5: API Endpoint
+
+**Files:**
+- Create: `server/api/lots/[o2i]/anomalies.get.ts`
+
+This endpoint reuses the same server utils already used by the lot overview endpoint (`server/api/lots/[o2i]/index.get.ts:18-21`): `getUosByLotO2i` from `server/utils/uo.ts` and `getToFixWorklogsForO2i` from `server/utils/worklog.ts`.
+
+- [ ] **Step 1: Create the anomalies endpoint**
+
+```ts
+// server/api/lots/[o2i]/anomalies.get.ts
+
+import { detectLotAnomalies } from '~~/server/usecases/anomalies'
+import { getUosByLotO2i } from '~~/server/utils/uo'
+import { getToFixWorklogsForO2i } from '~~/server/utils/worklog'
+import { handleDatabaseError, createValidationError } from '~~/server/utils/error'
+
+export default defineEventHandler(async (event) => {
+  const o2i = getRouterParam(event, 'o2i')
+  if (!o2i) {
+    throw createValidationError('Missing lot O2I parameter')
+  }
+
+  try {
+    const [uos, toFixWorklogs] = await Promise.all([
+      getUosByLotO2i(o2i),
+      getToFixWorklogsForO2i(o2i),
+    ])
+
+    return detectLotAnomalies({
+      lotO2i: o2i,
+      uos,
+      toFixWorklogs,
+    })
+  } catch (error) {
+    throw handleDatabaseError(error)
+  }
+})
+```
+
+- [ ] **Step 2: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS
+
+- [ ] **Step 3: Verify endpoint manually**
+
+Start dev server: `npm run dev`
+
+Test with a known lot O2I:
+```bash
+curl http://localhost:3000/api/lots/<known-o2i>/anomalies
+```
+Expected: JSON array of `LotAnomaly[]` (possibly empty `[]` if no anomalies on that lot)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add server/api/lots/[o2i]/anomalies.get.ts
+git commit -m "feat(anomalies): add GET /api/lots/[o2i]/anomalies endpoint"
+```
+
+---
+
+### Task 6: Frontend AnomalyBanner Component
+
+**Files:**
+- Create: `app/components/lot/AnomalyBanner.vue`
+
+This component is self-contained: receives the lot `o2i` as a prop, fetches anomalies from the dedicated endpoint, renders one `UAlert` per anomaly. Renders nothing if no anomalies or during loading.
+
+The `UAlert` styling follows existing patterns:
+- `milestone/ConfirmModal.vue:16` uses `UAlert` with `icon`, `color`, `variant="soft"`
+- The cadrage screenshot shows a warning icon with message text
+
+- [ ] **Step 1: Create the AnomalyBanner component**
+
+```vue
+<!-- app/components/lot/AnomalyBanner.vue -->
+<template>
+  <div v-if="anomalies?.length" class="flex flex-col gap-2 mt-4">
+    <UAlert
+      v-for="(anomaly, index) in anomalies"
+      :key="index"
+      icon="i-heroicons-exclamation-triangle"
+      :color="anomaly.severity === 'error' ? 'error' : 'warning'"
+      variant="soft"
+      :title="anomaly.message"
+    />
+  </div>
+</template>
+
+<script setup lang="ts">
+import type { LotAnomaly } from '~~/shared/types/anomaly'
+
+const props = defineProps<{
+  o2i: string
+}>()
+
+const { data: anomalies } = useFetch<LotAnomaly[]>(
+  () => `/api/lots/${props.o2i}/anomalies`
+)
+</script>
+```
+
+- [ ] **Step 2: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS
+
+- [ ] **Step 3: Commit**
+
+```bash
+git add app/components/lot/AnomalyBanner.vue
+git commit -m "feat(anomalies): add LotAnomalyBanner component"
+```
+
+---
+
+### Task 7: Integrate AnomalyBanner into Lot Overview
+
+**Files:**
+- Modify: `app/components/lot/Overview.vue`
+
+The banner goes inside the `<UCard>` header card, after the metadata `<dl>` grids and `<OwnerInput>`, at the bottom of the card body. This placement matches the cadrage screenshot where the alert sits below the descriptions within the header section.
+
+- [ ] **Step 1: Add AnomalyBanner to the Overview template**
+
+In `app/components/lot/Overview.vue`, locate the closing area of the `<UCard>` body (after the `<OwnerInput>` component, before `</UCard>`). Insert the `<LotAnomalyBanner>` component:
+
+Find this block (around lines 94-98):
+```vue
+          </div>
+        </div>
+      </UCard>
+```
+
+Replace with:
+```vue
+          </div>
+        </div>
+        <LotAnomalyBanner v-if="lot?.o2i" :o2i="lot.o2i" />
+      </UCard>
+```
+
+No import needed — Nuxt auto-imports components from `app/components/`.
+
+- [ ] **Step 2: Run quality gates**
+
+Run: `npm run typecheck && npm run lint`
+Expected: PASS
+
+- [ ] **Step 3: Visual verification**
+
+With dev server running (`npm run dev`):
+1. Navigate to a lot detail page with UOs that have overrun (totalQuantity > originalQuantity)
+2. Verify warning banners appear inside the header card, below the lot metadata
+3. Navigate to a lot with no overrun — verify no banners appear
+4. Verify the banners don't cause layout shift (they appear only when data loads and anomalies exist)
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add app/components/lot/Overview.vue
+git commit -m "feat(anomalies): integrate anomaly banners into lot overview"
+```
+
+---
+
+## Verification Checklist
+
+After all tasks are complete:
+
+- [ ] `npm run typecheck` passes
+- [ ] `npm run lint` passes
+- [ ] `GET /api/lots/{o2i}/anomalies` returns `[]` for lots without overruns
+- [ ] `GET /api/lots/{o2i}/anomalies` returns anomalies for lots with overruns
+- [ ] Warning banners render inside the lot header card on the detail page
+- [ ] No banners render for lots without anomalies
+- [ ] Multiple anomalies stack vertically with proper spacing
+
+## Extensibility Guide
+
+To add a new anomaly type:
+
+1. Create `server/usecases/anomalies/my-new-detector.ts` exporting a function `(context: AnomalyContext) => LotAnomaly[]`
+2. Import and add it to the `detectors` array in `server/usecases/anomalies/index.ts`
+3. If the detector needs new data, extend `AnomalyContext` in `server/usecases/anomalies/types.ts` and update the endpoint to fetch it

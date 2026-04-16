@@ -1,0 +1,114 @@
+import type { H3Event } from 'h3'
+import handler from '~~/server/api/lots/[o2i]/responsable.put'
+import { getLotByO2i, updateLotResponsable } from '~~/server/utils/lot'
+import { pushAssigneeToJira } from '~~/server/utils/jira'
+import { sendAdminErrorEmail } from '~~/server/utils/email'
+
+vi.mock('~~/server/utils/lot', () => ({
+  getLotByO2i: vi.fn(),
+  updateLotResponsable: vi.fn(),
+}))
+vi.mock('~~/server/utils/jira', () => ({
+  pushAssigneeToJira: vi.fn(),
+}))
+vi.mock('~~/server/utils/email', () => ({
+  sendAdminErrorEmail: vi.fn(),
+}))
+
+type Handler = (event: H3Event) => Promise<unknown>
+
+const mockEvent = {} as H3Event
+
+const lotWithResponsable = {
+  responsable: { accountId: 'prev-account-id' },
+  plannedDeploymentDate: undefined,
+} as Awaited<ReturnType<typeof getLotByO2i>>
+
+const lotWithoutResponsable = {
+  responsable: undefined,
+  plannedDeploymentDate: undefined,
+} as Awaited<ReturnType<typeof getLotByO2i>>
+
+const updatedLot = { o2i: 'O2I-001', responsable: { accountId: 'new-account-id' } } as Awaited<ReturnType<typeof updateLotResponsable>>
+
+describe('PUT /api/lots/[o2i]/responsable', () => {
+  const mockReadBody = vi.fn()
+  const mockGetRouterParam = vi.fn()
+
+  beforeEach(() => {
+    vi.stubGlobal('getRouterParam', mockGetRouterParam.mockReturnValue('O2I-001'))
+    vi.stubGlobal('readBody', mockReadBody.mockResolvedValue({ responsableAccountId: 'new-account-id' }))
+
+    vi.mocked(getLotByO2i).mockResolvedValue(lotWithResponsable)
+    vi.mocked(updateLotResponsable).mockResolvedValue(updatedLot)
+    vi.mocked(pushAssigneeToJira).mockResolvedValue({ success: true })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it('returns the updated lot on success', async () => {
+    const result = await (handler as Handler)(mockEvent)
+    expect(result).toBe(updatedLot)
+    expect(updateLotResponsable).toHaveBeenCalledWith('O2I-001', 'new-account-id')
+    expect(pushAssigneeToJira).toHaveBeenCalledWith('O2I-001', 'new-account-id')
+  })
+
+  it('throws 400 when responsableAccountId is missing', async () => {
+    mockReadBody.mockResolvedValue({})
+
+    await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 400 })
+    expect(getLotByO2i).not.toHaveBeenCalled()
+  })
+
+  it('throws 400 when o2i is missing', async () => {
+    mockGetRouterParam.mockReturnValue(undefined)
+
+    await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  describe('when Jira push fails', () => {
+    beforeEach(() => {
+      vi.mocked(pushAssigneeToJira).mockResolvedValue({
+        success: false,
+        error: 'Jira API returned 503',
+      })
+    })
+
+    it('rolls back the DB update when a previous responsable existed', async () => {
+      await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 502 })
+
+      expect(updateLotResponsable).toHaveBeenCalledTimes(2)
+      expect(updateLotResponsable).toHaveBeenLastCalledWith('O2I-001', 'prev-account-id')
+      expect(sendAdminErrorEmail).toHaveBeenCalledOnce()
+    })
+
+    it('skips rollback and warns when no previous responsable existed', async () => {
+      vi.mocked(getLotByO2i).mockResolvedValue(lotWithoutResponsable)
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 502 })
+
+      expect(updateLotResponsable).toHaveBeenCalledOnce()
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Cannot roll back'),
+        expect.objectContaining({ o2i: 'O2I-001' }),
+      )
+      expect(sendAdminErrorEmail).toHaveBeenCalledOnce()
+    })
+
+    it('does not trigger rollback when Jira is not configured', async () => {
+      vi.mocked(pushAssigneeToJira).mockResolvedValue({
+        success: false,
+        error: 'Jira API not configured',
+      })
+
+      const result = await (handler as Handler)(mockEvent)
+
+      expect(result).toBe(updatedLot)
+      expect(updateLotResponsable).toHaveBeenCalledOnce()
+    })
+  })
+})

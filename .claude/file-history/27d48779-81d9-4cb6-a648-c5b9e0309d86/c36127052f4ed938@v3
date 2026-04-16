@@ -1,0 +1,139 @@
+# Code Review — `main` → `PMPFLOW-93/reventilation-infos`
+
+> Généré le 2026-03-20
+
+## Summary
+
+Ce diff introduit deux fonctionnalités distinctes : (1) un système de coloration des badges de statut des lots via un nouveau composable `useLotStatusColors`, et (2) un enrichissement du composant `ReventilationSlideover` pour afficher des informations de quantité calculées (billed vs original) en réutilisant le composable `useUo`. Les changements accompagnant ces features sont majoritairement cosmétiques : externalisation du `ml-1` de `UoUnit` vers les parents et reformatage multi-lignes. La qualité générale est bonne, le code est lisible et bien structuré, mais deux problèmes techniques méritent attention avant merge.
+
+## Score: 7/10 — Good
+
+---
+
+## ⛔ Bloquant — À corriger avant merge
+
+### `package.json` / `package-lock.json` / `CHANGELOG.md` — Modified
+
+La branche est basée sur une version antérieure à la release `1.19.0`. La merge vers `main` va **écraser la version actuelle** :
+
+```
+main actuel   : "version": "1.19.0"
+après merge   : "version": "1.18.0"  ← régression
+```
+
+Le `CHANGELOG.md` perd également 32 lignes correspondant aux notes de release `1.19.0`.
+
+**Action requise :** Rebaser la branche sur `main` avant la merge, ou résoudre le conflit en conservant `1.19.0` et le CHANGELOG actuel.
+
+---
+
+## Files
+
+### `app/composables/useLotStatusColors.ts` — Added
+
+**Issues:**
+- ⚠️ `WARNING` — ligne 7 — `'primary'` est dans l'union type de `StatusColorMapping.color` mais n'est utilisé dans aucune entrée. Le commentaire dit « Blue (primary) » mais le code utilise `'info'`. Supprimer `'primary'` de l'union ou l'utiliser effectivement.
+- ⚠️ `WARNING` — ligne 35 — `'cancelled'` est classé en vert/success. Sémantiquement, un lot annulé n'est pas un état positif. Valider avec le PO si `warning` ou `neutral` conviendrait mieux.
+- ⚠️ `WARNING` — ligne 28 — `'approvising bis'` est vraisemblablement une faute de frappe pour `'approvisioning bis'`. Un statut non reconnu tombera silencieusement sur `defaultColorMapping` (neutral) sans erreur console.
+
+**Positives:**
+- ✅ Normalisation case-insensitive (`toLowerCase().trim()`) robuste pour des données venant de Jira.
+- ✅ Fallback `defaultColorMapping` bien défini — pas de crash si un nouveau statut apparaît en prod.
+- ✅ Structure claire avec JSDoc et groupement par catégorie sémantique.
+
+---
+
+### `app/components/lot/Table.vue` — Modified
+
+**Issues:**
+- ⚠️ `WARNING` — `row.getValue('status')` retourne `unknown` (type TanStack Table). Un cast explicite (`as string`) ou une vérification préalable renforcerait la robustesse.
+
+**Positives:**
+- ✅ Intégration minimaliste : une ligne dans le script, une substitution dans le template.
+
+---
+
+### `app/components/uo/ReventilationSlideover.vue` — Modified
+
+**Issues:**
+- ⛔ `CRITICAL` — ligne 136 — `useUo({ uos: props.uos })` passe le tableau brut au moment de l'initialisation. Si `props.uos` change après le montage (chargement asynchrone, réouverture du slideover avec des UOs différentes), le `uoMap` ne sera jamais mis à jour et `mappedUos` sera calculé sur des données périmées ou vides.
+
+  ```typescript
+  // Actuel — snapshot statique au mount
+  const { mappedUos } = useUo({ uos: props.uos })
+
+  // Fix — référence réactive
+  const { mappedUos } = useUo({ uos: toRef(props, 'uos') })
+  ```
+
+- ⚠️ `WARNING` — ligne 162 — `getDisplayInfo(item: unknown)` utilise un double cast `as UoDetails` qui casse la sécurité de type. Préférer une intersection type :
+
+  ```typescript
+  // Actuel — fragile
+  function getDisplayInfo(item: unknown) {
+    const o2i = (item as UoDetails).o2i
+    ...
+  }
+
+  // Recommandé
+  function getDisplayInfo(item: RadioGroupItem & UoDetails) {
+    const { o2i, originalQuantity } = item
+    ...
+  }
+  ```
+
+- ⚠️ `WARNING` — lignes 75-78 — `getDisplayInfo(item)` est appelé deux fois consécutives pour le même `item`, déclenchant deux `.find()`. Utiliser une variable locale ou un `computed` indexé par `o2i`.
+
+- ⚠️ `WARNING` — ligne 59 — `v-if="group.type === 'Forfait standard'"` compare une string hardcodée. Utiliser la constante depuis `shared/types/uo.ts` (`UoTypeEnum.FORFAIT_STANDARD`).
+
+**Positives:**
+- ✅ Upgrade du type de prop de `UoCore[]` vers `UoDetails[]` — c'est le bon type pour accéder à `originalQuantity`.
+- ✅ L'enrichissement visuel du `URadioGroup` améliore réellement l'UX de sélection lors de la réventilation.
+
+---
+
+### `app/components/uo/Unit.vue` — Modified
+
+**Positives:**
+- ✅ Bonne décision d'externaliser l'espacement `ml-1` : le composant ne doit pas imposer son layout aux parents.
+- ✅ Migration systématique dans `HistoricBundleSection`, `StandardBundleSection` et `TimesSection` — aucun oubli détecté.
+
+---
+
+### `app/components/uo/StandardBundleSection.vue`, `TimesSection.vue`, `HistoricBundleSection.vue` — Modified
+
+- ✅ Ajout de `class="ml-1"` en compensation de la suppression dans `Unit.vue`. Cohérent et complet.
+
+---
+
+## Cross-cutting concerns
+
+- ⚠️ **Pattern `useUo({ uos: props.uos })` risqué** — ce même pattern existe dans d'autres composants (`StandardBundleSection`, `TimesSection`). Une correction systématique dans `useUo` pour accepter un `MaybeRefOrGetter<UoDetails[]>` (pattern VueUse) serait plus robuste qu'un fix par composant.
+- ℹ️ **Strings hardcodées non i18nées** — `'Forfait standard'` (ligne 59) et `'Parent: '` (ligne 64) ne passent pas par `t()`, contrairement aux autres labels du même composant. L'app est French-only donc acceptable, mais incohérent.
+- ℹ️ **`category` non consommé** dans `StatusColorMapping` — le champ est défini mais jamais lu par les consommateurs du composable. Le supprimer si pas d'usage prévu.
+
+---
+
+## Top Recommendations
+
+1. **[CRITIQUE] Corriger la réactivité de `useUo` dans `ReventilationSlideover`** — Passer `toRef(props, 'uos')` au lieu de `props.uos` brut. Sans ça, le slideover peut afficher des quantités incorrectes (0) si les UOs sont chargées de façon asynchrone ou si le composant est réutilisé avec des props différentes.
+
+2. **Vérifier `'approvising bis'`** — Requêter `SELECT DISTINCT name FROM lot_statuses WHERE name ILIKE '%approv%'` pour confirmer l'orthographe exacte du statut en base.
+
+3. **Typer `getDisplayInfo` correctement** — Remplacer le double cast `as UoDetails` par l'intersection type `RadioGroupItem & UoDetails` pour maintenir la sécurité de type à la compilation.
+
+---
+
+## Récapitulatif des actions
+
+| # | Action | Fichier | Urgence |
+|---|---|---|---|
+| 0 | Rebaser sur `main` pour récupérer `1.19.0` + CHANGELOG | `package.json` / `CHANGELOG.md` | **Bloquant** |
+| 1 | `toRef(props, 'uos')` pour la réactivité | `ReventilationSlideover.vue` | **Obligatoire** |
+| 2 | Typer `getDisplayInfo` avec intersection type | `ReventilationSlideover.vue` | **Recommandé** |
+| 3 | Dédupliquer les appels à `getDisplayInfo` dans le template | `ReventilationSlideover.vue` | **Recommandé** |
+| 4 | Remplacer la string litérale par `UoTypeEnum.FORFAIT_STANDARD` | `ReventilationSlideover.vue` | **Recommandé** |
+| 5 | Vérifier l'orthographe de `'approvising bis'` en base | `useLotStatusColors.ts` | **Recommandé** |
+| 6 | Revoir `'cancelled'` → `'neutral'` ou `'warning'` | `useLotStatusColors.ts` | Optionnel |
+| 7 | Supprimer `'primary'` du type ou l'utiliser | `useLotStatusColors.ts` | Optionnel |
+| 8 | Supprimer `category` si non utilisé | `useLotStatusColors.ts` | Optionnel |

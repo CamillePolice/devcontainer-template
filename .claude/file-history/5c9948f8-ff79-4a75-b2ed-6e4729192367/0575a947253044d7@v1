@@ -1,0 +1,54 @@
+import type { H3Event } from 'h3'
+
+/**
+ * Validates the HMAC-SHA256 signature of an incoming webhook request.
+ * Expects the signature in the `x-webhook-signature` header with format: `sha256=<hex>`
+ */
+export async function verifyWebhookSignature(event: H3Event, rawBody: string): Promise<void> {
+  const config = useRuntimeConfig()
+  const secret = config.webhookSecret
+
+  if (!secret) {
+    throw createError({ statusCode: 500, statusMessage: 'Webhook secret not configured' })
+  }
+
+  const signature = getHeader(event, 'x-webhook-signature')
+  if (!signature) {
+    throw createError({ statusCode: 401, statusMessage: 'Missing webhook signature' })
+  }
+
+  const [algorithm, receivedHex] = signature.split('=')
+  if (algorithm !== 'sha256' || !receivedHex) {
+    throw createError({ statusCode: 401, statusMessage: 'Invalid signature format' })
+  }
+
+  const encoder = new TextEncoder()
+  const keyData = encoder.encode(secret)
+  const messageData = encoder.encode(rawBody)
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'raw',
+    keyData,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign'],
+  )
+
+  const signatureBuffer = await crypto.subtle.sign('HMAC', cryptoKey, messageData)
+  const computedHex = [...new Uint8Array(signatureBuffer)]
+    .map(b => b.toString(16).padStart(2, '0'))
+    .join('')
+
+  if (!timingSafeEqual(computedHex, receivedHex)) {
+    throw createError({ statusCode: 401, statusMessage: 'Invalid webhook signature' })
+  }
+}
+
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let result = 0
+  for (let i = 0; i < a.length; i++) {
+    result |= (a.codePointAt(i) ?? 0) ^ (b.codePointAt(i) ?? 0)
+  }
+  return result === 0
+}

@@ -1,0 +1,107 @@
+import type { H3Event } from 'h3'
+import { jwtDecode } from 'jwt-decode'
+import { AUTH0_AUTHENTICATED_HOOK } from '../../utils/hooks'
+
+/** User profile returned by Auth0 in the onSuccess callback */
+interface Auth0User {
+  sub: string
+  name?: string
+  email?: string
+  picture?: string
+  nickname?: string
+  preferred_username?: string
+  [key: string]: unknown // allows any additional claims Auth0 may return
+}
+
+/** Token bundle returned by Auth0 alongside the user profile */
+interface Auth0Tokens {
+  access_token?: string
+  id_token?: string
+  token_type?: string
+  expires_in?: number
+  [key: string]: unknown // allows any additional fields Auth0 may return
+}
+
+/** Claims extracted from the decoded ID token — used to read roles and groups */
+interface Auth0IdTokenClaims {
+  roles?: string[]
+  groups?: string[]
+  [key: string]: unknown // allows namespaced claims (e.g. https://ns/roles)
+}
+
+export default defineOAuthAuth0EventHandler({
+  config: {
+    clientId: useRuntimeConfig().auth0ClientId,
+    clientSecret: useRuntimeConfig().auth0ClientSecret,
+    domain: useRuntimeConfig().auth0Domain,
+    scope: ['openid', 'profile', 'email'],
+  },
+
+  async onSuccess(
+    event: H3Event,
+    { user, tokens }: { user: Auth0User, tokens: Auth0Tokens },
+  ) {
+    // Decode the ID token to extract roles and groups
+    let idTokenClaims: Auth0IdTokenClaims | null = null
+    if (tokens.id_token) {
+      try {
+        idTokenClaims = jwtDecode<Auth0IdTokenClaims>(tokens.id_token)
+      }
+      catch {
+        console.error('❌ Auth0: failed to decode id_token')
+      }
+    }
+
+    // Extract roles/groups: namespace custom or claim racine
+    const namespace = useRuntimeConfig().auth0RolesNamespace
+    const rolesRaw = namespace
+      ? idTokenClaims?.[`${namespace}/roles`]
+      : idTokenClaims?.roles
+    const roles: string[] | undefined = Array.isArray(rolesRaw)
+      ? rolesRaw
+      : undefined
+
+    const groupsRaw = namespace
+      ? idTokenClaims?.[`${namespace}/groups`]
+      : idTokenClaims?.groups
+    const groups: string[] | undefined = Array.isArray(groupsRaw)
+      ? groupsRaw
+      : undefined
+
+    const onionUser = {
+      username:
+        user.nickname || user.preferred_username || user.email || user.sub,
+      profile: {
+        id: user.sub,
+        name: user.name,
+        email: user.email,
+      },
+      roles: roles ?? [],
+      groups: groups ?? [],
+      // Raw data for compatibility
+      ...user,
+    }
+
+    await setUserSession(event, {
+      user: onionUser,
+      provider: 'auth0',
+      loggedInAt: Date.now(),
+    })
+
+    const nitroApp = useNitroApp()
+    await nitroApp.hooks.callHook(AUTH0_AUTHENTICATED_HOOK, {
+      user: onionUser,
+    })
+
+    // Redirect after successful login
+    const redirectUrl = getCookie(event, 'auth-redirect') || '/'
+    deleteCookie(event, 'auth-redirect')
+
+    return sendRedirect(event, redirectUrl)
+  },
+
+  onError(event: H3Event, error: unknown) {
+    console.error('❌ Auth0 OAuth error:', error)
+    return sendRedirect(event, '/login?error=auth0_error')
+  },
+})

@@ -1,0 +1,115 @@
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { H3Event } from 'h3'
+import handler from '~~/server/api/lots/[o2i]/deployment-date.put'
+import { getLotByO2i, updateLotDeploymentDate } from '~~/server/utils/lot'
+import { pushDeploymentDateToJira } from '~~/server/utils/jira'
+import { sendAdminErrorEmail } from '~~/server/utils/email'
+
+vi.mock('~~/server/utils/lot', () => ({
+  getLotByO2i: vi.fn(),
+  updateLotDeploymentDate: vi.fn(),
+}))
+vi.mock('~~/server/utils/jira', () => ({
+  pushDeploymentDateToJira: vi.fn(),
+}))
+vi.mock('~~/server/utils/email', () => ({
+  sendAdminErrorEmail: vi.fn(),
+}))
+
+type Handler = (event: H3Event) => Promise<unknown>
+
+const mockEvent = {} as H3Event
+
+const lotWithDate = {
+  plannedDeploymentDate: new Date('2025-06-15T00:00:00.000Z'),
+  responsable: undefined,
+} as unknown as Awaited<ReturnType<typeof getLotByO2i>>
+
+const lotWithoutDate = {
+  plannedDeploymentDate: undefined,
+  responsable: undefined,
+} as unknown as Awaited<ReturnType<typeof getLotByO2i>>
+
+const updatedLot = { o2i: 'O2I-001', plannedDeploymentDate: new Date('2025-09-01') } as unknown as Awaited<ReturnType<typeof updateLotDeploymentDate>>
+
+describe('PUT /api/lots/[o2i]/deployment-date', () => {
+  const mockReadBody = vi.fn()
+  const mockGetRouterParam = vi.fn()
+
+  beforeEach(() => {
+    vi.stubGlobal('getRouterParam', mockGetRouterParam.mockReturnValue('O2I-001'))
+    vi.stubGlobal('readBody', mockReadBody.mockResolvedValue({ deploymentDate: '2025-09-01' }))
+
+    vi.mocked(getLotByO2i).mockResolvedValue(lotWithDate)
+    vi.mocked(updateLotDeploymentDate).mockResolvedValue(updatedLot)
+    vi.mocked(pushDeploymentDateToJira).mockResolvedValue({ success: true })
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.clearAllMocks()
+  })
+
+  it('returns the updated lot on success', async () => {
+    const result = await (handler as Handler)(mockEvent)
+    expect(result).toBe(updatedLot)
+    expect(updateLotDeploymentDate).toHaveBeenCalledWith('O2I-001', '2025-09-01')
+    expect(pushDeploymentDateToJira).toHaveBeenCalledWith('O2I-001', '2025-09-01')
+  })
+
+  it('throws 400 when deploymentDate is missing', async () => {
+    mockReadBody.mockResolvedValue({})
+
+    await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 400 })
+    expect(getLotByO2i).not.toHaveBeenCalled()
+  })
+
+  it('throws 400 when o2i is missing', async () => {
+    mockGetRouterParam.mockReset()
+
+    await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 400 })
+  })
+
+  describe('when Jira push fails', () => {
+    beforeEach(() => {
+      vi.mocked(pushDeploymentDateToJira).mockResolvedValue({
+        success: false,
+        error: 'Jira API returned 503',
+      })
+    })
+
+    it('rolls back the DB update when a previous date existed', async () => {
+      await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 502 })
+
+      expect(updateLotDeploymentDate).toHaveBeenCalledTimes(2)
+      expect(updateLotDeploymentDate).toHaveBeenLastCalledWith('O2I-001', '2025-06-15')
+      expect(sendAdminErrorEmail).toHaveBeenCalledOnce()
+    })
+
+    it('skips rollback and warns when no previous date existed', async () => {
+      vi.mocked(getLotByO2i).mockResolvedValue(lotWithoutDate)
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      await expect((handler as Handler)(mockEvent)).rejects.toMatchObject({ statusCode: 502 })
+
+      expect(updateLotDeploymentDate).toHaveBeenCalledOnce()
+      expect(warnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('Cannot roll back'),
+        expect.objectContaining({ o2i: 'O2I-001' }),
+      )
+      expect(sendAdminErrorEmail).toHaveBeenCalledOnce()
+    })
+
+    it('does not trigger rollback when Jira is not configured', async () => {
+      vi.mocked(pushDeploymentDateToJira).mockResolvedValue({
+        success: false,
+        error: 'Jira API not configured',
+      })
+
+      const result = await (handler as Handler)(mockEvent)
+
+      expect(result).toBe(updatedLot)
+      expect(updateLotDeploymentDate).toHaveBeenCalledOnce()
+    })
+  })
+})

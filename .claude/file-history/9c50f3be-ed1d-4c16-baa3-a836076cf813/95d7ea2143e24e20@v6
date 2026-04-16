@@ -1,0 +1,74 @@
+import type { LotAnomaly } from '#shared/types/anomaly'
+import type { UoDetails } from '#shared/types/uo'
+import type { AnomalyContext } from './types'
+import { computeUoTotalQuantity, roundAnomalyQuantity } from './types'
+
+/**
+ * Normalize a quantity to HEURE regardless of the UO's native unit.
+ * All time UOs use either JH (= hoursPerWorkday h) or HEURE/H.
+ */
+function toHeure(quantity: number, unit: string | undefined, hoursPerWorkday: number): number {
+  return unit?.toUpperCase() === 'JH' ? quantity * hoursPerWorkday : quantity
+}
+
+export function detectLotTimeOverrun(context: AnomalyContext): LotAnomaly[] {
+  const timeUos = context.uos.TIME
+  const standardBundleChildUos = context.uos.STANDARD_BUNDLE.flatMap(bundle => bundle.uos)
+  const allTrackedUos = [...timeUos, ...standardBundleChildUos]
+
+  if (allTrackedUos.length === 0) {
+    return []
+  }
+
+  // Normalize everything to HEURE so mixed-unit lots (JH + HEURE) are compared correctly.
+  // timeToReallocate from toFixWorklogs is always in HEURE (from getToFixWorklogsForO2i).
+  const normalize = (quantity: number, uo: UoDetails) =>
+    toHeure(quantity, uo.unit, context.hoursPerWorkday)
+
+  const totalSoldHeures = roundAnomalyQuantity(
+    allTrackedUos.reduce((sum, uo) => sum + normalize(uo.originalQuantity ?? 0, uo), 0),
+  )
+  const totalConsumedHeures = roundAnomalyQuantity(
+    allTrackedUos.reduce((sum, uo) => sum + normalize(computeUoTotalQuantity(uo), uo), 0),
+  )
+  const timeToReallocateHeures = roundAnomalyQuantity(
+    context.toFixWorklogs.reduce((sum, worklog) => sum + (worklog.timeToReallocate ?? 0), 0),
+  )
+
+  const totalWithReventilation = roundAnomalyQuantity(totalConsumedHeures + timeToReallocateHeures)
+
+  if (totalWithReventilation <= totalSoldHeures) {
+    return []
+  }
+
+  // If all UOs share the same unit, report in that unit for readability.
+  // Otherwise fall back to hours since mixing units prevents a single native display.
+  const uniqueUnits = new Set(allTrackedUos.map(uo => uo.unit?.toUpperCase() ?? 'JH'))
+  const allJh = uniqueUnits.size === 1 && uniqueUnits.has('JH')
+
+  const displayTotal = allJh
+    ? roundAnomalyQuantity(totalWithReventilation / context.hoursPerWorkday)
+    : totalWithReventilation
+  const displaySold = allJh
+    ? roundAnomalyQuantity(totalSoldHeures / context.hoursPerWorkday)
+    : totalSoldHeures
+  const displayUnit = allJh ? 'j' : 'h'
+
+  return [
+    {
+      type: 'LOT_TIME_OVERRUN',
+      severity: 'error',
+      messageKey: 'anomalies.lotTimeOverrun',
+      params: {
+        total: displayTotal,
+        sold: displaySold,
+        unit: displayUnit,
+      },
+      metadata: {
+        totalConsumedHeures,
+        totalSoldHeures,
+        timeToReallocateHeures,
+      },
+    },
+  ]
+}

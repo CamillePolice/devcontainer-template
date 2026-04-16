@@ -1,0 +1,93 @@
+import type { H3Event } from "h3";
+import { jwtDecode } from "jwt-decode";
+import { MICROSOFT_AUTHENTICATED_HOOK } from "../../utils/hooks";
+
+interface MicrosoftUser {
+  id: string;
+  displayName?: string | null;
+  name?: string | null;
+  mail?: string | null;
+  userPrincipalName?: string | null;
+  [key: string]: unknown;
+}
+
+interface MicrosoftTokens {
+  access_token?: string;
+  id_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  [key: string]: unknown;
+}
+
+interface MicrosoftIdTokenClaims {
+  roles?: string[];
+  groups?: string[];
+  [key: string]: unknown;
+}
+
+export default defineOAuthMicrosoftEventHandler({
+  config: {
+    clientId: useRuntimeConfig().microsoftClientId,
+    clientSecret: useRuntimeConfig().microsoftClientSecret,
+    tenant: useRuntimeConfig().microsoftTenantId,
+    scope: ["openid", "profile", "email", "User.Read"],
+  },
+
+  async onError(event: H3Event, error: unknown) {
+    console.error("❌ Microsoft OAuth error:", error);
+    return sendError(
+      event,
+      createError({
+        statusCode: 500,
+        statusMessage: "Microsoft OAuth failed",
+        data: error,
+      }),
+    );
+  },
+
+  async onSuccess(
+    event: H3Event,
+    { user, tokens }: { user: MicrosoftUser; tokens: MicrosoftTokens },
+  ) {
+    // Decode the ID token to extract roles and groups
+    const idTokenClaims = tokens.id_token
+      ? jwtDecode<MicrosoftIdTokenClaims>(tokens.id_token)
+      : null;
+
+    const roles = idTokenClaims?.roles ?? [];
+    const groups = idTokenClaims?.groups ?? [];
+    const onionUser = {
+      username:
+        user.displayName ||
+        user.name ||
+        user.userPrincipalName ||
+        user.mail ||
+        user.id,
+      profile: {
+        name: user.name ?? user.displayName ?? undefined,
+        email: user.mail ?? undefined,
+        id: user.id,
+      },
+      roles,
+      groups,
+    };
+    console.log("✅ Microsoft user transformed:", onionUser);
+
+    await setUserSession(event, {
+      user: onionUser,
+      provider: "microsoft",
+      loggedInAt: Date.now(),
+    });
+
+    const nitroApp = useNitroApp();
+    await nitroApp.hooks.callHook(MICROSOFT_AUTHENTICATED_HOOK, {
+      user: onionUser,
+    });
+
+    // Redirect after successful login
+    const redirectUrl = getCookie(event, "auth-redirect") || "/";
+    deleteCookie(event, "auth-redirect");
+
+    return sendRedirect(event, redirectUrl);
+  },
+});

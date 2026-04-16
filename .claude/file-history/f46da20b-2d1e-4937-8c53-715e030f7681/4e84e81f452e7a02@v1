@@ -1,0 +1,15 @@
+{
+  "navigation": {
+    "lots": "Liste des lots",
+    "closure": "Clôture"
+  },
+  "pages": {
+    "lots": {
+      "title": "Liste des lots"
+    },
+    "lot": {
+      "title": "Détail du lot",
+      "breadcrumb": "Liste des lots"
+    }
+  }
+}

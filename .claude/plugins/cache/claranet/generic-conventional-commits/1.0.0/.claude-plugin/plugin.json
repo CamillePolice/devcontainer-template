@@ -1,0 +1,10 @@
+{
+  "name": "generic-conventional-commits",
+  "version": "1.0.0",
+  "description": "Generate git commit messages following Conventional Commits v1.0.0 specification with community conventions support",
+  "author": {
+    "name": "Claranet"
+  },
+  "license": "Internal Use",
+  "keywords": ["git", "commit", "conventional-commits", "workflow", "semver"]
+}

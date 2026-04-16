@@ -1,0 +1,3 @@
+ALTER TABLE "uo" ADD COLUMN "product_code_parent" varchar(255);--> statement-breakpoint
+ALTER TABLE "uo" ADD COLUMN "product_name_parent" varchar(255);--> statement-breakpoint
+ALTER TABLE "worklog" ADD COLUMN "o2i_reference_carte" varchar(45);

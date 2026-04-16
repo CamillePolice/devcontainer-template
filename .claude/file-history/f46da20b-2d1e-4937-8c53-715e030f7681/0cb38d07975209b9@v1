@@ -1,0 +1,24 @@
+<template>
+  <LotTable
+    :data="lots"
+    :pending="loading"
+    :status-items="statusItems"
+    :factories="factories"
+  />
+</template>
+
+<script setup lang="ts">
+definePageMeta({ alias: '/', title: 'Liste des lots' })
+
+const { t } = useI18n()
+useHead({ title: t('pages.lots.title') })
+
+const { lots, loading, fetchLots } = useLot()
+const { data: statusItems } = useFetchLotsStatus()
+const { data: factories } = useFetchFactories()
+
+const breadcrumb = useBreadcrumb()
+breadcrumb.setItems([{ label: 'ProjectFlow' }])
+
+await fetchLots()
+</script>

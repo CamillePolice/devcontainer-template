@@ -1,0 +1,74 @@
+{
+  "version": 2,
+  "plugins": {
+    "generic-conventional-commits@claranet": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/claranet/generic-conventional-commits/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-03-12T13:31:38.928Z",
+        "lastUpdated": "2026-03-12T13:31:38.928Z",
+        "gitCommitSha": "200a382013159135eaa78a798867744395343b7a"
+      }
+    ],
+    "devops-terraform-standards@claranet": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/claranet/devops-terraform-standards/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-03-12T13:31:38.928Z",
+        "lastUpdated": "2026-03-12T13:31:38.928Z",
+        "gitCommitSha": "200a382013159135eaa78a798867744395343b7a"
+      }
+    ],
+    "teams-hermes-adding-rds-prefix-list-access@claranet": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/claranet/teams-hermes-adding-rds-prefix-list-access/1.0.0",
+        "version": "1.0.0",
+        "installedAt": "2026-03-12T13:31:38.928Z",
+        "lastUpdated": "2026-03-12T13:31:38.928Z",
+        "gitCommitSha": "200a382013159135eaa78a798867744395343b7a"
+      }
+    ],
+    "context7@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/claude-plugins-official/context7/unknown",
+        "version": "unknown",
+        "installedAt": "2026-03-12T13:36:06.385Z",
+        "lastUpdated": "2026-04-07T12:16:51.301Z",
+        "gitCommitSha": "b36fd4b753018b0b340803579399992a32e43502"
+      }
+    ],
+    "claude-mem@thedotmack": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/thedotmack/claude-mem/10.6.2",
+        "version": "10.6.2",
+        "installedAt": "2026-03-24T15:36:32.024Z",
+        "lastUpdated": "2026-03-24T15:36:32.024Z",
+        "gitCommitSha": "e2a230286dd9fb351c4631c75da23daff1d27f12"
+      }
+    ],
+    "frontend-design@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/claude-plugins-official/frontend-design/unknown",
+        "version": "unknown",
+        "installedAt": "2026-03-30T07:26:03.121Z",
+        "lastUpdated": "2026-04-07T12:16:51.285Z"
+      }
+    ],
+    "superpowers@claude-plugins-official": [
+      {
+        "scope": "user",
+        "installPath": "/Users/cpo/.claude/plugins/cache/claude-plugins-official/superpowers/5.0.7",
+        "version": "5.0.7",
+        "installedAt": "2026-03-30T07:26:05.304Z",
+        "lastUpdated": "2026-04-01T07:19:30.623Z",
+        "gitCommitSha": "eafe962b18f6c5dc70fb7c8cc7e83e61f4cdde06"
+      }
+    ]
+  }
+}

@@ -1,0 +1,13 @@
+node_modules/@claranet/onion-auth/app/composables/useOnionAuth.ts(56,9): error TS2322: Type 'string | undefined' is not assignable to type 'string'.
+  Type 'undefined' is not assignable to type 'string'.
+node_modules/@claranet/onion-auth/app/composables/useOnionAuth.ts(65,11): error TS2353: Object literal may only specify known properties, and 'picture' does not exist in type '{ id: string; name?: string | undefined; email?: string | undefined; }'.
+node_modules/@claranet/onion-auth/app/composables/useOnionAuth.ts(69,9): error TS2322: Type 'string[] | undefined' is not assignable to type 'string[]'.
+  Type 'undefined' is not assignable to type 'string[]'.
+node_modules/@claranet/onion-auth/app/composables/useOnionAuth.ts(70,9): error TS2322: Type 'string[] | undefined' is not assignable to type 'string[]'.
+  Type 'undefined' is not assignable to type 'string[]'.
+node_modules/@claranet/onion-auth/app/composables/useOnionAuth.ts(72,7): error TS2322: Type 'unknown' is not assignable to type 'string | undefined'.
+node_modules/@claranet/onion-auth/app/composables/useOnionAuth.ts(73,7): error TS2322: Type 'unknown' is not assignable to type 'number | undefined'.
+node_modules/@claranet/onion-auth/server/routes/auth/auth0.get.ts(92,35): error TS2345: Argument of type '"auth0-auth:authenticated"' is not assignable to parameter of type 'HookKeys<NitroRuntimeHooks>'.
+node_modules/@claranet/onion-auth/server/routes/auth/microsoft.get.ts(82,35): error TS2345: Argument of type '"microsoft-auth:authenticated"' is not assignable to parameter of type 'HookKeys<NitroRuntimeHooks>'.
+node_modules/@claranet/onion-auth/server/routes/auth/auth0.get.ts(92,35): error TS2345: Argument of type '"auth0-auth:authenticated"' is not assignable to parameter of type 'HookKeys<NitroRuntimeHooks>'.
+node_modules/@claranet/onion-auth/server/routes/auth/microsoft.get.ts(82,35): error TS2345: Argument of type '"microsoft-auth:authenticated"' is not assignable to parameter of type 'HookKeys<NitroRuntimeHooks>'.

@@ -1,0 +1,141 @@
+import { pgTable, pgView, integer, date, varchar, pgEnum, text, real, numeric } from 'drizzle-orm/pg-core'
+import { lot, productionCell, factory, collaborator } from './index'
+import { relations } from 'drizzle-orm'
+
+export const uoType = pgEnum('uo_type', [
+  'T&M',
+  'Forfait standard',
+  'Forfait historique',
+])
+
+export const materialStatus = pgEnum('material_status', [
+  'PENDING',
+  'BILLED',
+])
+
+export const materialQuantityDeclaration = pgTable('material_quantity_declaration', {
+  id: integer('id').generatedByDefaultAsIdentity().primaryKey(),
+  o2i: varchar('o2i', { length: 45 }).notNull().references(() => uo.o2i, { onDelete: 'cascade' }),
+  quantity: real('quantity').notNull(),
+  availabilityDate: date('availability_date').notNull(),
+  createdAt: date('created_at').defaultNow(),
+  status: materialStatus('status').notNull(),
+})
+
+export const uo = pgTable('uo', {
+  id: integer('id').generatedByDefaultAsIdentity().primaryKey(),
+  o2iLot: varchar('o2i_lot', { length: 45 }).notNull().references(
+    () => lot.o2i, { onDelete: 'cascade' }),
+  o2i: varchar('o2i', { length: 45 }).notNull().unique(),
+  o2iParent: varchar('o2i_parent', { length: 45 }),
+  type: uoType('type').notNull(),
+  statusJiraId: integer('status_jira_id').notNull().references(
+    () => uoStatus.jiraId),
+  profile: varchar('profile', { length: 255 }).notNull(),
+  responsableAccountId: varchar('responsable_account_id', { length: 255 }).references(
+    () => collaborator.accountId),
+  productCode: varchar('product_code', { length: 255 }).notNull(),
+  productName: varchar('product_name', { length: 255 }),
+  productCodeParent: varchar('product_code_parent', { length: 255 }),
+  productNameParent: varchar('product_name_parent', { length: 255 }),
+  productionCell: varchar('production_cell', { length: 45 }).references(
+    () => productionCell.key),
+  factory: varchar('factory', { length: 45 }).references(
+    () => factory.key),
+  quantityConsumed: real('quantity_consumed'),
+  quantityConsumedAdjustment: real('quantity_consumed_adjustment').default(0),
+  raf: real('raf').notNull(),
+  rafAdjustment: real('raf_adjustment').default(0),
+  originalQuantity: real('original_quantity').notNull(),
+  quantityAdjustment: real('quantity_adjustment').default(0),
+  unit: varchar('unit', { length: 45 }),
+  price: numeric('price', { precision: 10, scale: 2 }),
+  description: text('description'),
+  billingDate: date('billing_date'),
+  billingTrigger: varchar('billing_trigger', { length: 255 }),
+  billingDetails: text('billing_details'),
+  plannedDeploymentDate: date('planned_deployment_date'),
+  desiredDeploymentDate: date('desired_deployment_date'),
+  quotelineNumber: varchar('quoteline_number', { length: 45 }),
+  billedMilestoneId: integer('billed_milestone_id'),
+  milestoneBilledAt: date('milestone_billed_at'),
+  createdAt: date('created_at').notNull().defaultNow(),
+  updatedAt: date('updated_at')
+    .$onUpdate(() => new Date().toISOString())
+    .defaultNow(),
+})
+
+export const uoStatus = pgTable('uo_status', {
+  id: integer().generatedByDefaultAsIdentity().primaryKey(),
+  name: varchar('name', { length: 255 }).notNull().unique(),
+  jiraId: integer('jira_id').notNull().unique(),
+  createdAt: date('created_at').notNull().defaultNow(),
+  updatedAt: date('updated_at')
+    .$onUpdate(() => new Date().toISOString())
+    .defaultNow(),
+})
+
+export const uoSnapshot = pgTable('uo_snapshot', {
+  id: integer().generatedByDefaultAsIdentity().primaryKey(),
+  o2iLot: varchar('o2i_lot', { length: 45 }).notNull().references(
+    () => lot.o2i),
+  o2i: varchar('o2i', { length: 45 }).notNull().references(
+    () => uo.o2i),
+  periodId: integer('period_id').notNull(),
+  type: uoType().notNull(),
+  billingDate: date('billing_date').notNull(),
+  quantityConsumed: real('quantity_consumed').notNull(),
+  quantityConsumedAdjustment: real('quantity_consumed_adjustment'),
+  quantity: real('quantity').notNull(),
+  quantityAdjustment: real('quantity_adjustment').notNull(),
+  raf: real('raf').notNull(),
+  rafAdjustment: real('raf_adjustment').notNull(),
+  ttr: real('ttr').notNull(),
+  plannedDeploymentDate: date('planned_deployment_date').notNull(),
+  createdAt: date('created_at').notNull().defaultNow(),
+  updatedAt: date('updated_at')
+    .$onUpdate(() => new Date().toISOString())
+    .defaultNow(),
+})
+
+export const uoRelations = relations(uo, ({ many }) => ({
+  snapshots: many(uoSnapshot, { relationName: 'uoSnapshots' }),
+  materials: many(materialQuantityDeclaration, { relationName: 'materialQuantityDeclaration' }),
+}))
+
+export const augmentedUoView = pgView('augmented_uo_view', {
+  o2i: varchar('o2i').notNull(),
+  o2iParent: varchar('o2i_parent'),
+  o2iLot: varchar('o2i_lot').notNull(),
+  productCode: varchar('product_code'),
+  productName: varchar('product_name'),
+  productCodeParent: varchar('product_code_parent'),
+  productNameParent: varchar('product_name_parent'),
+  type: uoType('type').notNull(),
+  id: integer('id'),
+  name: varchar('name'),
+  profile: varchar('profile').notNull(),
+  productionCellKey: varchar('production_cell_key'),
+  productionCellName: varchar('production_cell_name'),
+  factoryKey: varchar('factory_key'),
+  factoryName: varchar('factory_name'),
+  quantityConsumed: real('quantity_consumed'),
+  quantityConsumedAdjustment: real('quantity_consumed_adjustment'),
+  raf: real('raf').notNull(),
+  rafAdjustment: real('raf_adjustment'),
+  originalQuantity: real('original_quantity').notNull(),
+  quantityAdjustment: real('quantity_adjustment'),
+  unit: varchar('unit'),
+  price: numeric('price', { precision: 10, scale: 2 }),
+  description: text('description'),
+  billingDate: date('billing_date'),
+  billingTrigger: varchar('billing_trigger'),
+  billingDetails: text('billing_details'),
+  plannedDeploymentDate: date('planned_deployment_date'),
+  desiredDeploymentDate: date('desired_deployment_date'),
+  billedMilestoneId: integer('billed_milestone_id'),
+  billedMilestoneName: varchar('billed_milestone_name'),
+  billedMilestoneStepPercent: real('billed_milestone_step_percent'),
+  billedMilestoneIndex: integer('billed_milestone_index'),
+  milestoneBilledAt: date('milestone_billed_at'),
+}).existing()

@@ -1,0 +1,103 @@
+# Gestionnaire d'anomalies Lot
+
+## Contexte
+
+Les lots peuvent se retrouver en situation d'alerte de maniere indirecte. Par exemple, en additionnant les temps en reventilation aux UOs d'un lot, le temps total peut depasser les jours vendus. Il n'existe actuellement aucun mecanisme de detection ni d'affichage de ces anomalies.
+
+L'objectif est de creer un module extensible de gestion d'anomalies cote serveur, avec un affichage de bandeaux d'alerte sur la page detail d'un lot.
+
+## Decisions
+
+- **Calcul cote serveur** via un endpoint dedie `GET /api/lots/[o2i]/anomalies`
+- **Endpoint separe** (pas integre a LotOverview) pour permettre une evolution independante et un chargement parallele
+- **Module extensible** : registre de detecteurs, ajouter une anomalie = ajouter une fonction
+- **Affichage** : un `UAlert` par anomalie, dans le header card du lot, sous les descriptions
+- **Scope des UOs** : T&M + Forfait standard pour les deux anomalies
+
+## Anomalies initiales
+
+### 1. LOT_TIME_OVERRUN — Depassement temps au niveau lot
+
+**Condition :** Somme des `totalQuantity` (billedQty + pendingQty) de toutes les UOs (T&M + Forfait standard) + `timeToReallocate` des worklogs en reventilation > somme des `originalQuantity` de ces memes UOs.
+
+**Severity :** `warning`
+
+**Message :** "Le temps total impute ({totalTime} j) depasse les jours vendus ({soldDays} j) sur ce lot."
+
+### 2. UO_OVERRUN — UO en depassement
+
+**Condition :** Pour une UO donnee (T&M, enfant Forfait standard, ou parent Forfait standard), `totalQuantity > originalQuantity`. Pour le parent Forfait standard, `totalQuantity` = somme des `totalQuantity` des enfants.
+
+**Severity :** `warning`
+
+**Message :** "L'UO {uoName} ({uoO2i}) est en depassement : {totalQuantity} j / {originalQuantity} j prevus."
+
+## Architecture
+
+### Types partages (`shared/types/anomaly.ts`)
+
+```ts
+type AnomalySeverity = 'warning' | 'error'
+
+type LotAnomaly = {
+  type: string
+  severity: AnomalySeverity
+  message: string
+  metadata: Record<string, unknown>
+}
+```
+
+### Backend
+
+```
+server/usecases/lot-anomalies.ts           — Orchestrateur + registre
+server/usecases/anomalies/                 — Dossier des detecteurs
+  lot-time-overrun.ts                      — Detecteur 1
+  uo-overrun.ts                            — Detecteur 2
+server/api/lots/[o2i]/anomalies.get.ts     — Endpoint API
+```
+
+**AnomalyContext :** Structure passee a chaque detecteur, contenant les UOs enrichies (avec temps calcules) et les worklogs en reventilation du lot. Construite dans l'endpoint a partir des donnees deja disponibles via les utils existants (`getUosByLotO2i`, `getToFixWorklogsForO2i`).
+
+**Registre :** Array de fonctions `AnomalyDetector`. L'orchestrateur itere et concatene les resultats.
+
+```ts
+type AnomalyDetector = (context: AnomalyContext) => LotAnomaly[]
+```
+
+### Frontend
+
+```
+app/components/lot/AnomalyBanner.vue       — Composant autonome
+```
+
+- Prop : `o2i: string`
+- Utilise `useFetch('/api/lots/${o2i}/anomalies')` en parallele du lot overview
+- Rend un `<UAlert>` par anomalie retournee
+- Place dans le `<UCard>` header de `lot/Overview.vue`, apres les descriptions et avant le `<OwnerInput>`
+
+**Props UAlert par anomalie :**
+- `color` : mappe depuis `severity` (warning -> warning, error -> error)
+- `icon` : `i-heroicons-exclamation-triangle`
+- `variant` : `soft`
+- Contenu : `anomaly.message`
+
+## Fichiers impactes
+
+| Fichier | Action |
+|---------|--------|
+| `shared/types/anomaly.ts` | Creer — types LotAnomaly, AnomalySeverity |
+| `server/usecases/lot-anomalies.ts` | Creer — orchestrateur et registre |
+| `server/usecases/anomalies/lot-time-overrun.ts` | Creer — detecteur 1 |
+| `server/usecases/anomalies/uo-overrun.ts` | Creer — detecteur 2 |
+| `server/api/lots/[o2i]/anomalies.get.ts` | Creer — endpoint API |
+| `app/components/lot/AnomalyBanner.vue` | Creer — composant alerte |
+| `app/components/lot/Overview.vue` | Modifier — integrer AnomalyBanner dans le header card |
+
+## Verification
+
+1. **Typecheck** : `npm run typecheck` passe sans erreur
+2. **Lint** : `npm run lint` passe sans erreur
+3. **Test manuel endpoint** : `GET /api/lots/{o2i}/anomalies` retourne un tableau d'anomalies (ou vide si aucune)
+4. **Test visuel** : Sur un lot avec UOs en depassement, les bandeaux d'alerte apparaissent dans le header card
+5. **Test absence** : Sur un lot sans anomalie, aucun bandeau n'apparait

@@ -1,0 +1,337 @@
+import { useDB } from '~~/server/utils/database'
+import { sql, eq, and, inArray, or, desc } from 'drizzle-orm'
+import { worklog, aggregatedWorklogView, collaborator, fixedWorklog, uo } from '~~/server/database/schemas/index'
+import type { AggregatedWorklog, FixedWorklogDetail } from '~~/shared/types/worklog'
+import { getOpenPeriod } from '~~/server/utils/period'
+import { createValidationError } from '~~/server/utils/error'
+import { convertWorklogQuantity } from '#shared/utils/worklog-conversion'
+
+/**
+ * Get aggregated worklogs for a list of O2I identifiers
+ * @param o2i Array of O2I identifiers
+ * @returns Array of aggregated worklogs
+ */
+export async function getWorklogsForO2i(o2i: Array<string>): Promise<Array<AggregatedWorklog>> {
+  if (!o2i || o2i.length === 0) {
+    throw createValidationError('O2I identifiers array cannot be empty')
+  }
+
+  try {
+    const periode = await getOpenPeriod()
+    const database = await useDB()
+    const worklogs = await database
+      .select({
+        o2i: aggregatedWorklogView.o2i,
+        accountId: aggregatedWorklogView.accountId,
+        email: collaborator.email,
+        profile: collaborator.profile,
+        firstName: collaborator.firstName,
+        lastName: collaborator.lastName,
+        pendingQuantity: sql<number>`
+          SUM(CASE
+                  WHEN
+                    ${aggregatedWorklogView.status} = 'ACTIF'
+                    AND
+                    ${aggregatedWorklogView.date} >= ${periode.startDate}
+                    AND
+                    ${aggregatedWorklogView.date} <= ${periode.endDate}
+                  THEN
+                    ${aggregatedWorklogView.quantity}
+                  ELSE
+                    0
+                  END)
+        `,
+        billedQuantity: sql<number>`SUM(CASE WHEN ${aggregatedWorklogView.status} = 'BILLED' THEN ${aggregatedWorklogView.quantity} ELSE 0 END)`,
+        hasActiveFixedWorklogs: sql<boolean>`COALESCE((SELECT COUNT(*) > 0 FROM fixed_worklog fw2 INNER JOIN worklog w2 ON w2.id = fw2.reference_id WHERE fw2.fixed_o2i = ${aggregatedWorklogView.o2i} AND w2.account_id = ${aggregatedWorklogView.accountId}), false)`,
+      })
+      .from(aggregatedWorklogView)
+      .where(
+        and(
+          inArray(aggregatedWorklogView.o2i, o2i),
+          inArray(aggregatedWorklogView.fixedStatus, ['NONE', 'FIXED', 'PARTIALLY_FIXED']),
+        ),
+      )
+      .leftJoin(collaborator, eq(aggregatedWorklogView.accountId, collaborator.accountId))
+      .groupBy(
+        aggregatedWorklogView.o2i,
+        aggregatedWorklogView.accountId,
+        collaborator.email,
+        collaborator.profile,
+        collaborator.firstName,
+        collaborator.lastName,
+      )
+
+    return worklogs
+  }
+  catch (error) {
+    throw handleDatabaseError(error, 'getWorklogsForO2i')
+  }
+}
+
+/**
+ * Get worklogs that need to be fixed for a specific O2I identifier
+ * @param lotO2index The O2I identifier
+ * @returns Array of worklogs that need to be fixed
+ */
+export async function getToFixWorklogsForO2i(lotO2index: string): Promise<Array<ToFixWorklog>> {
+  if (!lotO2index) {
+    throw createValidationError('Lot O2I identifier cannot be empty')
+  }
+
+  try {
+    const database = await useDB()
+    const toFixedWorklogs = await database
+      .select({
+        id: worklog.id,
+        tempoId: worklog.tempoId,
+        o2i: worklog.o2i,
+        accountId: worklog.accountId,
+        email: collaborator.email,
+        firstName: collaborator.firstName,
+        lastName: collaborator.lastName,
+        profile: collaborator.profile,
+        quantity: worklog.quantity,
+        fixedQuantity: sql<number>`COALESCE(SUM(${fixedWorklog.quantity}), 0)`,
+      })
+      .from(worklog)
+      .where(and(eq(worklog.o2i, lotO2index), inArray(worklog.fixedStatus, ['TO_FIX', 'PARTIALLY_FIXED'])))
+      .leftJoin(collaborator, eq(worklog.accountId, collaborator.accountId))
+      .leftJoin(fixedWorklog, eq(fixedWorklog.referenceId, worklog.id))
+      .groupBy(
+        worklog.id,
+        worklog.tempoId,
+        worklog.o2i,
+        worklog.accountId,
+        collaborator.email,
+        collaborator.firstName,
+        collaborator.lastName,
+        collaborator.profile,
+        worklog.quantity,
+      )
+
+    return toFixedWorklogs.map((w) => {
+      const quantity = convertWorklogQuantity(w.quantity, 'HEURE')
+      const fixedQuantity = convertWorklogQuantity(w.fixedQuantity ?? 0, 'HEURE')
+      return {
+        ...w,
+        quantity,
+        fixedQuantity,
+        timeToReallocate: Math.max(0, Number((quantity - fixedQuantity).toFixed(2))),
+      }
+    })
+  }
+  catch (error) {
+    console.error(`Error fetching TO_FIX worklogs for O2I ${lotO2index}:`)
+    throw handleDatabaseError(error, 'getToFixWorklogsForO2i')
+  }
+}
+
+export async function getFixedWorklogsForLot(
+  lotO2i: string,
+  accountId?: string,
+  fixedO2i?: string,
+): Promise<FixedWorklogDetail[]> {
+  if (!lotO2i) {
+    throw createValidationError('Lot O2I identifier cannot be empty')
+  }
+
+  try {
+    const database = await useDB()
+    const conditions = [eq(fixedWorklog.o2i, lotO2i)]
+    if (accountId) conditions.push(eq(worklog.accountId, accountId))
+    if (fixedO2i) conditions.push(eq(fixedWorklog.fixedO2i, fixedO2i))
+
+    const rows = await database
+      .select({
+        id: fixedWorklog.id,
+        referenceId: fixedWorklog.referenceId,
+        o2i: fixedWorklog.o2i,
+        fixedO2i: fixedWorklog.fixedO2i,
+        quantity: fixedWorklog.quantity,
+        createdAt: fixedWorklog.createdAt,
+        worklogDate: worklog.date,
+        worklogStatus: worklog.status,
+        accountId: worklog.accountId,
+        email: collaborator.email,
+        firstName: collaborator.firstName,
+        lastName: collaborator.lastName,
+        targetProductName: uo.productName,
+        targetProductCode: uo.productCode,
+        targetUoType: uo.type,
+      })
+      .from(fixedWorklog)
+      .innerJoin(worklog, eq(worklog.id, fixedWorklog.referenceId))
+      .innerJoin(collaborator, eq(collaborator.accountId, worklog.accountId))
+      .innerJoin(uo, eq(uo.o2i, fixedWorklog.fixedO2i))
+      .where(and(...conditions))
+      .orderBy(desc(fixedWorklog.createdAt))
+
+    return rows.map(r => ({
+      ...r,
+      quantity: convertWorklogQuantity(r.quantity, 'HEURE'),
+    }))
+  }
+  catch (error) {
+    throw handleDatabaseError(error, 'getFixedWorklogsForLot')
+  }
+}
+
+export async function fixWorklog(o2i: string, fixedO2i: string, accountId: string, quantity: number): Promise<boolean> {
+  const database = await useDB()
+  try {
+    await database.transaction(async (tx) => {
+      const worklogs = await tx
+        .select({
+          id: worklog.id,
+          o2i: worklog.o2i,
+          quantity: worklog.quantity,
+          fixed_status: worklog.fixedStatus,
+          date: worklog.date,
+          fixed_sum: fixedWorklog.quantity,
+        })
+        .from(worklog)
+        .leftJoin(fixedWorklog, eq(fixedWorklog.referenceId, worklog.id))
+        .where(
+          and(
+            eq(worklog.o2i, o2i),
+            eq(worklog.accountId, accountId),
+            eq(worklog.status, 'ACTIF'),
+            or(eq(worklog.fixedStatus, 'TO_FIX'), eq(worklog.fixedStatus, 'PARTIALLY_FIXED')),
+          ),
+        )
+        .orderBy(worklog.date)
+
+      if (worklogs.length === 0) {
+        throw new Error('Worklog not found')
+      }
+      let totalAvailable = 0
+
+      for (const wl of worklogs) {
+        const remainingForWL = wl.quantity - (wl.fixed_sum ?? 0)
+        if (remainingForWL > 0) {
+          totalAvailable += remainingForWL
+        }
+      }
+
+      if (quantity <= 0) {
+        throw new Error('Invalid quantity')
+      }
+
+      if (quantity > totalAvailable) {
+        throw new Error('Requested quantity exceeds available time')
+      }
+      const [targetUo] = await tx.select().from(uo).where(eq(uo.o2i, fixedO2i)).limit(1)
+      if (!targetUo) throw new Error('Target O2i not found')
+
+      let remaining = quantity
+      const updates = []
+
+      for (const wl of worklogs) {
+        if (remaining <= 0) break
+
+        const remainingForWL = wl.quantity - (wl.fixed_sum ?? 0)
+        if (remainingForWL <= 0) continue
+
+        const fixedQty = Math.min(remainingForWL, remaining)
+
+        await tx
+          .insert(fixedWorklog)
+          .values({
+            referenceId: wl.id,
+            o2i: wl.o2i,
+            fixedO2i,
+            quantity: fixedQty,
+          })
+          .onConflictDoUpdate({
+            target: [fixedWorklog.referenceId, fixedWorklog.fixedO2i],
+            set: {
+              quantity: sql`${fixedWorklog.quantity} + ${fixedQty}`,
+            },
+          })
+
+        remaining -= fixedQty
+        const newFixedSum = (wl.fixed_sum ?? 0) + fixedQty
+        const newStatus = newFixedSum >= wl.quantity ? 'FIXED' : 'PARTIALLY_FIXED'
+
+        updates.push(tx.update(worklog).set({ fixedStatus: newStatus }).where(eq(worklog.id, wl.id)))
+      }
+      await Promise.all(updates)
+
+      return true
+    })
+    return true
+  }
+  catch (error) {
+    console.error('[fixWorklog] failed', error)
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to fix worklog',
+    })
+  }
+}
+
+export async function deleteFixedWorklog(fixedWorklogId: number): Promise<void> {
+  const database = await useDB()
+  try {
+    await database.transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          id: fixedWorklog.id,
+          referenceId: fixedWorklog.referenceId,
+        })
+        .from(fixedWorklog)
+        .where(eq(fixedWorklog.id, fixedWorklogId))
+        .limit(1)
+
+      if (!row) {
+        throw createError({ statusCode: 404, statusMessage: 'Fixed worklog not found' })
+      }
+
+      const [sourceWorklog] = await tx
+        .select({ id: worklog.id, quantity: worklog.quantity, status: worklog.status })
+        .from(worklog)
+        .where(eq(worklog.id, row.referenceId))
+        .limit(1)
+
+      if (!sourceWorklog) {
+        throw createError({ statusCode: 404, statusMessage: 'Source worklog not found' })
+      }
+
+      if (sourceWorklog.status === 'BILLED') {
+        throw createError({
+          statusCode: 422,
+          statusMessage: 'Cannot delete a reventilation whose source worklog has already been billed',
+        })
+      }
+
+      await tx.delete(fixedWorklog).where(eq(fixedWorklog.id, fixedWorklogId))
+
+      const [remaining] = await tx
+        .select({ total: sql<number>`COALESCE(SUM(${fixedWorklog.quantity}), 0)` })
+        .from(fixedWorklog)
+        .where(eq(fixedWorklog.referenceId, row.referenceId))
+
+      const remainingTotal = remaining?.total ?? 0
+      let newFixedStatus: 'TO_FIX' | 'PARTIALLY_FIXED' | 'FIXED'
+      if (remainingTotal <= 0) {
+        newFixedStatus = 'TO_FIX'
+      }
+      else if (remainingTotal < sourceWorklog.quantity) {
+        newFixedStatus = 'PARTIALLY_FIXED'
+      }
+      else {
+        newFixedStatus = 'FIXED'
+      }
+
+      await tx.update(worklog).set({ fixedStatus: newFixedStatus }).where(eq(worklog.id, row.referenceId))
+    })
+  }
+  catch (error) {
+    if ((error as { statusCode?: number }).statusCode) throw error
+    console.error('[deleteFixedWorklog] failed', error)
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Failed to delete fixed worklog',
+    })
+  }
+}

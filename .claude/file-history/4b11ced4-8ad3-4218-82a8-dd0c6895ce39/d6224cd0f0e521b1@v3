@@ -1,0 +1,3 @@
+# === RAG (available in all shells, including non-interactive) ===
+export RAG_DSN=postgresql://postgres:6hDbJ#BaqafSAnpp@localhost:5435/rag
+export RAG_PROJECT=global

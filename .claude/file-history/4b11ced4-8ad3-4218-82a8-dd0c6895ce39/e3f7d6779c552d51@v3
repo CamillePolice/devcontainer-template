@@ -1,0 +1,171 @@
+# Code Review — PMPFLOW-93/reventilation-infos
+
+**Date** : 2026-03-20
+**Branche** : `PMPFLOW-93/reventilation-infos` → `main`
+**Reviewer** : Claude Code (Sonnet 4.6)
+**Commits analysés** : 5 (ef2a75c → ff1a98f)
+
+---
+
+## Résumé
+
+- **Axe 1 — Affichage des unités** : Ajout systématique de l'unité (Heure) dans les colonnes de la section reventilation et dans toutes les cellules UoUnit des tables. Le déplacement de `ml-1` hors de `Unit.vue` vers les sites d'appel est un bon pattern de découplage.
+- **Axe 2 — Enrichissement du Slideover de reventilation** : Le composant affiche désormais les quantités totales/initiales de chaque UO via `useUo`. L'upgrade de `UoCore` vers `UoDetails` dans la prop est justifié par ce besoin de données supplémentaires.
+- **Axe 3 — Couleurs de statut** : Introduction du composable `useLotStatusColors` qui mappe les statuts de lot vers des couleurs NuxtUI. Bonne structure avec normalisation lowercase et valeur par défaut.
+- **Qualité générale** : Refactoring propre dans l'ensemble. Formatage du code amélioré (types complexes multi-lignes). Quelques problèmes de robustesse à corriger avant merge.
+- **Points d'attention** : Problème de réactivité critique dans `useUo({ uos: props.uos })`, incohérence de l'interface `StatusColorMapping`, asymétrie i18n, et deux sites avec du texte non traduit.
+
+---
+
+## Problèmes identifiés
+
+### CRITIQUE
+
+#### [BUG] Réactivité perdue — `useUo({ uos: props.uos })` dans `ReventilationSlideover.vue`
+
+**Fichier** : `app/components/uo/ReventilationSlideover.vue` — ligne 136
+
+`useUo` accepte `{ uos: UoDetails[] }` (tableau plain, pas de `MaybeRef`). En interne, il itère `param.uos` une seule fois à l'appel pour remplir un `reactive Map`. Passer `props.uos` directement donne la valeur initiale, mais si la prop change ultérieurement (ex. rechargement après `fixWorklog`), `mappedUos` ne sera jamais recalculé.
+
+```typescript
+// Actuel — snapshot initial, non réactif
+const { mappedUos } = useUo({ uos: props.uos })
+
+// Correction — passer via computed ou rendre le composable MaybeRef-aware
+const uosComputed = computed(() => props.uos)
+const { mappedUos } = useUo({ uos: uosComputed.value }) // si refacto du composable
+```
+
+La vraie correction dépend de l'intention : si les UOs peuvent changer pendant la vie du Slideover, `useUo` doit accepter `MaybeRefOrGetter<UoDetails[]>` et utiliser `watchEffect` ou `toValue()` en interne. Si les UOs sont statiques (snapshot à l'ouverture), la situation actuelle est fonctionnelle mais doit être documentée.
+
+---
+
+### MINEUR
+
+#### [TYPO + INCOHÉRENCE] Interface `StatusColorMapping` — `primary` déclaré mais jamais utilisé
+
+**Fichier** : `app/composables/useLotStatusColors.ts` — ligne 7
+
+L'interface déclare `color: 'neutral' | 'primary' | 'success' | 'info'` mais aucune entrée du `statusColorMap` n'utilise `'primary'`. Le commentaire "Blue (primary)" décrit la sémantique mais les valeurs réelles sont `'info'`. L'interface doit être alignée :
+
+```typescript
+// Option A — supprimer 'primary' de l'union (recommandé)
+color: 'neutral' | 'success' | 'info'
+
+// Option B — documenter que 'primary' est réservé pour extension future
+```
+
+De plus, `cancelled` est mappé à `'success'` (vert), ce qui peut être sémantiquement trompeur. Un état annulé n'est pas un succès — envisager `'neutral'` ou une couleur dédiée.
+
+---
+
+#### [I18N] Clé `pendingTime` présente en `en` mais absente en `fr`
+
+**Fichier** : `app/components/uo/ReventilationSection.vue` — bloc `<i18n>` lignes 168-200
+
+La clé `table.header.pendingTime` est définie dans la locale `en` mais absente de `fr`. Si cette colonne est rendue en production avec la locale française, la clé brute `table.header.pendingTime` s'affichera.
+
+```yaml
+# À ajouter dans fr:
+table:
+  header:
+    pendingTime: "Temps à facturer (période courante)"
+```
+
+---
+
+#### [I18N] `chooseUoLink` identique en `fr` et `en`
+
+**Fichier** : `app/components/uo/ReventilationSection.vue` — lignes 183 et 199
+
+```yaml
+# fr et en contiennent exactement la même valeur :
+chooseUoLink: "Choisissez l'UO"
+```
+
+La traduction anglaise devrait être `"Choose UO"` (déjà présente dans le Slideover en).
+
+---
+
+#### [I18N] Texte "Parent:" non traduit dans le template
+
+**Fichier** : `app/components/uo/ReventilationSlideover.vue` — ligne 64
+
+```html
+Parent: {{ item.o2iParent }}
+```
+
+Le label "Parent:" est un texte brut dans le template, non passé par `t()`. Si l'application doit rester bilingue, ce texte doit être externalisé dans le bloc `<i18n>`.
+
+---
+
+#### [I18N] Condition hardcodée en français dans le template
+
+**Fichier** : `app/components/uo/ReventilationSlideover.vue` — ligne 59
+
+```html
+v-if="group.type === 'Forfait standard'"
+```
+
+La valeur `'Forfait standard'` est une chaîne métier provenant vraisemblablement de l'API. Si les données serveur peuvent retourner des valeurs en anglais ou si les constantes de type sont centralisées, cette comparaison devrait référencer une constante partagée plutôt qu'un litéral.
+
+---
+
+#### [TYPE SAFETY] Double cast `unknown` dans `getDisplayInfo`
+
+**Fichier** : `app/components/uo/ReventilationSlideover.vue` — lignes 162-165
+
+```typescript
+function getDisplayInfo(item: unknown) {
+  const o2i = (item as UoDetails).o2i
+  const originalQuantity = (item as UoDetails).originalQuantity
+```
+
+Le slot `#label` et `#description` du `URadioGroup` reçoit les items du tableau `group.items` qui est de type `RadioGroupItem[]`. Puisque les items sont peuplés à partir de `props.uos: UoDetails[]`, typer le paramètre directement comme `UoDetails` (ou utiliser un type générique sur le composant) éviterait ces casts `as` non sûrs.
+
+```typescript
+// Plus sûr
+function getDisplayInfo(item: UoDetails) {
+  const { o2i, originalQuantity } = item
+```
+
+---
+
+#### [ALERT] Utilisation de `window.alert()` pour les erreurs utilisateur
+
+**Fichier** : `app/components/uo/ReventilationSection.vue` — lignes 143, 152
+
+```typescript
+return alert('Veuillez sélectionner une UO et un temps valide')
+return alert('Le temps à reventiler ne peut pas dépasser le temps à requalifier')
+```
+
+Ces messages ne sont pas traduits (texte FR hardcodé) et `window.alert()` est une mauvaise pratique UX dans une app NuxtUI. Le projet dispose de `useToast()` — remplacer par des notifications toast. Le texte doit également passer par i18n.
+
+---
+
+## Points positifs
+
+- Le refactoring du formatage TypeScript (types génériques complexes sur plusieurs lignes) améliore significativement la lisibilité.
+- La normalisation lowercase dans `getStatusColor` est correcte et robuste.
+- La valeur de retour par défaut `defaultColorMapping` pour les statuts inconnus est une bonne pratique défensive.
+- Le déplacement de `class="ml-1"` hors de `Unit.vue` vers les sites d'appel rend le composant réutilisable sans pollution de styles.
+- L'upgrade de `UoCore` vers `UoDetails` dans `ReventilationSlideover` est justifié et cohérent avec le besoin d'afficher les quantités.
+- Les JSDoc sur `useLotStatusColors` sont claires et bien structurées.
+
+---
+
+## Récapitulatif des actions
+
+| Priorité | Fichier | Action |
+|----------|---------|--------|
+| CRITIQUE | `ReventilationSlideover.vue:136` | Vérifier/corriger la réactivité de `useUo({ uos: props.uos })` |
+| MINEUR | `useLotStatusColors.ts:7` | Supprimer `'primary'` de l'union ou utiliser la valeur |
+| MINEUR | `useLotStatusColors.ts:35` | Reconsidérer `cancelled → success` (sémantique trompeuse) |
+| MINEUR | `ReventilationSection.vue` i18n | Ajouter `pendingTime` en locale `fr` |
+| MINEUR | `ReventilationSection.vue` i18n | Corriger `chooseUoLink` en locale `en` |
+| MINEUR | `ReventilationSlideover.vue:64` | Externaliser "Parent:" via i18n |
+| MINEUR | `ReventilationSlideover.vue:59` | Utiliser une constante pour `'Forfait standard'` |
+| MINEUR | `ReventilationSlideover.vue:162` | Typer `getDisplayInfo(item: UoDetails)` pour supprimer les casts |
+| MINEUR | `ReventilationSection.vue:143,152` | Remplacer `alert()` par `useToast()` + i18n |
+

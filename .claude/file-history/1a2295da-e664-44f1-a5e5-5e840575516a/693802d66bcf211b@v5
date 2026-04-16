@@ -1,0 +1,47 @@
+import { AppError, createValidationError } from '~~/server/utils/error'
+import { getCollaboratorByEmail } from '~~/server/utils/collaborator'
+import { updateLotResponsable } from '~~/server/utils/lot'
+import { verifyWebhookSignature } from '~~/server/utils/webhook'
+
+interface AssigneeWebhookBody {
+  assignee: string
+}
+
+export default defineEventHandler(async (event) => {
+  try {
+    const o2i = getRouterParam(event, 'o2i')
+    if (!o2i) {
+      throw createValidationError('Lot O2I identifier is required')
+    }
+
+    const rawBody = await readRawBody(event) ?? ''
+    await verifyWebhookSignature(event, rawBody)
+
+    const body = JSON.parse(rawBody) as AssigneeWebhookBody
+    if (!body?.assignee) {
+      throw createValidationError('assignee is required')
+    }
+
+    const collaborator = await getCollaboratorByEmail(body.assignee)
+    if (!collaborator.accountId) {
+      throw createValidationError('Collaborator has no accountId')
+    }
+
+    return await updateLotResponsable(o2i, collaborator.accountId)
+  }
+  catch (error) {
+    if (error instanceof AppError) {
+      throw error.toH3Error()
+    }
+
+    if (isError(error)) {
+      throw error
+    }
+
+    console.error('Unexpected error in lot assignee webhook:', error)
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal server error',
+    })
+  }
+})

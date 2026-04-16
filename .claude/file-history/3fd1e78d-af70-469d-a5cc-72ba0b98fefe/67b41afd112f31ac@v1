@@ -1,0 +1,206 @@
+---
+config:
+  theme: mc
+  look: classic
+  layout: dagre
+  themeVariables:
+    fontSize: 15px
+    primaryBorderColor: '#000000'
+title: Schéma BDD Project Flow
+---
+erDiagram
+    direction LR
+    Factory ||--o{ ProductionCell : "has"
+    Factory {
+        int id PK
+        varchar(45) key UK
+        varchar(255) name
+    }
+    ProductionCell {
+        int id PK
+        varchar(45) key UK
+        varchar(255) name
+        varchar(45) factoryKey FK
+    }
+    Collaborator {
+        int id PK
+        varchar(255) accountId UK
+        varchar(255) email UK
+        varchar(255) firstName
+        varchar(255) lastName
+        varchar(255) profile
+        varchar(45) factory FK
+    }
+    CollaboratorRole {
+        int id PK
+        varchar(255) account_id FK
+        varchar(100) role
+    }
+    LotStatus {
+        int id PK
+        varchar(255) name
+        int jiraId UK
+    }
+    Lot {
+        int id PK
+        varchar(255) o2i UK
+        varchar(255) name
+        int statusJiraId FK
+        enum opportunityType "NULL|UNKNOWN_OPPORTUNITY_TYPE|TERMINATION|AMEND|NEW|RENEW"
+        date opportunityApprobationDate
+        enum issueType "Quote Group One-Shot|Quote Group One-Shot Prepaid|Quote Group One-Shot T&M|Quote Group One-Shot Fixed Price|Quote Group UBR|Quote Group Recurrent|Quote Line Item|Epic"
+        varchar(45) productionCell FK
+        varchar(45) factory FK
+        varchar(255) clientName
+        varchar(255) universalNumber
+        varchar(255) salesEmail
+        varchar(255) responsableAccountId FK
+        date plannedDeploymentDate
+        date desiredDeploymentDate
+        date billingDate
+        varchar(255) billingTrigger
+        text billingDetails
+        varchar(255) bpj
+        varchar(255) bpjName
+        varchar(45) quoteNumber
+        text quoteDescription
+        text description
+        boolean downPayment
+    }
+    Milestone {
+        int id PK
+        varchar(45) o2i FK
+        varchar(255) name
+        int stepPercent
+        int index
+    }
+    UOStatus {
+        int id PK
+        varchar(255) name UK
+        int jiraId UK
+    }
+    UO {
+        uuid id PK
+        varchar(45) o2i UK
+        varchar(45) o2iLot FK
+        varchar(45) o2iPa@@rent
+        enum type "T&M|Forfait standard|Forfait historique"
+        int statusJiraId FK
+        varchar(255) profile
+        varchar(255) responsableAccountId FK
+        varchar(255) productCode
+        varchar(255) productName
+        varchar(255) productCodeParent
+        varchar(255) productNameParent
+        varchar(45) productionCell FK
+        varchar(45) factory FK
+        real quantityConsumed
+        real quantityConsumedAdjustment
+        real raf
+        real rafAdjustment
+        real originalQuantity
+        real quantityAdjustment
+        varchar(45) unit
+        numeric price
+        text description
+        date billingDate
+        varchar(255) billingTrigger
+        text billingDetails
+        date plannedDeploymentDate
+        date desiredDeploymentDate
+        varchar(45) quotelineNumber
+        int billedMilestoneId
+        date milestoneBilledAt
+    }
+    UOSnapshot {
+        int id PK
+        varchar(45) o2i_lot FK
+        varchar(45) o2i FK
+        int period_id
+        date billingDate
+        real quantityConsumed
+        real quantityConsumedAdjustment
+        real quantity
+        real quantityAdjustment
+        real raf
+        real rafAdjustment
+        real ttr
+        int billedMilestoneId
+        date plannedDeploymentDate
+    }
+    Worklog {
+        uuid id PK
+        varchar(255) tempoId
+        varchar(255) accountId FK
+        varchar(45) o2i FK
+        varchar(45) o2iReferenceCarte
+        date date
+        real quantity
+        enum fixedStatus "NONE|TO_FIX|PARTIALLY_FIXED|FIXED"
+        enum status "ACTIF|BILLED"
+    }
+    FixedWorklog {
+        int id PK
+        uuid referenceId FK
+        varchar(45) o2i
+        varchar(45) fixedO2i FK
+        real quantity
+    }
+    MaterialQuantityDeclaration {
+        int id PK
+        varchar(45) o2i FK
+        real quantity
+        date availibility_date
+        enum status "PENDING|BILLED"
+    }
+    BillingRequest {
+        int id PK
+        varchar(45) o2i_lot FK
+        varchar(45) o2i FK
+        int period_id
+        enum type
+        varchar(45) unit
+        real quantity
+        enum status "CREATED|PENDING|DONE|CANCELED"
+    }
+    Period {
+        int id PK
+        varchar(80) name
+        text description
+        date start_date
+        date end_date
+        enum status "OPEN|CLOSED"
+        Collaborator closed_by
+        date closed_at
+    }
+    ProductionCell }|--|| Factory : "belongs to"
+    Lot }|--|| LotStatus : "has status"
+    Lot }|--o| ProductionCell : "belongs to"
+    Lot }|--o| Factory : "belongs to"
+    Lot }|--o| Collaborator : "has responsable"
+    Lot ||--o{ Milestone : "has"
+    Lot ||--o{ UO : "has"
+    UO }|--|| UOStatus : "has status"
+    UO }|--o| Collaborator : "has responsable"
+    UO }|--o| ProductionCell : "belongs to"
+    UO }|--o| Factory : "belongs to"
+    UO }|--o| Milestone : "has current"
+    UO ||--o{ UOSnapshot : "has"
+    UO ||--o{ Worklog : "tracked in"
+    Worklog }|--o| Collaborator : "belongs to"
+    Worklog }|--|| UO : "references"
+    Worklog ||--o{ FixedWorklog : "has"
+    FixedWorklog }|--o| UO : "references"
+    Collaborator }|--o| Factory : "belongs to"
+    Collaborator ||--o{ CollaboratorRole : "has"
+    BillingRequest }o--|| Period : "belongs to"
+    UOSnapshot }o--|| Period : "belongs to"
+    MaterialQuantityDeclaration }o--|| UO : "belongs to"BillingRequest
+
+	style Collaborator stroke:#2962FF,fill:#BBDEFB
+	style UO stroke:#2962FF,fill:#BBDEFB
+	style ProductionCell stroke:#2962FF,fill:#BBDEFB
+	style Factory stroke:#2962FF,fill:#BBDEFB
+    style Milestone stroke:#2962FF,fill:#BBDEFB
+    style Lot stroke:#2962FF,fill:#BBDEFB
+    style Worklog stroke:#2962FF,fill:#BBDEFB

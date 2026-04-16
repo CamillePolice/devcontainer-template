@@ -1,0 +1,432 @@
+import type { UoDetails, UoStandardBundle } from '#shared/types/uo'
+import type { Milestone } from '#shared/types/milestone'
+import type { MaterialDeclaration } from '~~/shared/types/materialDeclaration'
+import { revertConvertWorklogQuantity } from '#shared/utils/worklog-conversion'
+import { reactive, computed } from 'vue'
+import type { AggregatedWorklog } from '#shared/types/worklog'
+import type { WorklogRowData } from '#shared/types/table'
+import { useToast } from '#ui/composables/useToast'
+
+export interface MappedUo {
+  type?: 'uo'
+  o2i: string
+  uo: UoDetails
+  billedQuantity: number
+  pendingQuantity: number
+  totalQuantity: number
+  raf: number
+  ttr: number
+  progress: number
+  reestimatedProgress: number
+  remainingToDeliver: number
+}
+
+export interface TableRow {
+  original: MappedUo
+  getIsExpanded: () => boolean
+  toggleExpanded: () => void
+}
+
+function validateMaterialQuantity(
+  mappedUo: MappedUo,
+  newQuantity: number,
+): {
+  isValid: boolean
+  remainingToDeliver: number
+  maxAllowedQuantity: number
+  message?: string
+} {
+  if (newQuantity < 0) {
+    return {
+      isValid: false,
+      remainingToDeliver: mappedUo.remainingToDeliver,
+      maxAllowedQuantity: 0,
+      message: 'La quantité ne peut pas être négative',
+    }
+  }
+
+  // Calculate what the new total would be with the additional quantity
+  const newTotalQuantityWithMaterials = Number(
+    (mappedUo.totalQuantity + newQuantity).toFixed(2),
+  )
+
+  // Calculate the new remaining to deliver percentage
+  const newRemainingToDeliver
+    = (mappedUo.uo.originalQuantity ?? 0) <= 0
+      ? 0
+      : Math.round(
+          ((mappedUo.uo.originalQuantity - newTotalQuantityWithMaterials)
+            / mappedUo.uo.originalQuantity)
+          * 100,
+        )
+
+  // Calculate maximum allowed quantity (quantity that would make remainingToDeliver = 0%)
+  const maxAllowedQuantity = Math.max(
+    0,
+    mappedUo.uo.originalQuantity - mappedUo.totalQuantity,
+  )
+
+  const isValid = newRemainingToDeliver >= 0
+
+  let message: string | undefined
+  if (!isValid) {
+    message = `La quantité saisie ferait passer le reste à livrer à ${newRemainingToDeliver}%. Quantité maximale autorisée : ${maxAllowedQuantity}`
+  }
+
+  return {
+    isValid,
+    remainingToDeliver: newRemainingToDeliver,
+    maxAllowedQuantity,
+    message,
+  }
+}
+
+/**
+ * Recalculate pendingQuantity for a material UO based on its material declarations
+ * This mirrors the server-side logic from augmented-uo.ts
+ */
+export function useUo(param: { uos: UoDetails[] }) {
+  const uoMap = reactive(new Map<string, UoDetails>())
+  const toast = useToast()
+
+  for (const uo of param.uos) {
+    uoMap.set(uo.o2i, uo)
+  }
+
+  /**
+   * Recalculate pendingQuantity for a material UO based on its material declarations
+   * This mirrors the server-side logic from augmented-uo.ts
+   */
+  function recalculatePendingQuantity(uo: UoDetails): void {
+    // Hard-coded timesUnit values from nuxt.config.ts to avoid useRuntimeConfig issues in composables
+    const timesUnit = ['JH', 'HEURE', 'H']
+    const isMaterialUo = !(
+      uo.unit && timesUnit.includes(uo.unit.toUpperCase())
+    )
+
+    if (isMaterialUo) {
+      // For material UOs: calculate based on PENDING material declarations
+      uo.pendingQuantity = uo.materialDeclarations
+        .filter(md => md.status === 'PENDING')
+        .reduce((sum, md) => sum + md.quantity, 0)
+    }
+    // For time UOs, pendingQuantity is calculated from worklogs and doesn't need recalculation here
+  }
+
+  const mappedUos = computed(() => {
+    return [...uoMap.entries()]
+      .map(([o2i, uo]) => {
+        const billedQuantity = Number(
+          (
+            (uo.quantityConsumed ?? 0) + (uo.quantityConsumedAdjustment ?? 0)
+          ).toFixed(2),
+        )
+        const pendingQuantity = Number(
+          ((uo.pendingQuantity ?? 0) + (uo.quantityAdjustment ?? 0)).toFixed(2),
+        )
+        const totalQuantity = Number(
+          (billedQuantity + pendingQuantity).toFixed(2),
+        )
+        const raf = Number(
+          (
+            (uo.originalQuantity ?? 0)
+            - totalQuantity
+            + (uo.rafAdjustment ?? 0)
+          ).toFixed(2),
+        )
+        const ttr = Number((totalQuantity + (raf ?? 0)).toFixed(2))
+        // Calculate total quantity including PENDING materialDeclarations
+        const pendingMaterialDeclarations = Number(
+          uo.materialDeclarations
+            .filter(md => md.status === 'PENDING')
+            .reduce((sum, md) => sum + md.quantity, 0)
+            .toFixed(2),
+        )
+        const totalQuantityWithMaterials = Number(
+          (totalQuantity + pendingMaterialDeclarations).toFixed(2),
+        )
+
+        const progress
+          = (uo.originalQuantity ?? 0) <= 0
+            ? 0
+            : Math.round(
+                (totalQuantityWithMaterials / uo.originalQuantity) * 100,
+              )
+        const reestimatedProgress
+          = (ttr ?? 0) <= 0 ? 0 : Math.round((totalQuantity / ttr) * 100)
+
+        const remainingToDeliver
+          = (uo.originalQuantity ?? 0) <= 0
+            ? 0
+            : Math.round(
+                ((uo.originalQuantity - totalQuantityWithMaterials)
+                  / uo.originalQuantity)
+                * 100,
+              )
+
+        return {
+          o2i,
+          uo,
+          billedQuantity,
+          pendingQuantity,
+          totalQuantity,
+          raf,
+          ttr,
+          progress,
+          reestimatedProgress,
+          remainingToDeliver,
+        } as MappedUo
+      })
+      .toSorted((a, b) => a.o2i.localeCompare(b.o2i))
+  })
+
+  async function updatePendingQuantity(
+    o2i: string,
+    newPendingQuantity: number,
+  ): Promise<void> {
+    const uo = uoMap.get(o2i)
+    if (!uo) return
+
+    const currentPendingQuantity = uo.pendingQuantity ?? 0
+    const quantityAdjustment = Number(
+      (newPendingQuantity - currentPendingQuantity).toFixed(2),
+    )
+
+    try {
+      await $fetch(`/api/uos/${o2i}/quantity-adjustment`, {
+        method: 'PUT',
+        body: {
+          quantityAdjustment,
+        },
+      })
+
+      uo.quantityAdjustment = quantityAdjustment
+    }
+    catch (error) {
+      console.error('Error persisting quantity adjustment:', error)
+    }
+  }
+
+  async function fixWorklogs(
+    selectedO2i: string,
+    timeToReallocate: number,
+    accountId: string,
+  ): Promise<void> {
+    const uo = uoMap.get(selectedO2i)
+    if (!uo) return
+    const timeToReallocateInSeconds = revertConvertWorklogQuantity(
+      timeToReallocate,
+      'HEURE',
+    )
+    try {
+      await $fetch('/api/worklogs/fix', {
+        method: 'POST',
+        body: {
+          o2i: uo.o2iLot,
+          fixedO2i: selectedO2i,
+          accountId: accountId,
+          quantity: timeToReallocateInSeconds,
+        },
+      })
+      toast.add({
+        title: 'Worklog corrigé',
+        description: `Le worklog a été corrigé pour la UO ${uo.o2i}.`,
+        color: 'success',
+      })
+    }
+    catch (error) {
+      console.error('Error persisting material quantity:', error)
+      toast.add({
+        title: 'Erreur',
+        description:
+          'Une erreur est survenue lors de la correction du worklog.',
+        color: 'error',
+      })
+    }
+  }
+
+  async function createMaterialDeclaration(
+    o2i: string,
+    quantity: number,
+    availabilityDate: string,
+  ): Promise<void> {
+    const uo = uoMap.get(o2i)
+    if (!uo) return
+    try {
+      const createdMaterial = await $fetch<MaterialDeclaration>(
+        `/api/uos/${o2i}/material-quantity-declarations`,
+        {
+          method: 'POST',
+          body: {
+            availabilityDate,
+            quantity,
+          },
+        },
+      )
+      uo.materialDeclarations.push(createdMaterial)
+
+      // Recalculate pendingQuantity to update the frontend immediately
+      recalculatePendingQuantity(uo)
+
+      toast.add({
+        title: 'Quantité de matériel',
+        description: `La quantité de matériel a été mise à jour pour la UO ${uo.o2i}.`,
+        color: 'success',
+      })
+    }
+    catch (error) {
+      console.error('Error persisting material quantity:', error)
+      toast.add({
+        title: 'Erreur',
+        description:
+          'Une erreur est survenue lors de la mise à jour de la quantité de matériel.',
+        color: 'error',
+      })
+    }
+  }
+
+  async function deleteMaterialDeclaration(
+    materialDeclarations: MaterialDeclaration,
+  ): Promise<void> {
+    const uo = uoMap.get(materialDeclarations.o2i)
+    if (!uo) return
+    try {
+      await $fetch(
+        `/api/uos/${materialDeclarations.o2i}/material-quantity-declarations/${materialDeclarations.id}`,
+        {
+          method: 'DELETE',
+        },
+      )
+      uo.materialDeclarations = uo.materialDeclarations.filter(
+        m => m.id !== materialDeclarations.id,
+      )
+
+      // Recalculate pendingQuantity to update the frontend immediately
+      recalculatePendingQuantity(uo)
+
+      toast.add({
+        title: 'Quantité de matériel',
+        description: `La quantité de matériel a été supprimée pour la UO ${uo.o2i}.`,
+        color: 'success',
+      })
+    }
+    catch (error) {
+      console.error('Error deleting material:', error)
+      toast.add({
+        title: 'Erreur',
+        description:
+          'Une erreur est survenue lors de la suppression du matériel.',
+        color: 'error',
+      })
+    }
+  }
+
+  async function updateRaf(o2i: string, newRaf: number): Promise<void> {
+    const uo = uoMap.get(o2i)
+    if (!uo) return
+
+    const mappedUo = findMappedUo(o2i)
+    if (!mappedUo) return
+
+    const newRafAdjustment
+      = newRaf - (mappedUo.raf - (mappedUo.uo.rafAdjustment ?? 0))
+
+    try {
+      await $fetch(`/api/uos/${o2i}/raf-adjustment`, {
+        method: 'PUT',
+        body: {
+          rafAdjustment: newRafAdjustment,
+        },
+      })
+
+      uo.rafAdjustment = newRafAdjustment
+    }
+    catch (error) {
+      console.error('Error persisting RAF adjustment:', error)
+    }
+  }
+
+  async function updateMilestone(
+    bundleO2i: string,
+    milestone: Milestone,
+    bundle?: UoStandardBundle,
+  ): Promise<void> {
+    try {
+      const result = await $fetch<{
+        billedMilestone: Milestone
+        milestoneBilledAt: Date
+      }>(`/api/uos/${bundleO2i}/milestone`, {
+        method: 'PUT',
+        body: {
+          milestoneId: milestone.id,
+        },
+      })
+
+      if (bundle) {
+        Object.assign(bundle, {
+          billedMilestone: result.billedMilestone,
+          milestoneBilledAt: result.milestoneBilledAt,
+        })
+      }
+
+      toast.add({
+        title: 'Jalon mis à jour',
+        description: `Le jalon "${result.billedMilestone.name}" a été appliqué avec succès`,
+        color: 'success',
+      })
+    }
+    catch (error) {
+      console.error('Error updating milestone:', error)
+
+      const errorMessage
+        = error instanceof Error
+          ? error.message
+          : 'Une erreur est survenue lors de la mise à jour du jalon'
+
+      toast.add({
+        title: 'Erreur',
+        description: errorMessage,
+        color: 'error',
+      })
+    }
+  }
+
+  function findMappedUo(o2i: string): MappedUo | undefined {
+    return mappedUos.value.find((mappedUo: MappedUo) => mappedUo.o2i === o2i)
+  }
+
+  function findChildMappedUo(o2i: string): MappedUo[] {
+    return mappedUos.value.filter((m: MappedUo) => m.uo.o2iParent === o2i)
+  }
+
+  return {
+    mappedUos,
+    findMappedUo,
+    findChildMappedUo,
+    updatePendingQuantity,
+    createMaterialDeclaration,
+    deleteMaterialDeclaration,
+    updateRaf,
+    updateMilestone,
+    fixWorklogs,
+    validateMaterialQuantity,
+  }
+}
+
+export function transformWorklogsToTableRows(
+  worklogs: AggregatedWorklog[],
+  unit: string | undefined,
+  parentO2i: string,
+): WorklogRowData[] {
+  return worklogs.map(worklog => ({
+    type: 'worklog' as const,
+    o2i: parentO2i,
+    unit: unit,
+    collaborator:
+      `${worklog.firstName || ''} ${worklog.lastName || ''}`.trim() || 'N/A',
+    email: worklog.email,
+    pendingQuantity: worklog.pendingQuantity,
+    billedQuantity: worklog.billedQuantity,
+    totalQuantity: worklog.pendingQuantity + worklog.billedQuantity,
+  }))
+}

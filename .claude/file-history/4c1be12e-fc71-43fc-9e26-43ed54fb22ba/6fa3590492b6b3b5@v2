@@ -1,0 +1,85 @@
+<template>
+  <div
+    class="login-background flex min-h-screen items-center justify-center pb-32"
+  >
+    <div
+      class="max-w-[900px] gap-(--spacing-2xl) brightness-black-40 border-b border-l border-gray-900 flex flex-row items-center justify-center gap-8 backdrop-blur-lg py-[40px] px-[80px] rounded-[16px] shadow-xl"
+    >
+      <div class="max-w-[250px] flex items-center gap-(--spacing-lg)">
+        <AppLogo class="size-[80px] shadow-xl min-w-fit" />
+        <h3 class="text-white line-clamp-2 max-w-fit">
+          {{ appConfig.name || "Application" }}
+        </h3>
+      </div>
+
+      <USeparator
+        orientation="vertical"
+        class="h-[80px]"
+      />
+
+      <UButton
+        v-if="provider === 'microsoft'"
+        prepend-icon="mdi-microsoft"
+        size="xl"
+        @click="handleLogin('microsoft')"
+      >
+        Connexion SSO
+      </UButton>
+      <UButton
+        v-if="provider === 'auth0'"
+        class="line-clamp-1"
+        prepend-icon="mdi-auth"
+        size="xl"
+        @click="handleLogin('auth0')"
+      >
+        Se connecter
+      </UButton>
+    </div>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { onMounted } from 'vue'
+import { navigateTo, useAppConfig, useRuntimeConfig } from '#imports'
+import { useColorMode } from '@vueuse/core'
+
+definePageMeta({
+  public: true,
+  layout: 'blank',
+})
+
+const colorMode = useColorMode()
+
+colorMode.value = 'light'
+
+const { isLoggedIn, login } = useNavigation()
+
+const appConfig = useAppConfig()
+
+const provider = useRuntimeConfig().public.authProvider as string
+
+const handleLogin = async (selectedProvider: string) => {
+  try {
+    await login(selectedProvider, { redirectUrl: '/' })
+  }
+  catch (error) {
+    console.error('Erreur lors de la connexion:', error)
+  }
+}
+
+onMounted(() => {
+  if (isLoggedIn.value) {
+    navigateTo('/')
+  }
+})
+</script>
+
+<style scoped>
+.login-background {
+  background-image: url("../assets/background-login.jpg");
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  position: relative;
+}
+</style>

@@ -1,0 +1,683 @@
+# Onion Auth Layer - Documentation
+
+## Overview
+
+The `onion-auth` is a Nuxt 4 layer that provides simple and efficient authentication with Auth0 and Microsoft Azure. After migration to a layer architecture, it requires minimal Nitro configuration to register server routes.
+
+## Key Features
+
+- 🔐 **Multi-Provider Authentication**: Support for Auth0 and Microsoft Azure
+- 🛡️ **Global Middleware**: Automatic route protection with public route support
+- 👥 **Roles & Groups Support**: Extract and manage user roles and groups from ID tokens
+- 🎯 **TypeScript Support**: Fully typed interfaces and composables
+- 🔄 **Session Management**: Automatic session handling with nuxt-auth-utils
+- 🧩 **Layer Architecture**: Easy integration via Nuxt extends
+- 🌐 **Server Routes**: OAuth handlers for authentication flows
+
+## Installation
+
+### 1. Extend the Layer
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  extends: ['onion-auth'],
+  
+  // REQUIRED Nitro configuration for authentication routes
+  nitro: {
+    handlers: [
+      {
+        route: '/auth/microsoft',
+        handler: '~/layers/onion-auth/app/server/auth/microsoft.get.ts'
+      },
+      {
+        route: '/auth/auth0',
+        handler: '~/layers/onion-auth/app/server/auth/auth0.get.ts'
+      }
+    ]
+  }
+})
+```
+
+### 2. Environment Variables
+
+Create a `.env` file with your authentication keys:
+
+```bash
+# Auth0 Configuration
+AUTH0_CLIENT_ID=your_auth0_client_id
+AUTH0_CLIENT_SECRET=your_auth0_client_secret
+AUTH0_DOMAIN=your_auth0_domain
+
+# Microsoft Azure Configuration
+MICROSOFT_CLIENT_ID=your_microsoft_client_id
+MICROSOFT_CLIENT_SECRET=your_microsoft_client_secret
+MICROSOFT_TENANT_ID=your_microsoft_tenant_id
+
+# General Configuration
+NUXT_AUTH_SECRET=your_secret_key_here
+NUXT_PUBLIC_AUTH_BASE_URL=http://localhost:3000
+```
+
+## Project Structure
+
+```
+onion-auth/
+├── app/
+│   ├── composables/
+│   │   └── useOnionAuth.ts        # Main authentication composable
+│   ├── middleware/
+│   │   └── auth.global.ts         # Global authentication middleware
+│   ├── server/
+│   │   └── auth/
+│   │       ├── microsoft.get.ts   # Microsoft OAuth handler
+│   │       └── auth0.get.ts       # Auth0 OAuth handler
+│   └── types/
+│       └── auth-bridge-contracts.ts # Bridge contracts for UI integration
+├── shared/
+│   └── types/
+│       └── auth-interfaces.ts     # Shared TypeScript interfaces
+├── nuxt.config.ts                 # Layer configuration
+└── package.json
+```
+
+## Usage
+
+### Authentication Composable
+
+The main composable [`useOnionAuth()`](app/composables/useOnionAuth.ts) provides authentication functionality:
+
+```vue
+<template>
+  <div>
+    <div v-if="isAuthenticated">
+      <h1>Welcome {{ userSession?.user.profile?.name }}!</h1>
+      <p v-if="userSession?.user.roles">Roles: {{ userSession.user.roles.join(', ') }}</p>
+      <p v-if="userSession?.user.groups">Groups: {{ userSession.user.groups.join(', ') }}</p>
+      <button @click="logout()">Logout</button>
+    </div>
+    <div v-else>
+      <button @click="login('microsoft')">Login with Microsoft</button>
+      <button @click="login('auth0')">Login with Auth0</button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+const { userSession, isAuthenticated, login, logout } = useOnionAuth()
+</script>
+```
+
+#### API Reference
+
+- **`userSession`**: Reactive user session data (readonly)
+- **`isAuthenticated`**: Computed boolean indicating login status
+- **`login(provider, options?)`**: Login function with provider selection
+- **`logout(options?)`**: Logout function with optional redirect
+
+### Authentication Middleware
+
+The global middleware [`auth.global.ts`](app/middleware/auth.global.ts) is automatically active. To make a page public:
+
+```vue
+<script setup>
+// Public page (no authentication required)
+definePageMeta({
+  public: true
+})
+</script>
+```
+
+The middleware automatically:
+- Protects all routes by default
+- Allows public routes with `public: true` meta
+- Skips authentication routes (`/auth/*`)
+- Handles login/logout routes
+- Stores redirect URLs in cookies for post-login navigation
+
+## Roles and Groups Support
+
+### Overview
+
+The onion-auth layer now supports extracting and managing user roles and groups from authentication providers, particularly Microsoft Azure AD. This enables role-based access control and permission management in your applications.
+
+### Microsoft Azure Configuration
+
+To enable roles and groups in Microsoft Azure AD:
+
+#### 1. Application Roles
+1. In Azure AD, go to **App registrations** > Your app > **App roles**
+2. Create application roles (e.g., `admin`, `editor`, `viewer`)
+3. Assign these roles to users in **Enterprise applications**
+
+#### 2. Group Claims
+1. In **Token configuration**, add the `groups` claim
+2. Configure **Group claims** in the **Token configuration**
+3. Ensure the application has the necessary permissions
+
+#### 3. Required Scopes
+```typescript
+scope: ["openid", "profile", "email", "User.Read"]
+```
+
+### Data Structure
+
+Roles and groups are automatically extracted from the ID token and included in the user session:
+
+```typescript
+interface User {
+  username: string
+  profile: {
+    name?: string
+    email?: string
+    picture?: string
+    sub?: string
+  }
+  picture?: string
+  roles?: string[]    // Application roles from Azure AD
+  groups?: string[]   // Group memberships from Azure AD
+}
+```
+
+### Usage Examples
+
+#### Accessing Roles and Groups
+```vue
+<template>
+  <div>
+    <h2>User Information</h2>
+    <p>Name: {{ userSession?.user.profile?.name }}</p>
+    
+    <!-- Display user roles -->
+    <div v-if="userSession?.user.roles?.length">
+      <h3>Roles:</h3>
+      <ul>
+        <li v-for="role in userSession.user.roles" :key="role">
+          {{ role }}
+        </li>
+      </ul>
+    </div>
+    
+    <!-- Display user groups -->
+    <div v-if="userSession?.user.groups?.length">
+      <h3>Groups:</h3>
+      <ul>
+        <li v-for="group in userSession.user.groups" :key="group">
+          {{ group }}
+        </li>
+      </ul>
+    </div>
+  </div>
+</template>
+
+<script setup>
+const { userSession } = useOnionAuth()
+</script>
+```
+
+#### Role-Based Conditional Rendering
+```vue
+<template>
+  <div>
+    <!-- Admin-only content -->
+    <div v-if="hasRole('admin')">
+      <h2>Admin Panel</h2>
+      <button @click="deleteUser">Delete User</button>
+    </div>
+    
+    <!-- Editor or Admin content -->
+    <div v-if="hasAnyRole(['editor', 'admin'])">
+      <h2>Content Management</h2>
+      <button @click="editContent">Edit Content</button>
+    </div>
+  </div>
+</template>
+
+<script setup>
+const { userSession } = useOnionAuth()
+
+// Helper functions for role checking
+const hasRole = (role: string): boolean => {
+  return userSession.value?.user.roles?.includes(role) ?? false
+}
+
+const hasAnyRole = (roles: string[]): boolean => {
+  if (!userSession.value?.user.roles) return false
+  return roles.some(role => userSession.value.user.roles?.includes(role))
+}
+</script>
+```
+
+### Auth0 Configuration
+
+To inject roles and groups into the ID token with Auth0, create an **Auth0 Action** triggered on `Post Login`:
+
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  const namespace = 'https://claranet.com'  // or leave empty to add at root
+  const roles = event.authorization?.roles ?? []
+  const groups = event.user.app_metadata?.groups ?? []
+
+  if (namespace) {
+    api.idToken.setCustomClaim(`${namespace}/roles`, roles)
+    api.idToken.setCustomClaim(`${namespace}/groups`, groups)
+  } else {
+    api.idToken.setCustomClaim('roles', roles)
+    api.idToken.setCustomClaim('groups', groups)
+  }
+}
+```
+
+#### Two modes for role extraction
+
+**Mode 1 — Custom namespace** (recommended for security):
+```bash
+AUTH0_ROLES_NAMESPACE=https://claranet.com
+```
+Roles are read from `idToken['https://claranet.com/roles']`.
+
+**Mode 2 — Root claim** (simpler, when Action adds roles directly):
+```bash
+AUTH0_ROLES_NAMESPACE=
+```
+Roles are read from `idToken.roles`.
+
+Both modes produce the same session structure:
+```typescript
+interface User {
+  username: string
+  profile: { name?: string; email?: string; picture?: string; sub?: string }
+  picture?: string
+  roles?: string[]   // from Auth0 or Azure AD
+  groups?: string[]  // from Auth0 or Azure AD
+}
+```
+
+### Integration with UI Layers
+
+When using with UI layers like `onion-layout-nuxt-ui`, roles and groups are automatically passed through the authentication bridge:
+
+```typescript
+// The defaultUserDataTransformer includes roles and groups
+export const defaultUserDataTransformer: UserDataTransformer = (session) => {
+  if (!session?.user) return null
+
+  return {
+    username: session.user.username || session.user.profile?.name || 'User',
+    profilePicture: session.user.picture || session.user.profile?.picture,
+    roles: session.user.roles,        // ✅ Roles included
+    groups: session.user.groups,      // ✅ Groups included
+    metadata: {
+      provider: session.provider,
+      loggedInAt: session.loggedInAt,
+    },
+  }
+}
+```
+
+### Server-Side Role Validation
+
+For server-side validation, access roles and groups in your API routes:
+
+```typescript
+// server/api/admin-only.get.ts
+export default defineEventHandler(async (event) => {
+  const session = await getUserSession(event)
+  
+  if (!session?.user?.roles?.includes('admin')) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Admin role required'
+    })
+  }
+  
+  return { message: 'Admin access granted' }
+})
+```
+
+### TypeScript Types
+
+Types are automatically available throughout your application:
+
+```typescript
+import type { 
+  UserSession, 
+  AuthProvider, 
+  AuthOptions 
+} from '#auth-utils'
+
+const session: UserSession | null = userSession.value
+const provider: string = 'microsoft' // or 'auth0'
+```
+
+## Server Handlers
+
+### Microsoft OAuth Handler
+
+The [`microsoft.get.ts`](app/server/auth/microsoft.get.ts) handler manages Microsoft Azure authentication:
+
+```typescript
+export default defineOAuthMicrosoftEventHandler({
+  config: {
+    clientId: useRuntimeConfig().microsoftClientId,
+    clientSecret: useRuntimeConfig().microsoftClientSecret,
+    tenant: useRuntimeConfig().microsoftTenantId || 'common',
+    scope: ['openid', 'profile', 'email', 'User.Read'],
+  },
+  async onSuccess(event, { user }) {
+    // Transform and store user data
+    const onionUser = {
+      id: user.id,
+      name: user.displayName || user.name,
+      email: user.mail || user.userPrincipalName,
+      provider: 'microsoft',
+      // ... additional user data
+    }
+    
+    await setUserSession(event, {
+      user: onionUser,
+      loggedInAt: Date.now(),
+    })
+    
+    // Handle redirect after login
+    const redirectUrl = getCookie(event, 'auth-redirect') || '/'
+    return sendRedirect(event, redirectUrl)
+  },
+})
+```
+
+### Auth0 OAuth Handler
+
+The [`auth0.get.ts`](app/server/auth/auth0.get.ts) handler manages Auth0 authentication:
+
+```typescript
+export default defineOAuthAuth0EventHandler({
+  config: {
+    clientId: useRuntimeConfig().auth0ClientId,
+    clientSecret: useRuntimeConfig().auth0ClientSecret,
+    domain: useRuntimeConfig().auth0Domain,
+  },
+  async onSuccess(event, { user }) {
+    // Transform and store user data
+    const onionUser = {
+      id: user.sub,
+      name: user.name,
+      email: user.email,
+      picture: user.picture,
+      provider: 'auth0',
+      // ... additional user data
+    }
+    
+    await setUserSession(event, {
+      user: onionUser,
+      loggedInAt: Date.now(),
+    })
+    
+    return sendRedirect(event, redirectUrl)
+  },
+  onError(event, error) {
+    return sendRedirect(event, '/login?error=auth0_error')
+  },
+})
+```
+
+## Configuration
+
+### Runtime Configuration
+
+The layer uses Nuxt's runtime configuration for secure credential management:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  extends: ['onion-auth'],
+  
+  runtimeConfig: {
+    // Server configuration (private)
+    authSecret: process.env.NUXT_AUTH_SECRET,
+    auth0ClientId: process.env.AUTH0_CLIENT_ID,
+    auth0ClientSecret: process.env.AUTH0_CLIENT_SECRET,
+    auth0Domain: process.env.AUTH0_DOMAIN,
+    microsoftClientId: process.env.MICROSOFT_CLIENT_ID,
+    microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET,
+    microsoftTenantId: process.env.MICROSOFT_TENANT_ID,
+    
+    public: {
+      // Client configuration (public)
+      authBaseURL: process.env.NUXT_PUBLIC_AUTH_BASE_URL || 'http://localhost:3000'
+    }
+  }
+})
+```
+
+### Custom Route Configuration
+
+You can customize authentication routes if needed:
+
+```typescript
+nitro: {
+  handlers: [
+    {
+      route: '/api/auth/microsoft', // Custom route
+      handler: '~/layers/onion-auth/app/server/auth/microsoft.get.ts'
+    },
+    {
+      route: '/custom-auth/auth0', // Custom route
+      handler: '~/layers/onion-auth/app/server/auth/auth0.get.ts'
+    }
+  ]
+}
+```
+
+## Integration with UI Layers
+
+### AuthProvider Interface
+
+The layer implements the [`AuthProvider`](shared/types/auth-interfaces.ts) interface for seamless integration with UI layers:
+
+```typescript
+interface AuthProvider {
+  userSession: Ref<UserSession | null>
+  isAuthenticated: ComputedRef<boolean>
+  login(provider: string, options?: AuthOptions): Promise<void>
+  logout(options?: LogoutOptions): Promise<void>
+}
+```
+
+### User Session Format
+
+The standardized user session format:
+
+```typescript
+interface UserSession {
+  user: {
+    username?: string
+    profile?: {
+      id: string
+      name?: string
+      email?: string
+    }
+  }
+  provider?: string
+  loggedInAt?: number
+}
+```
+
+### Integration Example
+
+```typescript
+// In a plugin or composable
+export default defineNuxtPlugin(() => {
+  const auth = useAuth() // From UI layer
+  const onionAuth = useOnionAuth() // From auth layer
+  
+  // Connect the authentication provider
+  auth.setAuthProvider(onionAuth, {
+    debug: true,
+    userDataTransformer: (session) => ({
+      username: session?.user?.profile?.name || session?.user?.username,
+      profilePicture: session?.user?.profile?.picture
+    })
+  })
+})
+```
+
+## Advanced Usage
+
+### Custom Login Options
+
+```typescript
+// Login with custom redirect
+await login('microsoft', {
+  redirectUrl: '/dashboard',
+  params: {
+    prompt: 'select_account'
+  }
+})
+
+// Login with Auth0 specific parameters
+await login('auth0', {
+  redirectUrl: '/profile',
+  params: {
+    connection: 'google-oauth2'
+  }
+})
+```
+
+### Custom Logout Handling
+
+```typescript
+// Logout with custom redirect
+await logout({
+  redirectUrl: '/goodbye'
+})
+```
+
+### Accessing Raw User Data
+
+```typescript
+const { userSession } = useOnionAuth()
+
+// Access provider-specific data
+const microsoftData = userSession.value?.user // Contains Microsoft-specific fields
+const auth0Data = userSession.value?.user // Contains Auth0-specific fields
+```
+
+## Migration from Module Architecture
+
+### Before (Module)
+```typescript
+export default defineNuxtConfig({
+  extends: ['onion-auth'],
+  modules: ['onion-auth/modules/onion-auth'] // ❌ No longer needed
+})
+```
+
+### After (Layer + Configuration)
+```typescript
+export default defineNuxtConfig({
+  extends: ['onion-auth'],
+  nitro: {
+    handlers: [
+      { route: '/auth/microsoft', handler: '~/layers/onion-auth/app/server/auth/microsoft.get.ts' },
+      { route: '/auth/auth0', handler: '~/layers/onion-auth/app/server/auth/auth0.get.ts' }
+    ]
+  }
+})
+```
+
+## Error Handling
+
+### Authentication Errors
+
+The layer provides built-in error handling:
+
+```typescript
+// Auth0 handler with error handling
+onError(event, error) {
+  console.error('Auth0 authentication error:', error)
+  return sendRedirect(event, '/login?error=auth0_error')
+}
+```
+
+### Client-Side Error Handling
+
+```vue
+<script setup>
+const { login } = useOnionAuth()
+
+const handleLogin = async (provider: string) => {
+  try {
+    await login(provider)
+  } catch (error) {
+    console.error('Login failed:', error)
+    // Handle error (show notification, etc.)
+  }
+}
+</script>
+```
+
+## Security Considerations
+
+### Environment Variables
+
+- Store sensitive credentials in environment variables
+- Use different secrets for different environments
+- Never commit secrets to version control
+
+### Session Security
+
+- The layer uses secure session management via nuxt-auth-utils
+- Sessions are encrypted using the `NUXT_AUTH_SECRET`
+- Cookies are configured with secure defaults
+
+### CSRF Protection
+
+- OAuth flows include state parameters for CSRF protection
+- Redirect URLs are validated against configured domains
+
+## Troubleshooting
+
+### Common Issues
+
+1. **Routes not working**: Ensure Nitro handlers are properly configured
+2. **Environment variables not loaded**: Check `.env` file and variable names
+3. **Authentication loops**: Verify public routes are marked with `public: true`
+4. **Session not persisting**: Check `NUXT_AUTH_SECRET` configuration
+
+### Debug Mode
+
+Enable debug logging by checking server logs and network requests:
+
+```bash
+# Check authentication routes
+curl http://localhost:3000/auth/microsoft
+curl http://localhost:3000/auth/auth0
+```
+
+### FAQ
+
+**Why is Nitro configuration required?**
+Nuxt layers auto-detect composables, middleware, and plugins, but **not server handlers**. Nitro configuration is necessary to register the `/auth/microsoft` and `/auth/auth0` routes.
+
+**Can I use other providers?**
+Currently, only Auth0 and Microsoft Azure are supported. To add other providers, you'll need to create additional server handlers following the same pattern.
+
+**How do I customize user data transformation?**
+When integrating with UI layers, use the `userDataTransformer` option to customize how user data is processed and displayed.
+
+## Version History
+
+### v0.2.0 - Latest
+- ✅ Migration to layer architecture
+- ✅ Nitro configuration for server routes
+- ✅ Improved TypeScript types
+- ✅ Updated documentation
+- ✅ Nuxt 4 compatibility
+- ✅ Enhanced security features
+
+## Dependencies
+
+- **nuxt-auth-utils**: Core authentication utilities
+- **Nuxt 4**: Framework compatibility
+- **TypeScript**: Type safety and developer experience

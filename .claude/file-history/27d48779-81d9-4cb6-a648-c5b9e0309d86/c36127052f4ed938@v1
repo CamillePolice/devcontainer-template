@@ -1,0 +1,223 @@
+# Code Review — `PMPFLOW-93/reventilation-infos` → `main`
+
+**Date :** 2026-03-20
+**Branche :** `PMPFLOW-93/reventilation-infos`
+**Commits :**
+- `ff1a98f` refactor: update UoUnit component usage for improved styling and consistency
+- `6b9cdf9` feat: implement lot status color mapping for improved UI consistency *(mergé depuis `PMPFLOW-175/status-badge-colors`)*
+
+**Fichiers :** 10 · +260 / -69 lignes · Vue 3 / TypeScript
+
+---
+
+## Score global : 6/10 — Average *(régression de version bloquante)*
+
+La branche enrichit correctement `ReventilationSlideover` avec les détails des UOs (nom produit, code, profil, o2i, badge parent, quantités). La refonte de `UoUnit` pour déplacer le `ml-1` vers les call sites est la bonne approche.
+
+---
+
+## ⛔ Blocant — À corriger avant merge
+
+### ⛔ Régression de version — `package.json` / `package-lock.json`
+
+La branche est basée sur une version antérieure à la release `1.19.0`. La merge vers `main` va **écraser la version actuelle** :
+
+```
+main actuel   : "version": "1.19.0"
+après merge   : "version": "1.18.0"  ← régression
+```
+
+Le `CHANGELOG.md` perd également 32 lignes correspondant aux notes de release `1.19.0`.
+
+**Action requise :** Rebaser la branche sur `main` avant la merge, ou résoudre le conflit en conservant `1.19.0` et le CHANGELOG actuel.
+
+---
+
+## Problèmes à corriger avant merge
+
+### ⚠️ Bug moyen — `useUo` reçoit un snapshot statique, pas une référence réactive
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```typescript
+// Actuel — snapshot au moment du mount
+const { mappedUos } = useUo({ uos: props.uos })
+
+// Recommandé — référence réactive
+const { mappedUos } = useUo({ uos: toRef(props, 'uos') })
+```
+
+Si le parent re-rend avec un nouveau tableau `uos`, la map interne de `useUo` devient obsolète.
+Les quantités affichées peuvent alors être incorrectes ou figées.
+
+---
+
+### ⚠️ `o2iParent` peut être `null` même pour un Forfait standard + string littérale évitable
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```html
+<!-- Actuel -->
+<UBadge v-if="group.type === 'Forfait standard'">
+  Parent: {{ item.o2iParent }}
+</UBadge>
+
+<!-- Recommandé -->
+<UBadge v-if="group.type === UoTypeEnum.FORFAIT_STANDARD && item.o2iParent">
+  Parent: {{ item.o2iParent }}
+</UBadge>
+```
+
+```typescript
+import { UoTypeEnum } from '~/shared/types/uo'
+```
+
+Deux améliorations combinées :
+
+1. **`&& item.o2iParent`** — `UoDetails.o2iParent` est typé `string | null`. Sans ce garde, le badge affiche "Parent: " avec une valeur vide pour un bundle racine.
+2. **`UoTypeEnum.FORFAIT_STANDARD`** — la constante existe déjà dans `shared/types/uo.ts` (valeur `'Forfait standard'`). L'utiliser évite la string littérale : refactoring-safe, autocomplétion IDE, cohérent avec l'usage dans `billing.ts`.
+
+---
+
+## Points d'amélioration mineurs
+
+### ℹ️ Double cast `unknown` dans `getDisplayInfo`
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```typescript
+// Actuel — contourne le typage
+function getDisplayInfo(item: unknown) {
+  const o2i = (item as UoDetails).o2i
+  const originalQuantity = (item as UoDetails).originalQuantity
+  ...
+}
+
+// Recommandé — intersection type précise
+function getDisplayInfo(item: RadioGroupItem & UoDetails) {
+  const { o2i, originalQuantity } = item
+  ...
+}
+```
+
+Typer en `RadioGroupItem & UoDetails` est plus sûr car `normalizedUo` est déjà construit avec les deux formes.
+
+---
+
+### ℹ️ Concaténation dans le template à extraire
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```html
+<!-- Actuel — lisible mais difficile à maintenir -->
+<span>{{ item.productName }} ({{ item.productCode }} - {{ item.profile }})</span>
+
+<!-- Recommandé — computed ou helper -->
+<span>{{ formatUoLabel(item) }}</span>
+```
+
+```typescript
+function formatUoLabel(item: UoDetails): string {
+  return `${item.productName} (${item.productCode} - ${item.profile})`
+}
+```
+
+---
+
+---
+
+## Nouveau commit — `6b9cdf9` : Lot status color mapping
+
+### `app/composables/useLotStatusColors.ts` — Ajouté
+
+**Positifs :**
+- Normalisation `toLowerCase().trim()` → insensible à la casse, robuste
+- Fallback `defaultColorMapping` pour les statuts inconnus
+- Logique pure isolée dans un composable, bien séparable
+
+**Issues :**
+
+**ℹ️ `'primary'` déclaré dans le type mais jamais utilisé**
+
+```typescript
+color: 'neutral' | 'primary' | 'success' | 'info'  // 'primary' → dead type
+```
+
+Aucun statut ne mappe sur `primary`. Soit le retirer du type, soit l'utiliser intentionnellement.
+
+**ℹ️ `category` non consommé**
+
+```typescript
+// Table.vue n'utilise que .color
+:color="getStatusColor(row.getValue('status')).color"
+```
+
+Le champ `category` dans `StatusColorMapping` est défini mais jamais lu. Si pas d'usage prévu à court terme, le supprimer pour éviter de maintenir un contrat mort.
+
+**ℹ️ `'cancelled'` → `success` (vert) sémantiquement discutable**
+
+```typescript
+'cancelled': { color: 'success', category: 'green' },
+```
+
+Un lot annulé n'est pas un état de succès. `'neutral'` (gris) serait plus juste sémantiquement.
+
+**ℹ️ Incohérence commentaire / code**
+
+```typescript
+// Blue (primary): Active/in-progress states  ← commentaire dit 'primary'
+'build en cours': { color: 'info', ... },     ← code utilise 'info'
+```
+
+### `app/components/lot/Table.vue` — Modifié
+
+```typescript
+const { getStatusColor } = useLotStatusColors()
+```
+
+```html
+:color="getStatusColor(row.getValue('status')).color"
+```
+
+Usage correct et minimal. Le composable est bien encapsulé.
+
+---
+
+## Points positifs ✅
+
+- Narrowing correct de `UoCore[]` → `UoDetails[]` pour la prop `uos`
+- Badge parent correctement conditionné sur le type Forfait standard
+- Refactoring `UoUnit` / `ml-1` propre et cohérent dans les 3 composants existants (`HistoricBundleSection`, `StandardBundleSection`, `TimesSection`)
+- Fallback `?? 0` défensif sur les quantités manquantes
+- Import explicite `./Unit.vue` cohérent avec le pattern du fichier
+
+---
+
+## Analyse fichier par fichier
+
+| Fichier | Statut | Note |
+|---|---|---|
+| `app/components/uo/Unit.vue` | Modifié | ✅ Suppression correcte du `ml-1` |
+| `app/components/uo/HistoricBundleSection.vue` | Modifié | ✅ Ajout `class="ml-1"` en compensation |
+| `app/components/uo/StandardBundleSection.vue` | Modifié | ✅ Ajout `class="ml-1"` en compensation |
+| `app/components/uo/TimesSection.vue` | Modifié | ✅ Ajout `class="ml-1"` + trailing comma style |
+| `app/components/uo/ReventilationSlideover.vue` | Modifié | ⚠️ Voir problèmes ci-dessus |
+| `app/composables/useLotStatusColors.ts` | Ajouté | ℹ️ Voir points mineurs ci-dessus |
+| `app/components/lot/Table.vue` | Modifié | ✅ Usage correct du composable |
+| `package.json` / `package-lock.json` | Modifié | ⛔ Régression 1.19.0 → 1.18.0 |
+| `CHANGELOG.md` | Modifié | ⛔ Perte des notes de release 1.19.0 |
+
+---
+
+## Récapitulatif des actions
+
+| # | Action | Fichier | Urgence |
+|---|---|---|---|
+| 0 | Rebaser sur `main` pour récupérer 1.19.0 + CHANGELOG | `package.json` / `CHANGELOG.md` | **Bloquant** |
+| 1 | `toRef(props, 'uos')` pour la réactivité | `ReventilationSlideover.vue` | **Obligatoire** |
+| 2 | Garde `&& item.o2iParent` + `UoTypeEnum.FORFAIT_STANDARD` sur le badge | `ReventilationSlideover.vue` | **Obligatoire** |
+| 3 | Corriger `'cancelled'` → `'neutral'` | `useLotStatusColors.ts` | Recommandé |
+| 4 | Supprimer `'primary'` du type ou l'utiliser | `useLotStatusColors.ts` | Recommandé |
+| 5 | Supprimer `category` si non utilisé | `useLotStatusColors.ts` | Recommandé |
+| 6 | Typer `getDisplayInfo` avec intersection type | `ReventilationSlideover.vue` | Recommandé |
+| 7 | Extraire `formatUoLabel` | `ReventilationSlideover.vue` | Optionnel |

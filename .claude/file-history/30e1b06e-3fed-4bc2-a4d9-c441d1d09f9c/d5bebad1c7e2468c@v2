@@ -1,0 +1,142 @@
+import type { AggregatedWorklog } from './worklog'
+import type { MaterialDeclaration } from './materialDeclaration.ts'
+import type { ProductionCell, Factory } from './filters'
+import type { Milestone } from './milestone'
+
+/**
+ * Raw UO data from uo_augmented_view
+ * Used to map to specific UO types
+ */
+export type AugmentedUo = {
+  o2i: string
+  o2iParent: string | null
+  o2iLot: string
+  productCode: string | null
+  productName: string | null
+  productCodeParent: string | null
+  productNameParent: string | null
+  type: UoType
+  id: number | null
+  name: string | null
+  profile: string
+  productionCellKey: string | null
+  productionCellName: string | null
+  factoryKey: string | null
+  factoryName: string | null
+  quantityConsumed: number | null
+  quantityConsumedAdjustment: number | null
+  raf: number
+  rafAdjustment: number | null
+  originalQuantity: number
+  quantityAdjustment: number | null
+  unit: string | null
+  price: string | null
+  description: string | null
+  billingDate: Date | null
+  billingTrigger: string | null
+  billingDetails: string | null
+  plannedDeploymentDate: Date | null
+  desiredDeploymentDate: Date | null
+  billedMilestoneId?: number
+  billedMilestoneName?: string
+  billedMilestoneStepPercent?: number
+  billedMilestoneIndex?: number
+  milestoneBilledAt?: Date
+}
+
+export type UoType = 'T&M' | 'Forfait standard' | 'Forfait historique'
+
+export const UO_TYPES = {
+  TIME_AND_MATERIALS: 'T&M' as UoType,
+  FORFAIT_STANDARD: 'Forfait standard' as UoType,
+  FORFAIT_HISTORIQUE: 'Forfait historique' as UoType,
+}
+
+export type UoStatus = {
+  id: number
+  name: string
+}
+
+export type UoCore = {
+  o2iLot: string
+
+  o2i: string
+
+  type: UoType
+
+  factory: Factory
+
+  productionCell: ProductionCell
+
+  productCode: string | null
+
+  productName: string | null
+
+  productCodeParent: string | null
+
+  productNameParent: string | null
+
+  profile: string
+
+  status: UoStatus
+
+  description: string | null
+
+  plannedDeploymentDate: Date | undefined
+
+  desiredDeploymentDate: Date | undefined
+
+  originalQuantity: number
+
+  unit: string | undefined
+}
+
+export type UoDetails = UoCore & {
+
+  o2iParent: string | null
+
+  quantityConsumed: number | null
+
+  quantityConsumedAdjustment: number | null
+
+  pendingQuantity: number | null
+
+  quantityAdjustment: number | null
+
+  raf: number
+
+  rafAdjustment: number | null
+
+  price: string | null
+
+  billingDate: Date | undefined
+
+  billingTrigger: string | null
+
+  billingDetails: string | null
+
+  worklogs: AggregatedWorklog[]
+
+  materialDeclarations: MaterialDeclaration[]
+}
+
+export type UoStandardBundle = UoCore & {
+  billedMilestone?: Milestone
+  milestoneBilledAt?: Date
+  uos: Array<UoDetails>
+}
+
+export type UoHistoricBundle = UoCore & {
+
+  originalQuantity: number
+
+  quantityConsumed: number | null
+
+  unit: string
+
+}
+
+export type UOSimplified = {
+  value: string
+  label: string | null
+}

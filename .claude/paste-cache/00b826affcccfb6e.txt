@@ -1,0 +1,30 @@
+xh POST :3000/api/webhooks/lots/TEST-LOT-001/assignee \
+  x-webhook-signature:'sha256=19906ef8e51d8f447c18bf4543e65173fe30146bedec9ac21c24f87637895c3d' \
+  --raw '{"email":"camille.police@claranet.com"}'
+HTTP/1.1 500 Internal server error
+Cache-Control: no-cache
+Connection: close
+Content-Length: 898
+Content-Security-Policy: script-src 'self' 'unsafe-inline'; object-src 'none'; base-uri 'self';
+Content-Type: application/json
+Date: Fri, 03 Apr 2026 13:41:30 GMT
+Referrer-Policy: no-referrer
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+
+{
+    "error": true,
+    "url": "http://localhost:3000/api/webhooks/lots/TEST-LOT-001/assignee",
+    "statusCode": 500,
+    "statusMessage": "Internal server error",
+    "message": "Internal server error",
+    "stack": [
+        "Internal server error",
+        "at createError (/Users/cpo/Documents/projects/project-flow/node_modules/h3/dist/index.mjs:71:15)",
+        "at Object.handler (/Users/cpo/Documents/projects/project-flow/server/api/webhooks/lots/[o2i]/assignee.post.ts:38:0)",
+        "at process.processTicksAndRejections (node:internal/process/task_queues:103:5)",
+        "at async file:///Users/cpo/Documents/projects/project-flow/node_modules/h3/dist/index.mjs:2017:19)",
+        "at async Object.callAsync (/Users/cpo/Documents/projects/project-flow/node_modules/unctx/dist/index.mjs:72:16)",
+        "at async Server.toNodeHandle (/Users/cpo/Documents/projects/project-flow/node_modules/h3/dist/index.mjs:2316:7)"
+    ]
+}

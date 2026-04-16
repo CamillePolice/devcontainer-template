@@ -1,0 +1,124 @@
+# Plan : Ajout de champs produit maître (UO) et référence carte (worklog)
+
+## Contexte
+
+Pour afficher le produit maître associé à chaque UO enfant T&M (et potentiellement aux forfaits), il faut ajouter 2 nouveaux champs dans la table `uo`. De plus, un champ `o2i_reference_carte` est requis dans la table `worklog` pour tracer la référence carte.
+
+## Nouveaux champs
+
+| Table | Champ DB | Champ Drizzle | Type | Nullable |
+|---|---|---|---|---|
+| `uo` | `product_code_parent` | `productCodeParent` | `varchar(255)` | oui |
+| `uo` | `product_name_parent` | `productNameParent` | `varchar(255)` | oui |
+| `worklog` | `o2i_reference_carte` | `o2iReferenceCarte` | `varchar(45)` | oui |
+
+## Fichiers impactés
+
+| Fichier | Modification |
+|---|---|
+| `server/database/schemas/uo.ts` | Ajout des 2 champs dans `uo` + dans `augmentedUoView` |
+| `server/database/schemas/worklog.ts` | Ajout du champ dans `worklog` |
+| `shared/types/uo.ts` | Ajout dans `AugmentedUo` |
+| `samples/mcd.mermaid` | Ajout des 3 champs dans le MCD |
+| Migration SQL (générée) | `ALTER TABLE` + `CREATE OR REPLACE VIEW` |
+
+## Étapes d'implémentation
+
+### 1. Schéma Drizzle — table `uo` (`server/database/schemas/uo.ts:38`)
+
+Ajouter après `productName` (ligne 38) :
+
+```ts
+productCodeParent: varchar('product_code_parent', { length: 255 }),
+productNameParent: varchar('product_name_parent', { length: 255 }),
+```
+
+### 2. Schéma Drizzle — vue `augmentedUoView` (`server/database/schemas/uo.ts:109`)
+
+Ajouter après `productName` (ligne 109) dans la définition de la vue :
+
+```ts
+productCodeParent: varchar('product_code_parent'),
+productNameParent: varchar('product_name_parent'),
+```
+
+### 3. Schéma Drizzle — table `worklog` (`server/database/schemas/worklog.ts:23`)
+
+Ajouter après `o2i` (ligne 23) :
+
+```ts
+o2iReferenceCarte: varchar('o2i_reference_carte', { length: 45 }),
+```
+
+### 4. Types partagés — `AugmentedUo` (`shared/types/uo.ts:15`)
+
+Ajouter après `productName` (ligne 15) :
+
+```ts
+productCodeParent: string | null
+productNameParent: string | null
+```
+
+### 5. MCD — `samples/mcd.mermaid`
+
+Ajouter dans la section UO (après `productName` ligne 92) :
+
+```
+varchar(255) productCodeParent
+varchar(255) productNameParent
+```
+
+Ajouter dans la section Worklog (après `o2i` ligne 133) :
+
+```
+varchar(45) o2iReferenceCarte
+```
+
+### 6. Génération de la migration
+
+```bash
+npm run db:generate
+```
+
+### 7. Compléter la migration — vue augmentée
+
+La vue `augmentedUoView` utilise `.existing()` donc Drizzle ne la gère pas. Ajouter manuellement à la fin du fichier de migration généré :
+
+```sql
+CREATE OR REPLACE VIEW augmented_uo_view AS
+SELECT
+  uo.o2i, uo.o2i_parent, uo.o2i_lot, uo.product_code, uo.product_name,
+  uo.product_code_parent, uo.product_name_parent,
+  uo.type,
+  uo_status.id, uo_status.name, uo.profile,
+  pc.key AS "production_cell_key", pc.name AS "production_cell_name",
+  f.key AS "factory_key", f.name AS "factory_name",
+  uo.quantity_consumed, uo.quantity_consumed_adjustment,
+  uo.raf, uo.raf_adjustment, uo.original_quantity, uo.quantity_adjustment,
+  uo.unit, uo.price, uo.description,
+  uo.billing_date, uo.billing_trigger, uo.billing_details,
+  uo.planned_deployment_date, uo.desired_deployment_date,
+  uo.milestone_billed_at, uo.billed_milestone_id,
+  bm.name AS "billed_milestone_name",
+  bm.step_percent AS "billed_milestone_step_percent",
+  bm.index AS "billed_milestone_index"
+FROM uo
+  LEFT JOIN uo_status ON uo.status_jira_id = uo_status.jira_id
+  LEFT JOIN production_cell pc ON uo.production_cell = pc.key
+  LEFT JOIN factory f ON uo.factory = f.key
+  LEFT JOIN milestone bm ON uo.billed_milestone_id = bm.id;
+```
+
+### 8. Appliquer la migration
+
+```bash
+npm run db:migrate
+```
+
+## Vérification
+
+1. `npm run typecheck` — pas d'erreur TypeScript
+2. `npm run lint` — pas d'erreur ESLint
+3. `npm run db:generate` — migration générée
+4. `npm run db:migrate` — migration appliquée
+5. Vérifier dans Drizzle Studio que les colonnes existent

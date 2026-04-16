@@ -1,0 +1,28 @@
+import type { H3Event } from 'h3'
+
+export default defineEventHandler(async (event: H3Event) => {
+  const query = getQuery(event)
+  const redirectTo = (query.redirectTo as string) || '/'
+
+  const session = await getUserSession(event)
+  const provider = (session as Record<string, unknown>).provider as string | undefined
+
+  await clearUserSession(event)
+
+  if (provider === 'auth0') {
+    const config = useRuntimeConfig()
+    // oauth.auth0 is populated by nuxt-auth-utils from NUXT_OAUTH_AUTH0_* env vars
+    const auth0Config = (config.oauth as Record<string, Record<string, string>>)?.auth0
+    const domain = auth0Config?.domain
+    const clientId = auth0Config?.clientId
+    const returnTo = encodeURIComponent(
+      new URL(redirectTo, useRuntimeConfig().public.authBaseURL).toString(),
+    )
+    return sendRedirect(
+      event,
+      `https://${domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`,
+    )
+  }
+
+  return sendRedirect(event, redirectTo)
+})

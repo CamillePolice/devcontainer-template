@@ -1,0 +1,179 @@
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
+
+// --- Mocks for Nuxt/H3 globals (must be set before dynamic import) ---
+
+const mockSetUserSession = vi.fn()
+const mockSendRedirect = vi.fn()
+const mockGetCookie = vi.fn()
+const mockDeleteCookie = vi.fn()
+const mockJwtDecode = vi.fn()
+
+// Mutable config — tests can mutate fields directly; afterEach restores defaults
+const runtimeConfig = {
+  auth0ClientId: 'test-client-id',
+  auth0ClientSecret: 'test-client-secret',
+  auth0Domain: 'test.auth0.com',
+  auth0RolesNamespace: '',
+  public: { authBaseURL: 'http://localhost:3000' },
+}
+
+let capturedOnSuccess: ((event: unknown, payload: unknown) => Promise<void>) | undefined
+let capturedOnError: ((event: unknown, error: unknown) => unknown) | undefined
+
+vi.stubGlobal('defineOAuthAuth0EventHandler', (config: {
+  onSuccess: (event: unknown, payload: unknown) => Promise<void>
+  onError: (event: unknown, error: unknown) => unknown
+}) => {
+  capturedOnSuccess = config.onSuccess
+  capturedOnError = config.onError
+  return vi.fn()
+})
+
+vi.stubGlobal('useRuntimeConfig', () => runtimeConfig)
+vi.stubGlobal('setUserSession', mockSetUserSession)
+vi.stubGlobal('sendRedirect', mockSendRedirect)
+vi.stubGlobal('getCookie', mockGetCookie)
+vi.stubGlobal('deleteCookie', mockDeleteCookie)
+
+vi.mock('jwt-decode', () => ({
+  jwtDecode: (...args: unknown[]) => mockJwtDecode(...args),
+}))
+
+// Trigger module evaluation (captures callbacks via stubbed global)
+beforeAll(async () => {
+  await import('../server/routes/auth/auth0.get.ts')
+
+  if (!capturedOnSuccess || !capturedOnError) {
+    throw new Error(
+      'Handler callbacks not captured — defineOAuthAuth0EventHandler mock may not have run',
+    )
+  }
+})
+
+// ---
+
+const mockEvent = {} as unknown
+
+function makeUser(overrides = {}) {
+  return {
+    sub: 'auth0|123',
+    name: 'Test User',
+    email: 'test@example.com',
+    picture: 'https://example.com/pic.jpg',
+    nickname: 'testuser',
+    ...overrides,
+  }
+}
+
+describe('auth0.get.ts — onSuccess', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockGetCookie.mockReturnValue(null)
+  })
+
+  afterEach(() => {
+    // Restore default namespace after each test
+    runtimeConfig.auth0RolesNamespace = ''
+  })
+
+  it('maps username, profile.name, profile.email, profile.picture, sub correctly', async () => {
+    mockJwtDecode.mockReturnValue({})
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: { id_token: 'tok' } })
+
+    const [, session] = mockSetUserSession.mock.calls[0]
+    expect(session.user.username).toBe('testuser')
+    expect(session.user.profile.name).toBe('Test User')
+    expect(session.user.profile.email).toBe('test@example.com')
+    expect(session.user.profile.picture).toBe('https://example.com/pic.jpg')
+    expect(session.user.profile.sub).toBe('auth0|123')
+  })
+
+  it('sets provider at session root (not inside user)', async () => {
+    mockJwtDecode.mockReturnValue({})
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: { id_token: 'tok' } })
+
+    const [, session] = mockSetUserSession.mock.calls[0]
+    expect(session.provider).toBe('auth0')
+    expect(session.user.provider).toBeUndefined()
+  })
+
+  it('leaves roles and groups undefined when ID token has no claims', async () => {
+    mockJwtDecode.mockReturnValue({})
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: { id_token: 'tok' } })
+
+    const [, session] = mockSetUserSession.mock.calls[0]
+    expect(session.user.roles).toBeUndefined()
+    expect(session.user.groups).toBeUndefined()
+  })
+
+  it('extracts roles from idToken.roles when no namespace is configured', async () => {
+    mockJwtDecode.mockReturnValue({ roles: ['admin', 'editor'], groups: ['team-a'] })
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: { id_token: 'tok' } })
+
+    const [, session] = mockSetUserSession.mock.calls[0]
+    expect(session.user.roles).toEqual(['admin', 'editor'])
+    expect(session.user.groups).toEqual(['team-a'])
+  })
+
+  it('extracts roles from namespace claim when AUTH0_ROLES_NAMESPACE is set', async () => {
+    runtimeConfig.auth0RolesNamespace = 'https://claranet.com'
+
+    mockJwtDecode.mockReturnValue({
+      'https://claranet.com/roles': ['superadmin'],
+      'https://claranet.com/groups': ['core-team'],
+    })
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: { id_token: 'tok' } })
+
+    const [, session] = mockSetUserSession.mock.calls[0]
+    expect(session.user.roles).toEqual(['superadmin'])
+    expect(session.user.groups).toEqual(['core-team'])
+  })
+
+  it('redirects to URL stored in auth-redirect cookie after login', async () => {
+    mockJwtDecode.mockReturnValue({})
+    mockGetCookie.mockReturnValue('/dashboard')
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: {} })
+
+    expect(mockSendRedirect).toHaveBeenCalledWith(mockEvent, '/dashboard')
+    expect(mockDeleteCookie).toHaveBeenCalledWith(mockEvent, 'auth-redirect')
+  })
+
+  it('redirects to / by default when no auth-redirect cookie is set', async () => {
+    mockJwtDecode.mockReturnValue({})
+
+    await capturedOnSuccess!(mockEvent, { user: makeUser(), tokens: {} })
+
+    expect(mockSendRedirect).toHaveBeenCalledWith(mockEvent, '/')
+  })
+})
+
+describe('auth0.get.ts — onError', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it('calls console.error with the error', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const err = new Error('OAuth failure')
+
+    capturedOnError!(mockEvent, err)
+
+    expect(consoleSpy).toHaveBeenCalledWith('❌ Auth0 OAuth error:', err)
+    consoleSpy.mockRestore()
+  })
+
+  it('redirects to /login?error=auth0_error', () => {
+    const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    capturedOnError!(mockEvent, new Error('fail'))
+
+    expect(mockSendRedirect).toHaveBeenCalledWith(mockEvent, '/login?error=auth0_error')
+    consoleSpy.mockRestore()
+  })
+})

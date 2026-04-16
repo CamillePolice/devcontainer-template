@@ -1,0 +1,68 @@
+---
+name: rag-context
+description: |
+  Charge les instructions RAG du projet depuis la base de données (avec RAG_DSN) au démarrage de session
+  ou avant d'écrire un plan. Filtre automatiquement par agent si le contexte
+  de la session le permet.
+  Triggers : démarrage de session, "before writing any plan", "load RAG context".
+---
+
+# RAG Context Loader
+
+## Overview
+
+Loads project-specific and global agent instructions from a PostgreSQL RAG store.
+Output is authoritative — it overrides defaults for the current project.
+
+## When to Use
+
+- **Session start** — before any other work
+- **Before writing any plan** — always run first
+
+---
+
+## Step 1 — Detect agent context (optional)
+
+Before running the query, check if the current session has an obvious agent focus:
+
+- Angular components, signals, standalone → `AGENT_FILTER=angular-expert`
+- Nuxt, Vue, SSR, Nitro → `AGENT_FILTER=nuxt-expert`
+- Symfony, PHP, Doctrine → `AGENT_FILTER=symfony-expert`
+- Security audit, auth, permissions → `AGENT_FILTER=security-expert`
+- Git diff, commit, review → `AGENT_FILTER=git-diff-reviewer`
+- No obvious focus → leave `AGENT_FILTER` empty (loads all agents)
+
+---
+
+## Step 2 — Load RAG context
+
+```bash
+# Set AGENT_FILTER to an agent name to restrict context, or leave empty to load all
+AGENT_FILTER=""  # e.g. "angular-expert" or "" for all
+
+psql "$RAG_DSN" -t -A -c "
+SELECT E'\n## ' || section_type || E'\n' || content
+FROM rag_agent_instructions
+WHERE project IN ('global', '${RAG_PROJECT:-global}')
+  AND active = true
+  AND ('${AGENT_FILTER}' = '' OR agent_name = '${AGENT_FILTER}')
+ORDER BY agent_name, CASE section_type
+    WHEN 'role' THEN 1
+    WHEN 'process' THEN 2
+    WHEN 'best_practices' THEN 3
+    WHEN 'edge_cases' THEN 4
+    WHEN 'output_format' THEN 5
+    ELSE 6
+END;" 2>/dev/null || echo "RAG unavailable - using core instructions only."
+```
+
+---
+
+## Rules
+
+- Run this command at the **start of every session**
+- Run again **before writing any plan**
+- If the query returns content, treat it as **authoritative context** for the project
+- If it returns `"RAG unavailable"`, proceed with core instructions only — do not block
+- Never skip because `RAG_DSN` looks unset; let the command fail gracefully
+- Prefer a filtered load when agent context is clear — reduces context window usage

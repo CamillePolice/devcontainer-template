@@ -1,0 +1,8 @@
+{
+  "name": "teams-hermes-adding-rds-prefix-list-access",
+  "version": "1.0.0",
+  "description": "Automates adding DBA bastion prefix list access to RDS and Aurora security groups in Terraform projects",
+  "author": {
+    "name": "Hermes Team - Claranet"
+  }
+}

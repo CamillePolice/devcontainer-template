@@ -1,0 +1,79 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Commands
+
+```bash
+# Development
+npm run dev              # Start dev server with inspector
+npm run build            # Production build
+npm run preview          # Preview production build
+
+# Quality checks (run both before completing any task)
+npm run lint             # ESLint check
+npm run lint:fix         # Auto-fix lint issues
+npm run typecheck        # TypeScript type checking
+
+# Database
+npm run db:generate      # Generate Drizzle migration files
+npm run db:migrate       # Run pending migrations
+npm run db:studio        # Open Drizzle Studio
+```
+
+Local database setup via Docker Compose (PostgreSQL + PgAdmin). No test runner is configured — use `lint` + `typecheck` as quality gates.
+
+## Architecture
+
+**Nuxt 4 fullstack app** — CSR only (SSR disabled). Client code lives under `app/`, server under `server/`, shared types/utils under `shared/`.
+
+### Frontend
+
+- **Pages** → `app/pages/` (file-based routing): `/lots/`, `/lots/[o2i]`, `/periods/`
+- **Components** → `app/components/` grouped by feature (`lot/`, `milestone/`, `period/`, `uo/`)
+- **Stores** → `app/stores/` (Pinia): `useLotStore`, `useCollaboratorStore`
+- **Composables** → `app/composables/` wrap stores + API calls with toast notifications
+- **Plugins** → `app/plugins/`: auth integration, collaborator loading, navigation setup
+
+Auth is handled by the `@claranet/onion-auth` layer. The plugin `01.auth-integration.client.ts` connects `useOnionAuth()` to `useAuth()`. Plugin `03.fetch-current-collaborator.client.ts` loads the current collaborator into the store after auth.
+
+### Backend (Nitro/H3)
+
+- **API routes** → `server/api/` resource-based: `/api/lots/`, `/api/lots/[o2i]/`, `/api/periods/[id]/`, `/api/uos/[o2i]/`, `/api/collaborators/`
+- **Middleware** → `server/middleware/auth.ts` protects all `/api/*` routes, sets `event.context.user`
+- **Use cases** → `server/usecases/` contains business logic
+- **Error handling** → `server/utils/error.ts` exports `AppError` with typed enum (DATABASE, NOT_FOUND, VALIDATION, UNAUTHORIZED, FORBIDDEN, INTERNAL) and helpers `handleDatabaseError`, `createNotFoundError`, `createValidationError`
+- **Database** → `server/database/` with Drizzle ORM + PostgreSQL. Uses `pg Pool` locally, Cloud SQL Connector with IAM auth in GCP (staging/prod). Runtime config drives connection selection.
+
+### Database Schema (Drizzle)
+
+Key entities: `lot`, `uo` (work units), `milestone`, `collaborator`, `period`, `billing`, `worklog`, `materialQuantityDeclaration`. Two augmented views (`lot_augmented_view`, `augmented_uo_view`) aggregate join-heavy queries.
+
+UOs have two variants: standard/historic bundles and T&M. Billing is milestone-triggered. Material declarations track PENDING/BILLED states.
+
+### Shared
+
+- `shared/types/` — TypeScript interfaces used by both client and server (API responses, domain models)
+- `shared/utils/` — Pure utility functions
+
+## Code Conventions
+
+- **Vue 3 Composition API exclusively** — `<script setup lang="ts">` syntax, no Options API
+- **Script order in SFCs**: imports → props/emits → composables → reactive state → computed → lifecycle → methods
+- **Naming**: Components `PascalCase.vue`, pages `kebab-case.vue`, composables `useXxx.ts`, layouts `kebab-case.vue`
+- **VueUse first**: check VueUse before writing custom composables
+- **NuxtUI v4 first**: use NuxtUI components before raw Tailwind classes
+- **Commit format**: `type(scope): description [AI]` — always include `[AI]` tag for AI-assisted commits
+
+## UI / Styling
+
+- UI kit: `@nuxt/ui` v4 + Tailwind (via NuxtUI). Customize theme variables, don't override component styles directly.
+- Localization: French only (`fr`), `@nuxtjs/i18n` with `no_prefix` strategy.
+
+## Environment & Deployment
+
+- Deployed on GCP Cloud Run (port 3000), Docker image via Artifact Registry
+- Database: Cloud SQL PostgreSQL with VPC connector
+- CI via `.gitlab-ci.yml` extending `claranet/dos/federanapps/common-ci`
+- Staging/prod use Cloud SQL IAM auth; local uses `DATABASE_URL` connection string
+- Semantic release via `.releaserc` (conventional commits → changelog → version bump)

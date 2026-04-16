@@ -1,0 +1,268 @@
+<template>
+  <UCard>
+    <template #header>
+      <CardTitle
+        :title="t('title')"
+        icon="/icons/card.png"
+      />
+    </template>
+    <UTable
+      :data="mappedUosWithType"
+      :columns="columns"
+      :get-sub-rows="getSubRows"
+      :ui="{
+        base: 'border-separate border-spacing-[8px] [&_tbody_tr:not([data-selectable])]:hidden [&_thead_tr]:h-[12px] [&_td:first-child]:w-[20%] [&_td:first-child]:min-w-[20%] [&_td:first-child]:max-w-[20%]',
+        th: 'text-gray-700 text-[10px] text-center p-0',
+        separator: 'hidden',
+        tr: 'data-[expanded=true]:bg-elevated/50 border-none h-[64px]',
+        td: 'text-default bg-gray-100 dark:bg-gray-50 rounded-[6px] py-[8px] px-[16px] min-w-[80px] w-[120px]',
+      }"
+    >
+      <template #identifiers-cell="{ row }">
+        <div
+          v-if="row.original.type === 'worklog'"
+          class="avatar-cell text-sm"
+        >
+          <UAvatar
+            :alt="row.original.collaborator"
+            class="bg-gray-800 me-2"
+            :ui="{
+              fallback: 'text-gray-50',
+            }"
+          />
+          {{ row.original.collaborator }}
+        </div>
+        <UoIdentifiers
+          v-else
+          :uo="row.original.uo"
+          :times="true"
+          :lot-factory="lotFactory"
+          :expandable="true"
+          :is-expanded="row.getIsExpanded()"
+          @toggle-expand="row.toggleExpanded()"
+        />
+      </template>
+      <template #billedQuantity-cell="{ row }">
+        <div>
+          {{ formatDisplayNumber(row.original.billedQuantity)
+          }}<UoUnit
+            class="ml-1"
+            :row="row.original"
+          />
+        </div>
+      </template>
+      <template #pendingQuantity-cell="{ row }">
+        <div
+          v-if="row.original.type === 'worklog'"
+          class="text-sm"
+        >
+          {{ formatDisplayNumber(row.original.pendingQuantity)
+          }}<UoUnit
+            class="ml-1"
+            :row="row.original"
+          />
+        </div>
+        <div
+          v-else
+          class="gap-1"
+        >
+          <UoPendingQuantityInput
+            :uo="row.original.uo"
+            :pending-quantity="row.original.pendingQuantity"
+            @pending-quantity-change="handlePendingQuantityChange"
+          />
+          <span
+            v-if="config.public.recetteEnabled"
+            class="ml-1"
+          >({{
+            formatDisplayNumber(row.original.uo.quantityAdjustment)
+          }})</span>
+          <UoUnit
+            class="ml-1"
+            :row="row.original"
+          />
+          <UTooltip
+            v-if="row.original.uo.quantityAdjustment"
+            :text="t('resetAdjustment')"
+          >
+            <UButton
+              icon="i-lucide-undo-2"
+              size="xs"
+              variant="ghost"
+              color="neutral"
+              :loading="resettingO2i === row.original.uo.o2i"
+              :disabled="resettingO2i !== undefined"
+              :aria-label="t('resetAdjustment')"
+              @click="handleResetQuantityAdjustment(row.original.uo.o2i)"
+            />
+          </UTooltip>
+        </div>
+      </template>
+      <template #totalQuantity-cell="{ row }">
+        <div>
+          {{ formatDisplayNumber(row.original.totalQuantity)
+          }}<UoUnit
+            class="ml-1"
+            :row="row.original"
+          />
+        </div>
+      </template>
+      <template #raf-cell="{ row }">
+        <span
+          v-if="row.original.type === 'worklog'"
+          class="empty-cell"
+        />
+        <span v-else>{{ formatDisplayNumber(row.original.raf)
+        }}<UoUnit
+          class="ml-1"
+          :row="row.original"
+        /></span>
+      </template>
+      <template #progress-cell="{ row }">
+        <span
+          v-if="row.original.type === 'worklog'"
+          class="empty-cell"
+        />
+        <span v-else>{{ row.original.progress }} %</span>
+      </template>
+      <template #expanded>
+        <!-- Sub-rows are rendered via getSubRows, hide the expand slot row -->
+      </template>
+    </UTable>
+  </UCard>
+</template>
+
+<script lang="ts" setup>
+import { computed, ref } from 'vue'
+import type { TableColumn } from '@nuxt/ui'
+import { useI18n } from 'vue-i18n'
+import type { UoDetails } from '@@/shared/types/uo'
+import type { Factory } from '@@/shared/types/filters'
+import { useUo, transformWorklogsToTableRows } from '~/composables/useUo'
+import type { TableRowData } from '@@/shared/types/table'
+import { formatDisplayNumber } from '@@/shared/utils/number-formatting'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+
+const props = defineProps<{ uos: UoDetails[], lotFactory?: Factory }>()
+
+const { mappedUos, updatePendingQuantity, resetQuantityAdjustment } = useUo({ uos: props.uos })
+
+// Transformation des UOs avec le type 'uo'
+const mappedUosWithType = computed(() => {
+  return mappedUos.value.map(uo => ({
+    ...uo,
+    type: 'uo' as const,
+  }))
+})
+
+// Fonction pour obtenir les sous-lignes (worklogs)
+const getSubRows = (row: TableRowData) => {
+  if (row.type === 'worklog') {
+    return []
+  }
+  return transformWorklogsToTableRows(
+    row.uo.worklogs || [],
+    row.uo.unit,
+    row.o2i,
+  )
+}
+
+const columns: TableColumn<TableRowData>[] = [
+  {
+    header: '',
+    accessorKey: 'identifiers',
+  },
+  {
+    header: t('table.headers.billedTime'),
+    id: 'billedQuantity',
+  },
+  {
+    header: t('table.headers.pendingTime'),
+    id: 'pendingQuantity',
+  },
+  {
+    header: t('table.headers.totalTime'),
+    id: 'totalQuantity',
+  },
+  {
+    header: t('table.headers.raf'),
+    id: 'raf',
+  },
+  {
+    header: t('table.headers.progress'),
+    id: 'progress',
+  },
+]
+
+async function handlePendingQuantityChange(o2i: string, newValue: number) {
+  await updatePendingQuantity(o2i, newValue)
+}
+
+const resettingO2i = ref<string | undefined>(undefined)
+
+async function handleResetQuantityAdjustment(o2i: string) {
+  resettingO2i.value = o2i
+  await resetQuantityAdjustment(o2i)
+  resettingO2i.value = undefined
+}
+</script>
+
+<style scoped>
+:deep(td) {
+  text-align: center;
+}
+
+:deep(td > div),
+:deep(td > span) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+:deep(th:first-child) {
+  height: 4px;
+}
+
+:deep(td:first-child > div),
+:deep(td:first-child > span) {
+  float: left;
+}
+
+:deep(td:first-child > div) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+:deep(td:has(.avatar-cell)),
+:deep(td:has(.empty-cell)) {
+  background: transparent !important;
+}
+</style>
+
+<i18n lang="yaml">
+fr:
+  title: "Temps"
+  resetAdjustment: "Annuler la re-estimation"
+  table:
+    headers:
+      productCode: "Code produit"
+      totalTime: "Temps total"
+      billedTime: "Temps comptabilisé"
+      pendingTime: "Temps période en cours"
+      raf: "RAF"
+      progress: "% consommé"
+en:
+  title: "Times"
+  resetAdjustment: "Reset re-estimation"
+  table:
+    headers:
+      productCode: "Product Code"
+      totalTime: "Total Time"
+      billedTime: "Time billed"
+      pendingTime: "Time current period"
+      raf: "RAF"
+      progress: "% consummed"
+</i18n>

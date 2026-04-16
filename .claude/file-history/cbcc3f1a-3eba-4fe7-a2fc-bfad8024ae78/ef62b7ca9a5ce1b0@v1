@@ -1,0 +1,73 @@
+<template>
+  <div>
+    <USlideover
+      v-model:open="isSlideoverOpen"
+      title="Nombre déjà produits"
+      close-icon="i-lucide-x"
+      :transition="true"
+      :ui="{
+        wrapper: 'flex items-center justify-center',
+        content: 'w-full sm:max-w-lg rounded-2xl shadow-xl p-6 space-y-6',
+        header: 'pb-2',
+        title: 'text-center text-base font-semibold',
+        body: 'pt-2',
+        footer: 'pt-4 flex justify-end gap-3',
+      }"
+    >
+      <UButton
+        icon="i-lucide-trash-2"
+        size="xs"
+        variant="ghost"
+        color="neutral"
+      />
+      <template #body>
+        <div class="space-y-4">
+          <div
+            v-for="material in uo.materialDeclarations"
+            :key="material.id"
+            class="flex items-center justify-between text-sm"
+          >
+            <div class="flex items-center gap-2">
+              <span>Produit -
+                {{
+                  useDateFormat(material.availabilityDate, "DD/MM/YYYY")
+                }}</span>
+            </div>
+
+            <div class="flex items-center gap-3">
+              <span class="font-medium">{{ material.quantity }}</span>
+              <UButton
+                icon="i-lucide-trash-2"
+                size="xs"
+                variant="ghost"
+                color="neutral"
+                @click="onDelete(material)"
+              />
+            </div>
+          </div>
+        </div>
+      </template>
+    </USlideover>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { useDateFormat } from '@vueuse/core'
+
+defineProps<{
+  uo: UoDetails
+}>()
+
+const isSlideoverOpen = ref(false)
+
+const emit = defineEmits<{
+  (
+    e: 'deleteMaterialDeclaration',
+    materialDeclaration: MaterialDeclaration,
+  ): void
+}>()
+
+function onDelete(materialDeclaration: MaterialDeclaration) {
+  emit('deleteMaterialDeclaration', materialDeclaration)
+}
+</script>

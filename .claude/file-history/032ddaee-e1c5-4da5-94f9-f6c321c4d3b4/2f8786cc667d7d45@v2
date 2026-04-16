@@ -1,0 +1,140 @@
+# Design : Auto-complétion sur les filtres de la table des lots
+
+**Date :** 2026-04-03  
+**Branche :** PMPFLOW-199/auto-completion-in-table-filters  
+**Ticket :** PMPFLOW-199
+
+---
+
+## Contexte
+
+Les filtres texte de la table des lots (`LotTable.vue`) fonctionnent actuellement comme des `UInput` libres qui relancent le filtrage à chaque frappe. L'objectif est de remplacer ces champs par des `UInputMenu autocomplete` (NuxtUI v4) qui suggèrent des valeurs existantes pendant la saisie, sans contraindre l'utilisateur à choisir dans la liste.
+
+---
+
+## Périmètre
+
+Trois filtres concernés :
+
+| Filtre | Réf actuelle | Réf nouvelle | Filtrage sur |
+|---|---|---|---|
+| Nom du lot | `nameSearch` | `nameSearch` (inchangé) | `lot.name` |
+| Carte O2I | `o2iSearch` | `o2iSearch` (inchangé) | `lot.o2i` |
+| Nom du responsable | `responsableEmailSearch` | `responsableNameSearch` | `firstName + lastName` |
+
+Filtres non touchés : factory (USelect), statut (USelect), hideAssigned (USwitch).
+
+---
+
+## Architecture
+
+**Un seul fichier modifié :** `app/components/lot/Table.vue`  
+**Fichiers i18n :** `i18n/locales/fr.json`, `i18n/locales/en.json`
+
+Pas de nouveau composant. Pas d'appel API supplémentaire. Les suggestions sont calculées en `computed` depuis `props.data` déjà chargé en mémoire.
+
+---
+
+## Logique de données
+
+### Computed suggestions
+
+```ts
+const lotNameSuggestions = computed(() =>
+  [...new Set(props.data?.map(l => l.name).filter(Boolean))].sort() as string[]
+)
+
+const o2iSuggestions = computed(() =>
+  [...new Set(props.data?.map(l => l.o2i).filter(Boolean))].sort() as string[]
+)
+
+const responsableNameSuggestions = computed(() =>
+  [...new Set(
+    props.data
+      ?.map(l => {
+        const r = l.responsable
+        if (!r?.firstName && !r?.lastName) return null
+        return `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim()
+      })
+      .filter(Boolean)
+  )].sort() as string[]
+)
+```
+
+### Template
+
+```vue
+<UInputMenu
+  v-model="nameSearch"
+  autocomplete
+  icon="i-lucide-search"
+  :items="lotNameSuggestions"
+  :content="{ hideWhenEmpty: true }"
+  :placeholder="t('lotTable.filters.name')"
+  :trailing-icon="false"
+  class="max-w-xs"
+  @update:model-value="resetPage"
+/>
+```
+
+Même pattern pour `o2iSearch` et `responsableNameSearch`. Pour `responsableNameSearch`, remplacer aussi l'icône `i-lucide-mail` (email) par `i-lucide-search`.
+
+> **Note événement :** `UInput` utilisait `@input="resetPage"`. `UInputMenu autocomplete` utilise `@update:model-value="resetPage"` (déclenché à chaque frappe, comportement identique).
+
+### Filtre responsable — prédicat mis à jour
+
+```ts
+// Avant
+filteredLots = filteredLots.filter(
+  lot => lot.responsable?.email?.toLowerCase().includes(emailSearchTerm)
+)
+
+// Après
+filteredLots = filteredLots.filter(lot => {
+  const name = `${lot.responsable?.firstName ?? ''} ${lot.responsable?.lastName ?? ''}`.trim()
+  return name.toLowerCase().includes(nameSearchTerm)
+})
+```
+
+---
+
+## SessionStorage
+
+| Clé supprimée | Clé ajoutée |
+|---|---|
+| `responsableEmailSearch` | `responsableNameSearch` |
+
+Pas de migration nécessaire (sessionStorage, durée de vie = onglet).
+
+---
+
+## Initialisation CDP
+
+Le profil CDP initialise le filtre responsable avec le collaborateur courant.
+
+```ts
+// Avant
+responsableEmailSearch.value = collaborator.email || ''
+
+// Après
+responsableNameSearch.value =
+  `${collaborator.firstName ?? ''} ${collaborator.lastName ?? ''}`.trim()
+```
+
+---
+
+## i18n
+
+| Fichier | Clé | Avant | Après |
+|---|---|---|---|
+| `fr.json` | `lotTable.filters.responsable` | `Rechercher par email du responsable` | `Rechercher par nom du responsable` |
+| `en.json` | `lotTable.filters.responsable` | `Search by manager email` | `Search by manager name` |
+
+---
+
+## Ce qui ne change pas
+
+- La logique de filtrage pour `nameSearch` et `o2iSearch` (inclus/inclus, case-insensitive)
+- Le tri, la pagination, le sessionStorage des autres filtres
+- Les colonnes de la table
+- Les composants parents (`pages/lots/index.vue`, etc.)

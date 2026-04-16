@@ -1,0 +1,26 @@
+import type { H3Event } from 'h3'
+
+export default defineEventHandler(async (event: H3Event) => {
+  const query = getQuery(event)
+  const redirectTo = (query.redirectTo as string) || '/'
+
+  const session = await getUserSession(event)
+  const provider = (session as Record<string, unknown>).provider as string | undefined
+
+  await clearUserSession(event)
+
+  if (provider === 'auth0') {
+    const config = useRuntimeConfig()
+    const domain = config.auth0Domain
+    const clientId = config.auth0ClientId
+    const returnTo = encodeURIComponent(
+      new URL(redirectTo, config.public.authBaseURL).toString(),
+    )
+    return sendRedirect(
+      event,
+      `https://${domain}/v2/logout?client_id=${clientId}&returnTo=${returnTo}`,
+    )
+  }
+
+  return sendRedirect(event, redirectTo)
+})

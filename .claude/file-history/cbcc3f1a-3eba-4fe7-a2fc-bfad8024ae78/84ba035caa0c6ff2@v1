@@ -1,0 +1,125 @@
+<template>
+  <UCard>
+    <template #header>
+      <CardTitle
+        :title="t('title')"
+        icon="/icons/card.png"
+      />
+    </template>
+    <UTable
+      :data="mappedUos"
+      :columns="columns"
+      :ui="{
+        base: 'border-separate border-spacing-[8px] [&_tbody_tr:not([data-selectable])]:hidden [&_thead_tr]:h-[12px] [&_td:first-child]:w-[20%] [&_td:first-child]:min-w-[20%] [&_td:first-child]:max-w-[20%]',
+        th: 'text-gray-700 text-[10px] text-center p-0',
+        separator: 'hidden',
+        tr: 'data-[expanded=true]:bg-elevated/50 border-none h-[64px]',
+        td: 'text-default text-center bg-gray-100 dark:bg-gray-50 rounded-[6px] py-[8px] px-[16px] min-w-[80px] w-[120px]',
+      }"
+    >
+      <template #identifiers-cell="{ row }">
+        <UoIdentifiers
+          :uo="row.original.uo"
+          :lot-factory="lotFactory"
+        />
+      </template>
+      <template #billedQuantity-cell="{ row }">
+        <div class="flex items-center justify-center gap-2">
+          <span class="leading-none">{{
+            formatDisplayNumber(row.original.billedQuantity)
+          }}</span>
+          <UButton
+            icon="mdi-search"
+            size="sm"
+            variant="ghost"
+            color="neutral"
+          />
+        </div>
+      </template>
+      <template #quantityAdjustment-cell="{ row }">
+        <div class="flex items-center justify-center gap-2">
+          <span>{{
+            formatDisplayNumber(
+              row.original.uo.materialDeclarations
+                ?.filter((b) => b.status === "PENDING")
+                ?.reduce((total, b) => total + (b.quantity || 0), 0) || 0,
+            )
+          }}
+          </span>
+          <MaterialDeclarationModal
+            :mapped-uo="row.original"
+            @create-material-declaration="createMaterialDeclaration"
+          />
+          <MaterialDeclarationSlideover
+            :uo="row.original.uo"
+            @delete-material-declaration="deleteMaterialDeclaration"
+          />
+        </div>
+      </template>
+    </UTable>
+  </UCard>
+</template>
+
+<script lang="ts" setup>
+import type { TableColumn } from '@nuxt/ui'
+import { useI18n } from 'vue-i18n'
+import type { UoDetails } from '#shared/types/uo'
+import { useUo, type MappedUo, type TableRow } from '~/composables/useUo'
+import MaterialDeclarationModal from './MaterialDeclarationModal.vue'
+import MaterialDeclarationSlideover from './MaterialDeclarationSlideover.vue'
+import { formatDisplayNumber } from '@@/shared/utils/number-formatting'
+
+const { t } = useI18n()
+
+const props = defineProps<{ uos: UoDetails[], lotFactory?: Factory }>()
+
+const { mappedUos, createMaterialDeclaration, deleteMaterialDeclaration }
+  = useUo({ uos: props.uos })
+
+const columns: TableColumn<MappedUo>[] = [
+  {
+    header: '',
+    accessorKey: 'identifiers',
+  },
+  {
+    header: t('table.headers.originalQuantity'),
+    accessorKey: 'originalQuantity',
+    cell: ({ row }: { row: TableRow }) => row.original.uo.originalQuantity,
+  },
+  {
+    header: t('table.headers.billedQuantity'),
+    accessorKey: 'billedQuantity',
+    cell: ({ row }: { row: TableRow }) => row.original.billedQuantity,
+  },
+  {
+    header: t('table.headers.pendingQuantity'),
+    accessorKey: 'quantityAdjustment',
+    cell: ({ row }: { row: TableRow }) => row.original.uo.quantityAdjustment,
+  },
+  {
+    header: t('table.headers.status'),
+    accessorKey: 'remainingToDeliver',
+    cell: ({ row }: { row: TableRow }) =>
+      row.original.remainingToDeliver + ' % ',
+  },
+]
+</script>
+
+<i18n lang="yaml">
+fr:
+  title: "Matériel"
+  table:
+    headers:
+      originalQuantity: "Vendus"
+      billedQuantity: "Nombre déjà produits"
+      pendingQuantity: "Quantité à comptabiliser \n ( période en cours )"
+      status: "Reste à livrer"
+en:
+  title: "Materials"
+  table:
+    headers:
+      originalQuantity: "Sold"
+      billedQuantity: "Quantity already produced"
+      pendingQuantity: "Quantity to be accounted \n ( current period )"
+      status: "Remaining to deliver"
+</i18n>

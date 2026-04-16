@@ -1,0 +1,83 @@
+/**
+ * Jira REST API v3 client for PFlow → Jira outgoing calls.
+ * Uses Basic Auth with a service account.
+ * All methods are non-throwing — they return a JiraApiResult.
+ * Callers are responsible for checking `success` and rolling back DB changes on failure.
+ * When credentials are not configured (local dev), `success` is false with error 'Jira API not configured'
+ * — callers should treat this as a non-fatal skip (no rollback needed).
+ */
+
+export interface JiraApiResult<T = void> {
+  success: boolean
+  data?: T
+  error?: string
+}
+
+/**
+ * Low-level helper to call the Jira REST API.
+ * Returns a result object — never throws.
+ */
+async function callJiraApi<T = void>(
+  method: 'GET' | 'PUT' | 'POST' | 'DELETE',
+  path: string,
+  body?: unknown,
+): Promise<JiraApiResult<T>> {
+  const config = useRuntimeConfig()
+  const { apiBaseUrl, serviceAccountEmail, serviceAccountToken } = config.jira
+
+  if (!apiBaseUrl || !serviceAccountEmail || !serviceAccountToken) {
+    console.warn('Jira API not configured — skipping outgoing call', { method, path })
+    return { success: false, error: 'Jira API not configured' }
+  }
+
+  const url = `${apiBaseUrl}${path}`
+  const credentials = Buffer.from(`${serviceAccountEmail}:${serviceAccountToken}`).toString('base64')
+
+  try {
+    const data = await $fetch<T>(url, {
+      method,
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      },
+      body: body ?? undefined,
+    }) as T
+
+    console.info('Jira push succeeded', { method, path })
+    return { success: true, data }
+  }
+  catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error)
+    console.error('Jira push failed', { method, path, error: errorMessage })
+    return { success: false, error: errorMessage }
+  }
+}
+
+/**
+ * Push an assignee change to Jira.
+ * PUT /rest/api/3/issue/{issueKey}/assignee
+ */
+export async function pushAssigneeToJira(
+  issueKey: string,
+  accountId: string,
+): Promise<JiraApiResult<void>> {
+  return callJiraApi('PUT', `/rest/api/3/issue/${issueKey}/assignee`, {
+    accountId,
+  })
+}
+
+/**
+ * Push a deployment date change to Jira.
+ * PUT /rest/api/3/issue/{issueKey} with customfield_10900
+ */
+export async function pushDeploymentDateToJira(
+  issueKey: string,
+  date: string,
+): Promise<JiraApiResult<void>> {
+  return callJiraApi('PUT', `/rest/api/3/issue/${issueKey}`, {
+    fields: {
+      customfield_10900: date,
+    },
+  })
+}

@@ -1,0 +1,3 @@
+# === RAG (available in all shells, including non-interactive) ===
+export RAG_DSN=postgresql://postgres.qfkfrfjoxrgdvkrdtubc:6hDbJ#BaqafSAnpp@aws-1-eu-west-1.pooler.supabase.com:5432/postgres
+export RAG_PROJECT=global

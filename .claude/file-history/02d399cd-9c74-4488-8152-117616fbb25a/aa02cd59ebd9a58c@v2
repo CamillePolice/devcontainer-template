@@ -1,0 +1,124 @@
+# Plan : Afficher une icone d'alerte d'anomalie dans la liste des lots
+
+## Context
+
+La page liste des lots (`app/pages/lots/index.vue`) n'affiche aucune indication d'anomalie. Les anomalies ne sont visibles qu'en entrant dans le detail d'un lot (via `LotAnomalyBanner`). L'objectif est d'ajouter une icone d'alerte dans la colonne "Nom" du tableau pour signaler les lots avec anomalies, permettant aux utilisateurs de prioriser leur attention.
+
+## Approche
+
+Nouveau endpoint batch `GET /api/lots/anomalies` qui reutilise la logique existante (`detectLotAnomalies`) pour calculer un resume par lot. Le fetch est independant du chargement de la liste : le tableau s'affiche immediatement, les icones apparaissent quand les donnees arrivent.
+
+---
+
+## Etapes
+
+### 1. Ajouter les types partages
+
+**Fichier** : `shared/types/anomaly.ts`
+
+Ajouter :
+```ts
+export type LotAnomalySummary = {
+  maxSeverity: AnomalySeverity
+  count: number
+}
+
+export type LotsAnomalySummaryMap = Record<string, LotAnomalySummary>
+```
+
+### 2. Creer l'endpoint batch serveur
+
+**Fichier** : `server/api/lots/anomalies.get.ts` (nouveau)
+
+- Recuperer tous les lots via `getAllLots()` (reutiliser `server/utils/lot.ts:18`)
+- Extraire les `o2i` de chaque lot
+- Pour chaque lot, en parallele (avec concurrence limitee) :
+  - Appeler `getUosByLotO2i(o2i)` et `getToFixWorklogsForO2i(o2i)` (fonctions existantes)
+  - Appeler `detectLotAnomalies(context)` (existant dans `server/usecases/anomalies/index.ts:11`)
+  - Si anomalies detectees, calculer `maxSeverity` et `count`
+- Retourner `LotsAnomalySummaryMap` (seuls les lots avec anomalies)
+- Error handling : pattern `AppError` / `handleDatabaseError` existant
+
+### 3. Creer le composable client
+
+**Fichier** : `app/composables/fetchLotsAnomalies.ts` (nouveau)
+
+Suivre le pattern de `app/composables/fetchLotAnomalies.ts` :
+```ts
+export const useFetchLotsAnomalies = () => {
+  return useFetchWrapper<LotsAnomalySummaryMap>('/api/lots/anomalies')
+}
+```
+
+### 4. Wire-up dans la page lots
+
+**Fichier** : `app/pages/lots/index.vue`
+
+- Appeler `useFetchLotsAnomalies()` pour obtenir `{ data: anomalySummaries }`
+- Passer `anomaly-summaries="anomalySummaries"` en prop a `<LotTable>`
+
+### 5. Afficher l'icone dans LotTable
+
+**Fichier** : `app/components/lot/Table.vue`
+
+- Ajouter la prop `anomalySummaries: LotsAnomalySummaryMap | null | undefined`
+- Dans le template `#name-cell` (ligne 113), inserer avant le `<ULink>` :
+  ```vue
+  <UTooltip
+    v-if="anomalySummaries?.[row.original.o2i]"
+    :text="t('lotTable.anomalyTooltip', { count: anomalySummaries[row.original.o2i].count })"
+  >
+    <UIcon
+      name="i-heroicons-exclamation-triangle"
+      class="shrink-0 w-4 h-4"
+      :class="anomalySummaries[row.original.o2i].maxSeverity === 'error'
+        ? 'text-error-500'
+        : 'text-warning-500'"
+    />
+  </UTooltip>
+  ```
+- Style : `i-heroicons-exclamation-triangle` avec `text-error-500` (error) ou `text-warning-500` (warning), coherent avec `StandardBundleSection.vue:39`
+
+### 6. Ajouter les cles i18n
+
+**Fichier** : `app/components/lot/Table.vue` (section `<i18n>`) ou `i18n/locales/fr.json`
+
+Verifier ou sont les traductions existantes du `lotTable` et ajouter :
+```yaml
+fr:
+  lotTable:
+    anomalyTooltip: "{count} anomalie(s) detectee(s)"
+en:
+  lotTable:
+    anomalyTooltip: "{count} anomaly(ies) detected"
+```
+
+---
+
+## Fichiers impactes
+
+| Fichier | Action |
+|---------|--------|
+| `shared/types/anomaly.ts` | Modifier (ajouter types) |
+| `server/api/lots/anomalies.get.ts` | Creer |
+| `app/composables/fetchLotsAnomalies.ts` | Creer |
+| `app/pages/lots/index.vue` | Modifier (ajouter fetch + prop) |
+| `app/components/lot/Table.vue` | Modifier (ajouter prop + icone) |
+
+## Fonctions existantes reutilisees
+
+- `detectLotAnomalies` — `server/usecases/anomalies/index.ts:11`
+- `getUosByLotO2i` — `server/utils/uo.ts:14`
+- `getToFixWorklogsForO2i` — `server/utils/worklog.ts:76`
+- `getAllLots` — `server/utils/lot.ts:18`
+- `useFetchWrapper` — `app/composables/fetchWrapper.ts`
+- Pattern erreur : `AppError`, `handleDatabaseError` — `server/utils/error.ts`
+
+## Verification
+
+1. `npm run dev` — verifier que la page lots charge sans erreur
+2. Verifier que les icones d'alerte apparaissent pour les lots avec anomalies connues
+3. Verifier la couleur : orange (warning) vs rouge (error) selon la severite
+4. Hover sur l'icone : tooltip avec le nombre d'anomalies
+5. Verifier que le tableau s'affiche immediatement meme si les anomalies sont encore en chargement
+6. Naviguer vers un lot avec anomalie : verifier coherence entre icone liste et AnomalyBanner detail

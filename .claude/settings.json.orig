@@ -1,0 +1,87 @@
+{
+  "model": "opusplan",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "/Users/cpo/.claude/hooks/rtk-rewrite.sh"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '(.tool_response.stdout // \"\") + (.tool_response.stderr // \"\")' 2>/dev/null | grep -qi 'error' && echo '[gotcha] Build/runtime error encountered' >> /tmp/learning-notes.md || true"
+          }
+        ]
+      }
+    ],
+    "Notification": [
+      {
+        "matcher": "permission_prompt|idle_prompt",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Submarine.aiff &"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "if [ -s /tmp/learning-notes.md ]; then echo '[session-end] Learning notes present - run capture-learning before closing' >&2; fi"
+          },
+          {
+            "type": "command",
+            "command": "afplay /System/Library/Sounds/Hero.aiff &"
+          }
+        ]
+      }
+    ]
+  },
+  "enabledPlugins": {
+    "generic-conventional-commits@claranet": true,
+    "devops-terraform-standards@claranet": true,
+    "teams-hermes-adding-rds-prefix-list-access@claranet": true,
+    "context7@claude-plugins-official": true,
+    "claude-mem@thedotmack": true
+  },
+  "extraKnownMarketplaces": {
+    "claranet": {
+      "source": {
+        "source": "git",
+        "url": "git@git.fr.clara.net:claranet/projects/ai/claude-code.git"
+      }
+    },
+    "thedotmack": {
+      "source": {
+        "source": "github",
+        "repo": "thedotmack/claude-mem"
+      }
+    }
+  },
+  "skipDangerousModePermissionPrompt": true,
+  "blockedCommands": [
+    "rm -rf",
+    "dd if=/dev/zero",
+    "kill -9 -1",
+    "chmod -R 777",
+    "shutdown",
+    "reboot",
+    "curl | bash",
+    "wget | sh",
+    "git push --force",
+    "git clean -fdx"
+  ]
+}

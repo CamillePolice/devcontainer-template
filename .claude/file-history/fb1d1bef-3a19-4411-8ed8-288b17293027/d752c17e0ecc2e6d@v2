@@ -1,0 +1,13 @@
+export const MICROSOFT_AUTHENTICATED_HOOK = 'microsoft-auth:authenticated' as const
+export const AUTH0_AUTHENTICATED_HOOK = 'auth0-auth:authenticated' as const
+
+declare module 'nitropack/types' {
+  interface NitroRuntimeHooks {
+    'microsoft-auth:authenticated': (payload: {
+      user: import('#auth-utils').User
+    }) => void | Promise<void>
+    'auth0-auth:authenticated': (payload: {
+      user: import('#auth-utils').User
+    }) => void | Promise<void>
+  }
+}

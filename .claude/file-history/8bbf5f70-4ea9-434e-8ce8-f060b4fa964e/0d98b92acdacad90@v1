@@ -1,0 +1,195 @@
+<template>
+  <UCard>
+    <CardTitle
+      :title="t('title')"
+      icon="/icons/refresh.png"
+    />
+    <UTable
+      :data="localWorklogs"
+      :columns="columns"
+    >
+      <template #timeToReallocate-cell="{ row }">
+        <UInput
+          v-model.number="row.original.timeToReallocate"
+          type="number"
+          class="w-16 mx-auto"
+          :min="0"
+          :max="row.original.quantity - (row.original.fixedQuantity ?? 0)"
+        />
+        H
+      </template>
+      <template #cardUo-cell="{ row }">
+        <ReventilationSlideover
+          :uos="allUos"
+          :time-to-reallocate="row.original.timeToReallocate"
+          :account-id="row.original.accountId"
+          @fix-worklog="fixWorklog"
+        />
+      </template>
+    </UTable>
+  </UCard>
+</template>
+
+<script lang="ts" setup>
+import type { TableColumn } from '@nuxt/ui'
+import { useI18n } from 'vue-i18n'
+import type { ToFixWorklog } from '~~/shared/types/worklog'
+import ReventilationSlideover from './ReventilationSlideover.vue'
+import { formatDisplayNumber } from '@@/shared/utils/number-formatting'
+
+const { t } = useI18n()
+
+const props = defineProps<{
+  uosTime: UoDetails[] | null | undefined
+  uosStandardBundle: UoStandardBundle[] | null | undefined
+  toFixWorklogs?: ToFixWorklog[]
+}>()
+
+const allUos = computed(() => {
+  const uos: UoDetails[] = []
+  for (const bundle of props.uosStandardBundle || []) {
+    for (const uo of bundle.uos) {
+      uos.push(uo)
+    }
+  }
+  for (const uo of props.uosTime || []) {
+    uos.push(uo)
+  }
+  return uos
+})
+
+const { fixWorklogs } = useUo({ uos: allUos.value })
+
+const localWorklogs = ref<
+  (ToFixWorklog & {
+    quantity: number
+    fixedQuantity: number
+    timeToReallocate?: number
+  })[]
+>([])
+
+watch(
+  () => props.toFixWorklogs,
+  (newVal) => {
+    const map = new Map<
+      string,
+      ToFixWorklog & {
+        quantity: number
+        fixedQuantity: number
+        timeToReallocate?: number
+      }
+    >()
+
+    for (const w of newVal || []) {
+      if (!w.accountId) continue
+
+      if (!map.has(w.accountId)) {
+        map.set(w.accountId, {
+          ...w,
+          quantity: 0,
+          fixedQuantity: 0,
+          timeToReallocate: 0,
+        })
+      }
+
+      const entry = map.get(w.accountId)!
+      entry.quantity += w.quantity ?? 0
+      entry.fixedQuantity += w.fixedQuantity ?? 0
+    }
+
+    localWorklogs.value = [...map.values()]
+  },
+  { immediate: true },
+)
+
+const columns: TableColumn<ToFixWorklog>[] = [
+  {
+    id: 'person',
+    cell: ({ row }) => {
+      const data = row.original
+      return `${data.firstName} ${data.lastName}`
+    },
+  },
+  {
+    header: t('table.header.billedTimeToFix'),
+    accessorKey: 'quantity',
+    cell: ({ row }) => {
+      const r = row.original
+      return `${formatDisplayNumber(r.quantity - (r.fixedQuantity ?? 0))} ${t('table.unit.hour')}`
+    },
+  },
+  {
+    header: t('table.header.toFixTime'),
+    id: 'timeToReallocate',
+    cell: ({ row }) => {
+      const r = row.original
+      return `${r.timeToReallocate || 0} ${t('table.unit.hour')}`
+    },
+  },
+  {
+    header: t('table.header.chooseUo'),
+    id: 'cardUo',
+  },
+]
+
+const fixWorklog = async (selectedo2i: string, timeToReallocate: number | undefined, accountId: string) => {
+  if (!selectedo2i || timeToReallocate === undefined || timeToReallocate <= 0) {
+    return alert(t('alert.selectUO'))
+  }
+
+  const rowIndex = localWorklogs.value.findIndex(w => w.accountId === accountId)
+  const row = localWorklogs.value[rowIndex]
+  if (!row) return
+  if (timeToReallocate > row.quantity - (row.fixedQuantity ?? 0)) {
+    return alert(t('alert.timeExceeds'))
+  }
+  await fixWorklogs(selectedo2i, timeToReallocate, accountId)
+
+  row.fixedQuantity = (row.fixedQuantity ?? 0) + timeToReallocate
+  row.timeToReallocate = 0
+  const newRemaining = row.quantity - row.fixedQuantity
+
+  if (newRemaining <= 0) {
+    localWorklogs.value.splice(rowIndex, 1)
+  }
+}
+</script>
+
+<i18n lang="yaml">
+fr:
+  title: 'Reventilation'
+  status: 'Statut'
+  table:
+    header:
+      billedTimeToFix: 'Temps saisis à requalifier (Heure)'
+      toFixTime: 'Temps à reventiler (Heure)'
+      chooseUo: 'Carte UO de destination'
+      totalTime: 'Temps total'
+      raf: 'RAF'
+      ttr: 'Temps total réestimé'
+      progress: 'Avancement'
+    unit:
+      hour: 'Heure'
+    chooseUoLink: "Choisissez l'UO"
+  alert:
+    selectUO: 'Veuillez sélectionner une UO et entrer un temps à reventiler'
+    timeExceeds: 'Le temps à reventiler ne peut pas excéder le temps restant à fixer'
+en:
+  title: 'Reventilation'
+  status: 'Status'
+  table:
+    header:
+      billedTimeToFix: 'Time entered to requalify (Hour)'
+      toFixTime: 'Time to reallocate (Hour)'
+      chooseUo: 'Choose UO'
+      totalTime: 'Total Time'
+      raf: 'RAF'
+      ttr: 'Total reestimated time'
+      progress: 'Progress'
+    unit:
+      hour: 'Hour'
+    chooseUoLink: 'Choose UO'
+  alert:
+    selectUO: 'Please select a UO and enter a valid time to reallocate'
+    timeExceeds: 'Time to reallocate cannot exceed remaining time to fix'
+</i18n>

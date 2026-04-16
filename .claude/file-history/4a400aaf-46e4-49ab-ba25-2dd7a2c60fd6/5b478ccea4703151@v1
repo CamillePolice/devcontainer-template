@@ -1,0 +1,27 @@
+import type { LotsAnomalySummaryMap } from '#shared/types/anomaly'
+
+export function useFetchLotsAnomalies(o2is: Ref<string[]>) {
+  const data = ref<LotsAnomalySummaryMap>({})
+  const pending = ref(false)
+
+  async function execute() {
+    if (!o2is.value.length) {
+      data.value = {}
+      return
+    }
+    pending.value = true
+    try {
+      data.value = await $fetch<LotsAnomalySummaryMap>('/api/lots/anomalies', {
+        method: 'POST',
+        body: { o2is: o2is.value },
+      })
+    }
+    finally {
+      pending.value = false
+    }
+  }
+
+  watch(o2is, execute, { immediate: true })
+
+  return { data, pending, refresh: execute }
+}

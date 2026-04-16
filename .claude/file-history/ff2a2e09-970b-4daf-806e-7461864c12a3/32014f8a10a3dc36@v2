@@ -1,0 +1,11 @@
+---
+name: Commit format - no AI tag
+description: Do not append [AI] tag to commit messages, user changed their convention
+type: feedback
+---
+
+Do not add `[AI]` at the end of commit messages.
+
+**Why:** User explicitly changed their commit convention on 2026-03-31 — the `[AI]` tag previously documented in CLAUDE.md is no longer wanted.
+
+**How to apply:** Use standard conventional commits format `type(scope): description` without any AI tag suffix.

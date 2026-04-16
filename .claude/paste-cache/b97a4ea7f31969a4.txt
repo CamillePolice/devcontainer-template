@@ -1,0 +1,33 @@
+Missing Error Handling
+The resetQuantityAdjustment function catches errors but only logs them to console. Consider providing user feedback (toast notification) when the reset operation fails, similar to how other API operations might handle errors in the application.
+
+
+async function resetQuantityAdjustment(o2i: string): Promise<void> {
+  const uo = uoMap.get(o2i)
+  if (!uo) return
+  try {
+    await $fetch(`/api/uos/${o2i}/quantity-adjustment`, {
+      method: 'PUT',
+      body: { quantityAdjustment: 0 },
+    })
+    uo.quantityAdjustment = 0
+  }
+  catch (error) {
+    console.error('Error resetting quantity adjustment:', error)
+  }
+}
+
+
+
+Missing Loading State
+The reset button doesn't show any loading state during the async operation. Users might click multiple times if the API call is slow, potentially causing duplicate requests. Consider adding a loading indicator or disabling the button during the operation.
+
+
+<UButton
+  icon="i-lucide-undo-2"
+  size="xs"
+  variant="ghost"
+  color="neutral"
+  :aria-label="t('resetAdjustment')"
+  @click="handleResetQuantityAdjustment(row.original.uo.o2i)"
+/>

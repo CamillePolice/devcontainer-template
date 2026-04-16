@@ -1,0 +1,60 @@
+import type { H3Event } from 'h3'
+import { verifyAutomationSecret } from '~~/server/utils/automation'
+
+const mockGetHeader = vi.fn()
+const mockUseRuntimeConfig = vi.fn()
+const mockEvent = {} as H3Event
+
+describe('verifyAutomationSecret', () => {
+  beforeEach(() => {
+    vi.stubGlobal('getHeader', mockGetHeader)
+    vi.stubGlobal('useRuntimeConfig', mockUseRuntimeConfig)
+    vi.clearAllMocks()
+  })
+
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('throws 500 when the automation secret is not configured', () => {
+    mockUseRuntimeConfig.mockReturnValue({ jira: { webhookSecret: '' } })
+
+    expect(() => verifyAutomationSecret(mockEvent)).toThrow(
+      expect.objectContaining({ statusCode: 500 }),
+    )
+  })
+
+  it('throws 401 when the x-automation-secret header is missing', () => {
+    mockUseRuntimeConfig.mockReturnValue({ jira: { webhookSecret: 'my-secret' } })
+    mockGetHeader.mockReturnValue(undefined)
+
+    expect(() => verifyAutomationSecret(mockEvent)).toThrow(
+      expect.objectContaining({ statusCode: 401 }),
+    )
+  })
+
+  it('throws 401 when the secret does not match', () => {
+    mockUseRuntimeConfig.mockReturnValue({ jira: { webhookSecret: 'correct-secret' } })
+    mockGetHeader.mockReturnValue('wrong-secret')
+
+    expect(() => verifyAutomationSecret(mockEvent)).toThrow(
+      expect.objectContaining({ statusCode: 401 }),
+    )
+  })
+
+  it('throws 401 when secrets have different lengths (timing-safe branch)', () => {
+    mockUseRuntimeConfig.mockReturnValue({ jira: { webhookSecret: 'short' } })
+    mockGetHeader.mockReturnValue('a-much-longer-secret')
+
+    expect(() => verifyAutomationSecret(mockEvent)).toThrow(
+      expect.objectContaining({ statusCode: 401 }),
+    )
+  })
+
+  it('does not throw when the secret matches', () => {
+    mockUseRuntimeConfig.mockReturnValue({ jira: { webhookSecret: 'correct-secret' } })
+    mockGetHeader.mockReturnValue('correct-secret')
+
+    expect(() => verifyAutomationSecret(mockEvent)).not.toThrow()
+  })
+})

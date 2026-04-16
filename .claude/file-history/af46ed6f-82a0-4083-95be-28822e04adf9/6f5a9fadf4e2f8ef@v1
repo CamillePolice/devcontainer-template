@@ -1,0 +1,32 @@
+export default defineNuxtPlugin(() => {
+  const navigation = useNavigation()
+  const collaboratorStore = useCollaboratorStore()
+
+  const items = [
+    {
+      id: 'dashboard',
+      label: 'Liste des commandes',
+      icon: {
+        active: 'i-lucide-home',
+        inactive: 'i-lucide-home',
+      },
+      to: '/',
+      order: 1,
+    },
+  ]
+
+  if (collaboratorStore.isCurrentCollaboratorAdmin) {
+    items.push({
+      id: 'periods',
+      label: 'Cloture',
+      icon: {
+        active: 'i-lucide-calendar-clock',
+        inactive: 'i-lucide-calendar-clock',
+      },
+      to: '/periods',
+      order: 2,
+    })
+  }
+
+  navigation.setItems(items)
+})

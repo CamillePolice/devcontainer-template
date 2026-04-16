@@ -1,0 +1,16 @@
+export type AnomalySeverity = 'warning' | 'error'
+
+export type LotAnomaly = {
+  type: string
+  severity: AnomalySeverity
+  messageKey: string
+  params: Record<string, unknown>
+  metadata: Record<string, unknown>
+}
+
+export type LotAnomalySummary = {
+  maxSeverity: AnomalySeverity
+  count: number
+}
+
+export type LotsAnomalySummaryMap = Record<string, LotAnomalySummary>

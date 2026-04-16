@@ -1,0 +1,85 @@
+import type { H3Event } from 'h3'
+import { jwtDecode } from 'jwt-decode'
+
+interface Auth0User {
+  sub: string
+  name?: string
+  email?: string
+  picture?: string
+  nickname?: string
+  preferred_username?: string
+  [key: string]: unknown
+}
+
+interface Auth0Tokens {
+  access_token?: string
+  id_token?: string
+  token_type?: string
+  expires_in?: number
+  [key: string]: unknown
+}
+
+interface Auth0IdTokenClaims {
+  roles?: string[]
+  groups?: string[]
+  [key: string]: unknown
+}
+
+export default defineOAuthAuth0EventHandler({
+  config: {
+    clientId: useRuntimeConfig().auth0ClientId,
+    clientSecret: useRuntimeConfig().auth0ClientSecret,
+    domain: useRuntimeConfig().auth0Domain,
+    scope: ['openid', 'profile', 'email'],
+  },
+
+  async onSuccess(
+    event: H3Event,
+    { user, tokens }: { user: Auth0User, tokens: Auth0Tokens },
+  ) {
+    // Decode the ID token to extract roles and groups
+    const idTokenClaims = tokens.id_token
+      ? jwtDecode<Auth0IdTokenClaims>(tokens.id_token)
+      : null
+
+    // Extract roles/groups: namespace custom or claim racine
+    const namespace = useRuntimeConfig().auth0RolesNamespace
+    const roles: string[] | undefined = namespace
+      ? (idTokenClaims?.[`${namespace}/roles`] as string[] | undefined)
+      : idTokenClaims?.roles
+
+    const groups: string[] | undefined = namespace
+      ? (idTokenClaims?.[`${namespace}/groups`] as string[] | undefined)
+      : idTokenClaims?.groups
+
+    const onionUser = {
+      username: user.nickname || user.preferred_username || user.email || user.sub,
+      profile: {
+        name: user.name,
+        email: user.email,
+        picture: user.picture,
+        sub: user.sub,
+      },
+      picture: user.picture,
+      roles,
+      groups,
+    }
+
+    await setUserSession(event, {
+      user: onionUser,
+      provider: 'auth0',
+      loggedInAt: Date.now(),
+    })
+
+    // Redirect after successful login
+    const redirectUrl = getCookie(event, 'auth-redirect') || '/'
+    deleteCookie(event, 'auth-redirect')
+
+    return sendRedirect(event, redirectUrl)
+  },
+
+  onError(event: H3Event, error: unknown) {
+    console.error('❌ Auth0 OAuth error:', error)
+    return sendRedirect(event, '/login?error=auth0_error')
+  },
+})

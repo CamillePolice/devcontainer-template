@@ -1,0 +1,19 @@
+import { getFixedWorklogsForLot } from '@@/server/utils/worklog'
+
+export default defineEventHandler(async (event) => {
+  const query = getQuery(event)
+  const { o2i, accountId, fixedO2i } = query
+
+  if (!o2i || typeof o2i !== 'string') {
+    throw createError({
+      statusCode: 400,
+      statusMessage: 'Bad Request: Missing o2i parameter',
+    })
+  }
+
+  return await getFixedWorklogsForLot(
+    o2i,
+    typeof accountId === 'string' ? accountId : undefined,
+    typeof fixedO2i === 'string' ? fixedO2i : undefined,
+  )
+})

@@ -1,0 +1,65 @@
+import { AppError, createValidationError } from '~~/server/utils/error'
+import { getLotByO2i, updateLotResponsable } from '~~/server/utils/lot'
+import { pushAssigneeToJira } from '~~/server/utils/jira'
+import { sendAdminErrorEmail } from '~~/server/utils/email'
+
+interface UpdateResponsableBody {
+  responsableAccountId: string
+}
+
+export default defineEventHandler(async (event) => {
+  try {
+    const o2i = getRouterParam(event, 'o2i')
+    if (!o2i) {
+      throw createValidationError('Lot O2I identifier is required')
+    }
+
+    const body = await readBody<UpdateResponsableBody>(event)
+    if (!body?.responsableAccountId) {
+      throw createValidationError('responsableAccountId is required')
+    }
+
+    // Read current value for potential rollback
+    const current = await getLotByO2i(o2i)
+    const previousAccountId = current.responsable?.accountId
+
+    const result = await updateLotResponsable(o2i, body.responsableAccountId)
+
+    // Await Jira push — rollback DB on failure to keep systems in sync
+    const jiraResult = await pushAssigneeToJira(o2i, body.responsableAccountId)
+    if (!jiraResult.success && jiraResult.error !== 'Jira API not configured') {
+      console.error('Rolling back lot responsable update due to Jira push failure', { o2i, error: jiraResult.error })
+      if (previousAccountId) {
+        await updateLotResponsable(o2i, previousAccountId)
+      }
+      else {
+        console.warn('Cannot roll back lot responsable: no previous value existed', { o2i })
+      }
+      sendAdminErrorEmail(
+        `Échec de synchronisation du responsable avec Jira`,
+        `La mise à jour du responsable dans ProjectFlow a réussi, mais la synchronisation avec Jira a échoué. La modification a été annulée pour maintenir la cohérence des données.\n\nLot concerné: ${o2i}\nChamp concerné: Responsable\nProblème rencontré: ${jiraResult.error}\nAction recommandée: Vérifiez la configuration de la synchronisation Jira et mettez à jour manuellement le responsable du lot ${o2i} si nécessaire.\nDate: ${new Date().toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })}`,
+      )
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'Failed to sync responsable update with Jira. Change has been rolled back.',
+      })
+    }
+
+    return result
+  }
+  catch (error) {
+    if (error instanceof AppError) {
+      throw error.toH3Error()
+    }
+
+    if (isError(error)) {
+      throw error
+    }
+
+    console.error('Unexpected error in update lot responsable API:', error)
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal server error',
+    })
+  }
+})

@@ -1,0 +1,42 @@
+npm run db:migrate
+
+> project-flow@1.18.0 db:migrate
+> drizzle-kit migrate
+
+No config path provided, using default 'drizzle.config.ts'
+Reading config file '/Users/cpo/Documents/projects/project-flow/drizzle.config.ts'
+Using 'pg' driver for database querying
+[⣷] applying migrations...DrizzleQueryError: Failed query: CREATE SCHEMA IF NOT EXISTS "drizzle"
+params:
+    at NodePgPreparedQuery.queryWithCache (/Users/cpo/Documents/projects/project-flow/node_modules/src/pg-core/session.ts:73:11)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async PgDialect.migrate (/Users/cpo/Documents/projects/project-flow/node_modules/src/pg-core/dialect.ts:85:3)
+    at async migrate (/Users/cpo/Documents/projects/project-flow/node_modules/src/node-postgres/migrator.ts:10:2) {
+  query: 'CREATE SCHEMA IF NOT EXISTS "drizzle"',
+  params: [],
+  cause: error: password authentication failed for user "project-flow_user"
+      at /Users/cpo/Documents/projects/project-flow/node_modules/pg-pool/index.js:45:11
+      at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+      at async <anonymous> (/Users/cpo/Documents/projects/project-flow/node_modules/src/node-postgres/session.ts:149:14)
+      at async NodePgPreparedQuery.queryWithCache (/Users/cpo/Documents/projects/project-flow/node_modules/src/pg-core/session.ts:71:12)
+      at async PgDialect.migrate (/Users/cpo/Documents/projects/project-flow/node_modules/src/pg-core/dialect.ts:85:3)
+      at async migrate (/Users/cpo/Documents/projects/project-flow/node_modules/src/node-postgres/migrator.ts:10:2) {
+    length: 113,
+    severity: 'FATAL',
+    code: '28P01',
+    detail: undefined,
+    hint: undefined,
+    position: undefined,
+    internalPosition: undefined,
+    internalQuery: undefined,
+    where: undefined,
+    schema: undefined,
+    table: undefined,
+    column: undefined,
+    dataType: undefined,
+    constraint: undefined,
+    file: 'auth.c',
+    line: '334',
+    routine: 'auth_failed'
+  }
+}

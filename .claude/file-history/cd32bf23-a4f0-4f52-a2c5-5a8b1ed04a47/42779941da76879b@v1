@@ -1,0 +1,17 @@
+import { fileURLToPath, URL } from 'node:url'
+import { defineConfig } from 'vitest/config'
+
+export default defineConfig({
+  test: {
+    environment: 'node',
+  },
+  resolve: {
+    alias: [
+      // Nuxt's #shared/* alias  →  shared/*
+      {
+        find: /^#shared(\/.+)$/,
+        replacement: fileURLToPath(new URL('shared$1', import.meta.url)),
+      },
+    ],
+  },
+})

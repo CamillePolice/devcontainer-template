@@ -1,0 +1,273 @@
+# Auto-complétion Filtres Table Lots — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Remplacer les 3 `UInput` de filtres texte dans `LotTable.vue` par des `UInputMenu autocomplete` (NuxtUI v4) qui suggèrent les valeurs existantes pendant la frappe, et basculer le filtre responsable de l'email vers le nom.
+
+**Architecture:** Les suggestions sont calculées en `computed` depuis `props.data` déjà chargé en mémoire — aucun appel API supplémentaire. Le composant `UInputMenu` avec la prop `autocomplete` agit comme un `UInput` libre dont le `modelValue` est une `string`, ce qui préserve toute la logique de filtrage existante.
+
+**Tech Stack:** Vue 3 Composition API, NuxtUI v4 (`UInputMenu`), VueUse (`useSessionStorage`), nuxt-i18n
+
+---
+
+## Fichiers modifiés
+
+| Fichier | Rôle |
+|---|---|
+| `app/components/lot/Table.vue` | Filtres template + logique script |
+| `i18n/locales/fr.json` | Placeholder responsable |
+| `i18n/locales/en.json` | Placeholder responsable |
+
+---
+
+## Task 1 — Mise à jour i18n
+
+**Files:**
+- Modify: `i18n/locales/fr.json`
+- Modify: `i18n/locales/en.json`
+
+- [ ] **Step 1 : Modifier `i18n/locales/fr.json`**
+
+Trouver la ligne :
+```json
+"responsable": "Rechercher par email du responsable",
+```
+Remplacer par :
+```json
+"responsable": "Rechercher par nom du responsable",
+```
+
+- [ ] **Step 2 : Modifier `i18n/locales/en.json`**
+
+Trouver la ligne :
+```json
+"responsable": "Search by manager email",
+```
+Remplacer par :
+```json
+"responsable": "Search by manager name",
+```
+
+- [ ] **Step 3 : Vérification**
+
+```bash
+npm run typecheck
+```
+Attendu : 0 erreurs.
+
+- [ ] **Step 4 : Commit**
+
+```bash
+git add i18n/locales/fr.json i18n/locales/en.json
+git commit -m "feat(i18n): update responsable filter label from email to name"
+```
+
+---
+
+## Task 2 — Logique script dans `Table.vue`
+
+**Files:**
+- Modify: `app/components/lot/Table.vue`
+
+Quatre changements dans la balise `<script setup>` :
+1. Ajouter 3 computed pour les suggestions
+2. Renommer `responsableEmailSearch` → `responsableNameSearch`
+3. Mettre à jour le prédicat de filtrage responsable
+4. Mettre à jour l'initialisation CDP
+
+- [ ] **Step 1 : Ajouter les computed suggestions**
+
+Après le bloc `const factoryItems = computed(...)` (ligne ~165), ajouter :
+
+```ts
+const lotNameSuggestions = computed(() =>
+  [...new Set(props.data?.map(l => l.name).filter(Boolean))].sort() as string[]
+)
+
+const o2iSuggestions = computed(() =>
+  [...new Set(props.data?.map(l => l.o2i).filter(Boolean))].sort() as string[]
+)
+
+const responsableNameSuggestions = computed(() =>
+  [...new Set(
+    props.data
+      ?.map(l => {
+        const r = l.responsable
+        if (!r?.firstName && !r?.lastName) return null
+        return `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim()
+      })
+      .filter(Boolean),
+  )].sort() as string[]
+)
+```
+
+- [ ] **Step 2 : Renommer `responsableEmailSearch`**
+
+Trouver :
+```ts
+const responsableEmailSearch = useSessionStorage('responsableEmailSearch', '')
+```
+Remplacer par :
+```ts
+const responsableNameSearch = useSessionStorage('responsableNameSearch', '')
+```
+
+- [ ] **Step 3 : Mettre à jour l'initialisation CDP**
+
+Trouver :
+```ts
+    responsableEmailSearch.value = collaborator.email || ''
+```
+Remplacer par :
+```ts
+    responsableNameSearch.value = `${collaborator.firstName ?? ''} ${collaborator.lastName ?? ''}`.trim()
+```
+
+- [ ] **Step 4 : Mettre à jour le prédicat de filtrage**
+
+Trouver :
+```ts
+  if (responsableEmailSearch.value) {
+    const emailSearchTerm = responsableEmailSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter(lot => lot.responsable?.email?.toLowerCase().includes(emailSearchTerm))
+  }
+```
+Remplacer par :
+```ts
+  if (responsableNameSearch.value) {
+    const nameSearchTerm = responsableNameSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter((lot) => {
+      const name = `${lot.responsable?.firstName ?? ''} ${lot.responsable?.lastName ?? ''}`.trim()
+      return name.toLowerCase().includes(nameSearchTerm)
+    })
+  }
+```
+
+- [ ] **Step 5 : Vérification lint + typecheck**
+
+```bash
+npm run lint && npm run typecheck
+```
+Attendu : 0 erreurs, 0 warnings lint.
+
+- [ ] **Step 6 : Commit**
+
+```bash
+git add app/components/lot/Table.vue
+git commit -m "feat(lot): switch responsable filter from email to name with autocomplete suggestions"
+```
+
+---
+
+## Task 3 — Template : remplacer `UInput` par `UInputMenu`
+
+**Files:**
+- Modify: `app/components/lot/Table.vue`
+
+- [ ] **Step 1 : Remplacer le filtre `nameSearch`**
+
+Trouver :
+```vue
+        <UInput
+          v-model="nameSearch"
+          :placeholder="t('lotTable.filters.name')"
+          icon="i-lucide-search"
+          class="max-w-xs"
+          @input="resetPage"
+        />
+```
+Remplacer par :
+```vue
+        <UInputMenu
+          v-model="nameSearch"
+          autocomplete
+          icon="i-lucide-search"
+          :items="lotNameSuggestions"
+          :content="{ hideWhenEmpty: true }"
+          :trailing-icon="false"
+          :placeholder="t('lotTable.filters.name')"
+          class="max-w-xs"
+          @update:model-value="resetPage"
+        />
+```
+
+- [ ] **Step 2 : Remplacer le filtre `o2iSearch`**
+
+Trouver :
+```vue
+        <UInput
+          v-model="o2iSearch"
+          :placeholder="t('lotTable.filters.o2i')"
+          icon="i-lucide-search"
+          class="max-w-xs"
+          @input="resetPage"
+        />
+```
+Remplacer par :
+```vue
+        <UInputMenu
+          v-model="o2iSearch"
+          autocomplete
+          icon="i-lucide-search"
+          :items="o2iSuggestions"
+          :content="{ hideWhenEmpty: true }"
+          :trailing-icon="false"
+          :placeholder="t('lotTable.filters.o2i')"
+          class="max-w-xs"
+          @update:model-value="resetPage"
+        />
+```
+
+- [ ] **Step 3 : Remplacer le filtre `responsableEmailSearch` → `responsableNameSearch`**
+
+Trouver :
+```vue
+        <UInput
+          v-model="responsableEmailSearch"
+          :placeholder="t('lotTable.filters.responsable')"
+          icon="i-lucide-mail"
+          class="max-w-xs"
+          @input="resetPage"
+        />
+```
+Remplacer par :
+```vue
+        <UInputMenu
+          v-model="responsableNameSearch"
+          autocomplete
+          icon="i-lucide-search"
+          :items="responsableNameSuggestions"
+          :content="{ hideWhenEmpty: true }"
+          :trailing-icon="false"
+          :placeholder="t('lotTable.filters.responsable')"
+          class="max-w-xs"
+          @update:model-value="resetPage"
+        />
+```
+
+- [ ] **Step 4 : Vérification lint + typecheck**
+
+```bash
+npm run lint && npm run typecheck
+```
+Attendu : 0 erreurs, 0 warnings lint.
+
+- [ ] **Step 5 : Test manuel**
+
+```bash
+npm run dev
+```
+
+Vérifier dans le navigateur :
+- Taper quelques lettres dans "Nom du lot" → une liste de suggestions apparaît
+- Taper quelques lettres dans "Carte O2I" → suggestions d'O2I existants
+- Taper un prénom dans "Responsable" → suggestions de noms (prénom + nom)
+- Sélectionner une suggestion → la table se filtre
+- Effacer le champ → la table affiche tous les lots
+
+- [ ] **Step 6 : Commit final**
+
+```bash
+git add app/components/lot/Table.vue
+git commit -m "feat(lot): replace UInput with UInputMenu autocomplete for name, o2i and responsable filters"
+```

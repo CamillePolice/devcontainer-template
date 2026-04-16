@@ -1,0 +1,70 @@
+export type WorklogStatus = 'ACTIF' | 'BILLED'
+
+export type FixedWorklogStatus = 'NONE' | 'TO_FIX' | 'PARTIALLY_FIXED' | 'FIXED'
+
+/**
+ * Represents worklog quantities grouped by collaborator email
+ * Includes collaborator's personal information
+ */
+export type Worklog = {
+
+  id: number
+
+  tempoId: string
+
+  o2i: string
+
+  email: string | null
+
+  accountId: string | null
+
+  firstName: string | null
+
+  lastName: string | null
+
+  quantity: number
+
+  fixedQuantity: number | null
+}
+
+export type AggregatedWorklog = {
+
+  o2i: string
+
+  email: string | null
+
+  accountId: string | null
+
+  firstName: string | null
+
+  lastName: string | null
+
+  pendingQuantity: number
+
+  billedQuantity: number
+}
+
+export type ToFixWorklog = {
+
+  id: number
+
+  tempoId: string
+
+  o2i: string
+
+  email: string | null
+
+  accountId: string
+
+  firstName: string | null
+
+  lastName: string | null
+
+  quantity: number
+
+  fixedQuantity: number | null
+
+  fixedO2i?: string
+
+  timeToReallocate?: number
+}

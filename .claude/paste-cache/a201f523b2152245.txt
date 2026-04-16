@@ -1,0 +1,55 @@
+upport for old versions may be purchased (at exorbitant rates) by contacting i@izs.me         │                                                                                09:14 [25/90]
+npm warn deprecated @lerna/create@8.2.4: This package is an implementation detail of Lerna and│  1. Roles & permissions — fonctionnalité manquante
+ is no longer published separately.                                                           │
+npm warn deprecated glob@9.3.5: Old versions of glob are not supported, and contain widely pub│  Auth0 supporte les rôles via des custom namespace claims dans l'ID token (ex.
+licized security vulnerabilities, which have been fixed in the current version. Please update.│  https://namespace/roles). Il faut :
+ Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me       │  - Typer Auth0Tokens avec id_token
+npm warn deprecated glob@10.5.0: Old versions of glob are not supported, and contain widely pu│  - Décoder l'ID token avec jwtDecode comme Microsoft
+blicized security vulnerabilities, which have been fixed in the current version. Please update│  - Extraire les claims personnalisés (configurable via le namespace Auth0)
+. Support for old versions may be purchased (at exorbitant rates) by contacting i@izs.me      │
+                                                                                              │  2. Logout Auth0 — comportement incorrect
+added 1448 packages, and audited 1452 packages in 2m                                          │
+                                                                                              │  Le logout() actuel (useOnionAuth.ts:80) appelle uniquement clear() (session locale). Il ne
+321 packages are looking for funding                                                          │  contacte pas l'endpoint Auth0 :
+  run `npm fund` for details                                                                  │  https://{domain}/v2/logout?client_id={clientId}&returnTo={returnTo}
+                                                                                              │  Sans ça, la session SSO Auth0 reste active — l'utilisateur peut se reconnecter sans prompt.
+27 vulnerabilities (1 moderate, 26 high)                                                      │   Il faut soit un server/routes/auth/logout.get.ts dédié, soit adapter le composable pour
+                                                                                              │  détecter le provider.
+To address issues that do not require attention, run:                                         │
+  npm audit fix                                                                               │  3. Structure de session incohérente
+                                                                                              │
+To address all issues (including breaking changes), run:                                      │  Auth0 spread le raw user (...user, ligne 39) ce qui pollue la session avec des champs Auth0
+  npm audit fix --force                                                                       │   inattendus. La structure doit être alignée sur Microsoft :
+                                                                                              │
+Run `npm audit` for details.                                                                  │  // Actuel (Auth0) — non-standard
+                                                                                              │  { id, name, email, picture, login, username, profile, provider, ...user }
+󰀵 cpo  …/onion   V2 !   v22.22.1   17:28                                            │
+                                                                                             │  // Attendu (aligné Microsoft)
+──────────────────────────────────────────────────────────────────────────────────────────────┤  { username, profile: { name, email, picture, sub }, picture, roles, groups }
+        '@vue/devtools-core',                                                                 │
+        '@vue/devtools-kit',                                                                  │  Le champ provider: 'auth0' est mis dans user (ligne 37) mais auth.d.ts:29 l'attend au
+      ]                                                                                       │  niveau session root (setUserSession(event, { user, provider: 'auth0', loggedInAt })).
+    }                                                                                         │
+  }                                                                                           │  4. Gestion d'erreur à améliorer
+})                                                                                            │
+Learn more: https://vite.dev/guide/dep-pre-bundling.html                                      │  // Actuel — silencieux
+ℹ New dependencies found: @vueuse/core                                                        │  onError(event, _error) {
+ℹ Vite discovered new dependencies at runtime:                                                │    return sendRedirect(event, '/login?error=auth0_error')
+  ./../virtual:nuxt:%2FUsers%2Fcpo%2FDocuments%2Fprojects%2Fonion%2Fonion-auth%2F.playground%2│  }
+F.nuxt%2Fruntime.vue-devtools-client.TREZ1Xt_90huhLeKXdJiwxb6AFq_w_AzQSXlDLiVK_o.js           │
+    @vue/devtools-core                                                                        │  // Attendu — aligné Microsoft
+    @vue/devtools-kit                                                                         │  async onError(event, error) {
+Pre-bundle them in your nuxt.config.ts to avoid page reloads:                                 │    console.error('❌ Auth0 OAuth error:', error)
+export default defineNuxtConfig({                                                             │    return sendRedirect(event, '/login?error=auth0_error')
+  vite: {                                                                                     │  }
+    optimizeDeps: {                                                                           │
+      include: [                                                                              │  5. Tests — absents pour les deux providers, prioritaires pour Auth0
+        '@vue/devtools-core',                                                                 │
+        '@vue/devtools-kit',                                                                  │  Aucun test dans le projet. Pour Auth0 (le moins fiable), il faut au minimum :
+      ]                                                                                       │  - Test unitaire du transformer onSuccess (mapping des champs)
+    }                                                                                         │  - Test du redirect post-login (cookie auth-redirect)
+  }                                                                                           │  - Test du handler d'erreur
+})                                                                                            │  - Test d'intégration du logout SSO
+Learn more: https://vite.dev/guide/dep-pre-bundling.html                                      │
+                                                                                              │  ---
+  cpo 1  ✳ Claude Code                                                                                                                             onion   onion   10.0% 󰚥  100%

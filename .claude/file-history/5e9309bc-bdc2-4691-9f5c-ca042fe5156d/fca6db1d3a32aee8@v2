@@ -1,0 +1,121 @@
+# self-devis
+
+Application permettant aux clients de simuler leurs devis. La simulation se base sur des bundles définis par les commerciaux de Claranet, offrant une abstraction des ressources utilisées afin de simplifier la compréhension de ces devis.
+
+## Stack technique
+
+| Couche          | Technologie                         |
+| --------------- | ----------------------------------- |
+| Frontend        | Nuxt 4, Vue 3, TypeScript           |
+| UI              | NuxtUI v4, Tailwind CSS             |
+| État            | Pinia                               |
+| Auth            | OpenID Connect (Auth0 ou Microsoft) |
+| ORM             | Drizzle ORM                         |
+| Base de données | PostgreSQL 15                       |
+| i18n            | @nuxtjs/i18n (fr-FR, en-US)         |
+| Utilitaires     | VueUse                              |
+
+## Prérequis
+
+- Node.js >= 20
+- npm >= 10
+- Docker & Docker Compose (pour PostgreSQL local)
+- Accès au registry NPM Claranet (token GitLab)
+
+## Installation
+
+```bash
+# Cloner le dépôt
+git clone git.fr.clara.net/camille.police/self-devis
+cd self-devis
+
+# Copier et configurer les variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos valeurs
+
+# Installer les dépendances
+npm install
+```
+
+## Variables d'environnement
+
+Copier `.env.example` en `.env` et renseigner les valeurs :
+
+| Variable             | Description                                              |
+| -------------------- | -------------------------------------------------------- |
+| `GITLAB_NPM_TOKEN`   | Token d'accès au registry NPM Claranet                   |
+| `AUTH_CLIENT_ID`     | Client ID OpenID Connect (Auth0 ou Microsoft)            |
+| `AUTH_CLIENT_SECRET` | Secret OpenID Connect                                    |
+| `AUTH_DOMAIN`        | Domaine Auth0 ou endpoint Microsoft                      |
+| `AUTH_REDIRECT_URL`  | URL de callback après authentification                   |
+| `DATABASE_URL`       | URL de connexion PostgreSQL                              |
+| `SESSION_PASSWORD`   | Mot de passe de chiffrement des sessions (min. 32 chars) |
+| `NUXT_ENV`           | Environnement : `local`, `staging` ou `production`       |
+
+## Démarrage
+
+```bash
+# Démarrer PostgreSQL (et PgAdmin) via Docker
+docker compose up -d
+
+# Appliquer les migrations de base de données
+npm run db:migrate
+
+# Démarrer le serveur de développement
+npm run dev
+```
+
+L'application est accessible sur `http://localhost:3000`.
+
+PgAdmin est accessible sur `http://localhost:5050`.
+
+## Scripts disponibles
+
+| Commande              | Description                   |
+| --------------------- | ----------------------------- |
+| `npm run dev`         | Serveur de développement      |
+| `npm run build`       | Build de production           |
+| `npm run lint`        | Vérification ESLint           |
+| `npm run typecheck`   | Vérification TypeScript       |
+| `npm run db:generate` | Générer les migrations Drizzle |
+| `npm run db:migrate`  | Appliquer les migrations      |
+| `npm run db:push`     | Push du schéma sans migration |
+| `npm run db:studio`   | Interface Drizzle Studio      |
+
+## Structure du projet
+
+```
+self-devis/
+├── app/
+│   ├── components/       # Composants Vue
+│   ├── composables/      # Composables réutilisables
+│   ├── i18n/locales/     # Traductions (fr-FR, en-US)
+│   ├── middlewares/      # Middlewares Nuxt
+│   ├── pages/            # Pages (routing automatique)
+│   ├── plugins/          # Plugins Nuxt
+│   └── stores/           # Stores Pinia
+├── server/
+│   ├── database/
+│   │   └── schemas/      # Schémas Drizzle ORM
+│   └── utils/            # Utilitaires serveur
+├── shared/               # Code partagé client/serveur
+├── utils/                # Utilitaires racine
+├── docs/                 # Documentation
+│   └── guidelines/       # Conventions de code
+└── public/               # Assets statiques
+```
+
+## Conventions
+
+- Composition API + `<script setup lang="ts">` uniquement
+- VueUse en priorité sur les composables custom
+- Commits conventionnels avec le tag `[AI]` pour les commits assistés par IA
+- `npm run lint` + `npm run typecheck` obligatoires avant chaque tâche
+
+Voir [`docs/guidelines/coding.md`](docs/guidelines/coding.md) pour les conventions complètes.
+
+## Liens
+
+- [NuxtUI v4](https://ui.nuxt.com)
+- [Drizzle ORM](https://orm.drizzle.team)
+- [VueUse](https://vueuse.org)

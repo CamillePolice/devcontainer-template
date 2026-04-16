@@ -1,0 +1,44 @@
+# fix(types): resolve TypeScript errors reported by nuxt typecheck
+
+## Contexte
+
+Le projet `project-flow` utilise `@claranet/onion-auth` comme layer Nuxt. Lors de l'exécution de `nuxt typecheck` en CI, **8 erreurs TypeScript** ont été détectées dans les fichiers du layer installé via `node_modules`.
+
+---
+
+## Erreurs CI rencontrées
+
+### `useOnionAuth.ts` — 6 erreurs
+
+La construction de l'objet `UserSession` dans le composable ne respectait pas strictement les interfaces définies dans `shared/types/auth-interfaces.ts`.
+
+**1. `username: string | undefined` → `string` requis**
+La chaîne de fallback (`userData.username || userData.name || ...`) pouvait résoudre à `undefined` si tous les champs optionnels de `RawUserData` étaient absents. Ajout d'un fallback `|| ''` final.
+
+**2. Propriété `picture` en excès dans `profile` + champ `sub` mal nommé**
+Le bloc `profile` contenait `picture` (absent de `User.profile`) et utilisait `sub` au lieu de `id` (le nom défini dans l'interface). TypeScript signalait un excess property check sur `picture` et le mapping était incorrect.
+
+**3. `roles` / `groups` : `string[] | undefined` → `string[]` requis**
+`RawUserData.roles` et `.groups` sont optionnels. L'interface `User` les déclare requis. Corrigé avec `?? []`.
+
+**4. `provider` / `loggedInAt` : `unknown`**
+L'augmentation de type `#auth-utils` déclarée dans `shared/types/auth.d.ts` n'est pas toujours résolue dans le contexte TypeScript du projet consommateur. `rawSession.value.provider` et `.loggedInAt` étaient donc typés `unknown`. Corrigé par un cast explicite de `rawSession.value`.
+
+### `hooks.d.ts` — 2 erreurs (× 2 providers)
+
+```
+Argument of type '"auth0-auth:authenticated"' is not assignable
+to parameter of type 'HookKeys<NitroRuntimeHooks>'
+```
+
+Le fichier `server/types/hooks.d.ts` augmentait `NitroRuntimeHooks` avec une référence au type `User` qui **n'était pas défini ni importé** dans ce contexte ambient. Cette référence invalide faisait silencieusement échouer l'augmentation du module `nitropack` — les noms de hooks n'étaient donc pas reconnus par TypeScript. La signature était également incorrecte : le handler était déclaré `(user: User)` alors que `callHook` passe `{ user: onionUser }` comme premier argument.
+
+---
+
+## Changements
+
+| Fichier | Changement |
+|---|---|
+| `app/composables/useOnionAuth.ts` | Fallback `username`, mapping `sub→id`, suppression `picture` du profile, `?? []`, cast `rawSession` |
+| `server/types/hooks.d.ts` | `User` → `unknown`, correction de la signature en `(payload: { user: unknown })` |
+| `server/routes/auth/auth0.get.ts` | Suppression du commentaire obsolète `// Raw data for compatibility` |

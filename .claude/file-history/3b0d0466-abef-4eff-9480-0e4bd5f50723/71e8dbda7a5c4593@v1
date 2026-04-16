@@ -1,0 +1,203 @@
+<template>
+  <div v-if="errorValue">
+    <UAlert
+      color="warning"
+      :title="t('errorTitle')"
+    >
+      {{ errorValue }}
+    </UAlert>
+  </div>
+  <div v-else>
+    <UCard class="mb-8">
+      <template #header>
+        <CardTitle
+          :title="lot?.name || 'Lot'"
+          icon="/icons/folder.png"
+        />
+      </template>
+      <div class="flex flex-col lg:flex-row justify-between text-secondary-700 items-start text-md">
+        <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 content-start">
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('quoteDescription') }}:
+          </dt>
+          <dd>{{ lot?.quoteDescription || '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('lotDescription') }}:
+          </dt>
+          <dd>{{ lot?.description || '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('o2i') }}:
+          </dt>
+          <dd>
+            <ULink
+              class="font-mono text-secondary-600"
+              :href="`${config.public.jiraBaseUrl}${lot?.o2i}`"
+              target="_blank"
+            >
+              {{ lot?.o2i }}
+            </ULink>
+          </dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('client') }}:
+          </dt>
+          <dd>{{ lot?.clientName ? `${lot.clientName} (${lot.universalNumber})` : '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('commercial') }}:
+          </dt>
+          <dd>{{ sales || '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('bpj') }}:
+          </dt>
+          <dd>{{ lot?.bpj ? `${lot.bpj}${lot.bpjName ? ' - ' + lot.bpjName : ''}` : '-' }}</dd>
+        </dl>
+
+        <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5 content-start">
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('plannedDeploymentDate') }}:
+          </dt>
+          <dd>{{ lot?.plannedDeploymentDate ? useDateFormat(lot.plannedDeploymentDate, 'DD/MM/YYYY') : '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('factory') }}:
+          </dt>
+          <dd>{{ lot?.factory?.name || '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('productionCell') }}:
+          </dt>
+          <dd>{{ lot?.productionCell?.name || '-' }}</dd>
+
+          <dt class="font-medium text-muted whitespace-nowrap">
+            {{ t('billingTrigger') }}:
+          </dt>
+          <dd>{{ lot?.billingTrigger || '-' }}</dd>
+
+          <template v-if="lot?.downPayment">
+            <dt class="font-medium text-muted whitespace-nowrap">
+              {{ t('downPaymentLabel') }}:
+            </dt>
+            <dd>{{ props.data?.milestones[0]?.stepPercent }} %</dd>
+          </template>
+        </dl>
+
+        <div class="shrink-0 w-64 self-start">
+          <OwnerInput
+            v-if="lot?.o2i"
+            class="rounded-xl"
+            :lot-o2i="lot.o2i"
+            :current-responsable="lot.responsable"
+            @updated="handleOwnerUpdated"
+          />
+        </div>
+      </div>
+      <LotAnomalyBanner
+        v-if="lot?.o2i"
+        :o2i="lot.o2i"
+      />
+    </UCard>
+    <UoTimesSection
+      v-if="uos?.['TIME']?.length"
+      class="mb-6"
+      :uos="uos?.['TIME']"
+      :lot-factory="lot?.factory"
+      @refresh="emit('refresh')"
+    />
+    <UoMaterialsSection
+      v-if="uos?.['MATERIAL']?.length"
+      class="mb-6"
+      :uos="uos?.['MATERIAL']"
+      :lot-factory="lot?.factory"
+    />
+    <UoStandardBundleSection
+      v-if="uos?.['STANDARD_BUNDLE']?.length"
+      class="mb-6"
+      :uos="uos?.['STANDARD_BUNDLE']"
+      :lot-factory="lot?.factory"
+      @refresh="emit('refresh')"
+    />
+    <UoHistoricBundleSection
+      v-if="uos?.['HISTORIC_BUNDLE']?.length"
+      :uos="uos?.['HISTORIC_BUNDLE']"
+      :lot-factory="lot?.factory"
+    />
+    <UoReventilationSection
+      v-if="toFixWorklogs?.length"
+      class="my-6"
+      :uos-time="uos?.['TIME']"
+      :uos-standard-bundle="uos?.['STANDARD_BUNDLE']"
+      :to-fix-worklogs="toFixWorklogs"
+      @refresh="emit('refresh')"
+    />
+  </div>
+</template>
+
+<script lang="ts" setup>
+import type { LotOverview } from '#shared/types/lot'
+import { useDateFormat } from '@vueuse/core'
+import type { FetchError } from 'ofetch'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+const { getByEmail } = useCollaboratorStore()
+
+const props = defineProps<{
+  data: LotOverview | null | undefined
+  error: FetchError | null | undefined
+  pending: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'refresh'): void
+}>()
+
+const lot = computed(() => props.data?.lot)
+const uos = computed(() => props.data?.uos)
+const toFixWorklogs = computed(() => props.data?.toFixWorklogs)
+const sales = computed(() => {
+  const email = props.data?.lot?.salesEmail
+  const salesInfo = email ? getByEmail(email) : undefined
+  return salesInfo ? salesInfo.firstName + ' ' + salesInfo.lastName : ''
+})
+const errorValue = computed(() => props.error)
+
+function handleOwnerUpdated() {
+  emit('refresh')
+}
+</script>
+
+<i18n lang="yaml">
+fr:
+  o2i: O2I
+  errorTitle: Erreur lors du chargement des données du lot
+  lotDescription: Description du lot
+  quoteDescription: Description de l'opportunité
+  client: Client
+  commercial: Commercial
+  bpj: BPJ
+  plannedDeploymentDate: Date de MEP prévisionnelle
+  factory: Factory
+  productionCell: Cellule de production
+  billingTrigger: Condition de facturation
+  attributionAndMilestones: Attribution et jalons
+  downPaymentLabel: 'Acompte : '
+en:
+  o2i: O2I
+  errorTitle: Error loading lot data
+  lotDescription: Lot Description
+  quoteDescription: Quote description
+  client: Client
+  commercial: Sales Representative
+  bpj: BPJ
+  plannedDeploymentDate: Planned Deployment Date
+  factory: Factory
+  productionCell: Production Cell
+  billingTrigger: Billing Condition
+  attributionAndMilestones: Attribution and Milestones
+  downPaymentLabel: 'Down-payment : '
+</i18n>

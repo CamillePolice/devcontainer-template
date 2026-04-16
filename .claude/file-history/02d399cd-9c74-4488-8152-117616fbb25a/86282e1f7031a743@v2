@@ -1,0 +1,513 @@
+<template>
+  <div class="w-full space-y-4 pb-4">
+    <UCard>
+      <div class="flex items-center gap-4">
+        <div>{{ t('lotTable.filterLabel') }}</div>
+        <UInputMenu
+          v-model="nameSearch"
+          icon="i-lucide-search"
+          :items="lotNameSuggestions"
+          :trailing-icon="false"
+          :placeholder="t('lotTable.filters.name')"
+          class="max-w-xs"
+          @update:model-value="resetPage"
+        >
+          <template
+            v-if="nameSearch"
+            #trailing
+          >
+            <UButton
+              color="neutral"
+              variant="link"
+              size="sm"
+              icon="i-lucide-x"
+              aria-label="Effacer"
+              @click.stop="nameSearch = ''; resetPage()"
+            />
+          </template>
+        </UInputMenu>
+        <UInputMenu
+          v-model="o2iSearch"
+          icon="i-lucide-search"
+          :items="o2iSuggestions"
+          :trailing-icon="false"
+          :placeholder="t('lotTable.filters.o2i')"
+          class="max-w-xs"
+          @update:model-value="resetPage"
+        >
+          <template
+            v-if="o2iSearch"
+            #trailing
+          >
+            <UButton
+              color="neutral"
+              variant="link"
+              size="sm"
+              icon="i-lucide-x"
+              aria-label="Effacer"
+              @click.stop="o2iSearch = ''; resetPage()"
+            />
+          </template>
+        </UInputMenu>
+        <SelectAllSelectMenu
+          v-model="factorySearch"
+          :items="factoryItems"
+          :placeholder="t('lotTable.filters.factory')"
+          class="w-48"
+          @update:model-value="resetPage"
+        />
+        <UInputMenu
+          v-model="responsableNameSearch"
+          icon="i-lucide-search"
+          :items="responsableNameSuggestions"
+          :trailing-icon="false"
+          :placeholder="t('lotTable.filters.responsable')"
+          class="max-w-xs"
+          @update:model-value="resetPage"
+        >
+          <template
+            v-if="responsableNameSearch"
+            #trailing
+          >
+            <UButton
+              color="neutral"
+              variant="link"
+              size="sm"
+              icon="i-lucide-x"
+              aria-label="Effacer"
+              @click.stop="responsableNameSearch = ''; resetPage()"
+            />
+          </template>
+        </UInputMenu>
+        <SelectAllSelectMenu
+          v-model="statusSearch"
+          :items="statusSelectItems"
+          :placeholder="t('lotTable.filters.status')"
+          class="w-48"
+          @update:model-value="resetPage"
+        />
+        <USwitch
+          v-model="hideAssignedLots"
+          :label="t('lotTable.filters.hideAssigned')"
+          @update:model-value="resetPage"
+        />
+      </div>
+      <UTable
+        ref="table"
+        v-model:sorting="sorting"
+        v-model:pagination="pagination"
+        :data="lots"
+        :columns="columns"
+        :loading="pending"
+        :pagination-options="{
+          getPaginationRowModel: getPaginationRowModel(),
+        }"
+        :sorting-options="{
+          enableMultiSort: true,
+          enableMultiRemove: true,
+          enableSortingRemoval: true,
+          isMultiSortEvent: () => true,
+        }"
+        class="flex-1 overflow-x-auto"
+      >
+        <template #name-cell="{ row }">
+          <div class="flex items-center gap-1 max-w-100 overflow-hidden">
+            <UTooltip
+              v-if="anomalySummaries?.[row.original.o2i]"
+              :text="t('lotTable.anomalyTooltip', { count: anomalySummaries[row.original.o2i]!.count })"
+            >
+              <UIcon
+                name="i-heroicons-exclamation-triangle"
+                class="shrink-0 w-4 h-4"
+                :class="anomalySummaries[row.original.o2i]!.maxSeverity === 'error' ? 'text-error-500' : 'text-warning-500'"
+              />
+            </UTooltip>
+            <ULink
+              class="text-secondary-600 hover:underline truncate flex-1"
+              :to="{ name: 'lots-o2i', params: { o2i: row.getValue('o2i') } }"
+            >
+              {{ row.getValue('name') }}
+            </ULink>
+            <UTooltip :text="t('lotTable.actions.preview')">
+              <UButton
+                color="neutral"
+                variant="ghost"
+                icon="i-lucide-panel-right-open"
+                size="xs"
+                class="shrink-0 ml-auto"
+                @click="openDetailSlideover(row.getValue('o2i'))"
+              />
+            </UTooltip>
+          </div>
+        </template>
+        <template #o2i-cell="{ row }">
+          <div class="max-w-100 overflow-hidden text-ellipsis">
+            <ULink
+              class="font-mono"
+              :href="`${config.public.jiraBaseUrl}${row.getValue('o2i')}`"
+              target="_blank"
+              @click.stop
+            >
+              {{ row.getValue('o2i') }}
+            </ULink>
+          </div>
+        </template>
+        <template #status-cell="{ row }">
+          <div class="flex items-center gap-2">
+            <UBadge
+              class="capitalize"
+              variant="subtle"
+              :color="getStatusColor(row.getValue('status')).color"
+            >
+              {{ row.getValue('status') }}
+            </UBadge>
+          </div>
+        </template>
+      </UTable>
+
+      <LotDetailSlideover
+        v-model:open="isDetailSlideoverOpen"
+        :o2i="selectedLotO2i"
+      />
+
+      <div class="flex justify-center border-t border-default pt-4">
+        <UPagination
+          :page="pagination.pageIndex + 1"
+          :default-page="(table?.tableApi?.getState().pagination.pageIndex || 0) + 1"
+          :items-per-page="table?.tableApi?.getState().pagination.pageSize"
+          :total="table?.tableApi?.getFilteredRowModel().rows.length"
+          @update:page="(p) => table?.tableApi?.setPageIndex(p - 1)"
+        />
+      </div>
+    </UCard>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { storeToRefs } from 'pinia'
+import { getPaginationRowModel } from '@tanstack/vue-table'
+import type { ListableLot } from '#shared/types/lot'
+import type { Collaborator } from '#shared/types/collaborator'
+import type { Factory } from '#shared/types/filters'
+import type { Column } from '@tanstack/vue-table'
+import type { TableColumn } from '@nuxt/ui'
+import { useDateFormat, useSessionStorage } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
+
+const UButton = resolveComponent('UButton')
+const UDropdownMenu = resolveComponent('UDropdownMenu')
+
+const isDetailSlideoverOpen = ref(false)
+const selectedLotO2i = ref<string | undefined>(undefined)
+
+const openDetailSlideover = (o2i: string) => {
+  selectedLotO2i.value = o2i
+  isDetailSlideoverOpen.value = true
+}
+
+const { t } = useI18n()
+const { getStatusColor } = useLotStatusColors()
+const table = useTemplateRef('table')
+const config = useRuntimeConfig()
+
+const collaboratorStore = useCollaboratorStore()
+const { currentCollaborator, isCurrentCollaboratorDispatcher, isCurrentCollaboratorCDP }
+  = storeToRefs(collaboratorStore)
+
+// Receive data and loading state as props from the parent page
+const props = defineProps<{
+  data: ListableLot[] | null | undefined
+  pending: boolean
+  statusItems: { id: number, name: string }[] | undefined
+  factories: Factory[] | undefined
+}>()
+
+const factoryItems = computed(
+  () =>
+    props.factories?.map(f => ({
+      label: f.name,
+      value: f.name,
+    })) ?? [],
+)
+
+const lotNameSuggestions = computed(
+  () => [...new Set((props.data ?? []).map(l => l.name).filter(Boolean))].toSorted() as string[],
+)
+
+const o2iSuggestions = computed(
+  () => [...new Set((props.data ?? []).map(l => l.o2i).filter(Boolean))].toSorted() as string[],
+)
+
+const responsableNameSuggestions = computed(
+  () =>
+    [
+      ...new Set(
+        (props.data ?? [])
+          .map((l) => {
+            const r = l.responsable
+            if (!r?.firstName && !r?.lastName) return
+            return `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim()
+          })
+          .filter(Boolean),
+      ),
+    ].toSorted() as string[],
+)
+
+const statusSelectItems = computed(
+  () =>
+    props.statusItems?.map(s => ({
+      label: s.name,
+      value: String(s.id),
+    })) ?? [],
+)
+
+// All filters become persistent in sessionStorage
+const nameSearch = useSessionStorage('nameSearch', '')
+const o2iSearch = useSessionStorage('o2iSearch', '')
+const factorySearch = useSessionStorage<string[]>('factorySearch', [])
+const statusSearch = useSessionStorage<string[]>('statusSearch', [])
+
+const responsableNameSearch = useSessionStorage('responsableNameSearch', '')
+const hideAssignedLots = useSessionStorage('hideAssignedLots', false)
+
+// New system to identify if the session has been initialized
+const isSessionInitialized = useSessionStorage('lots-session-initialized', false)
+
+// Function to initialize filters based on user profile
+const initializeFiltersForSession = (collaborator: Collaborator) => {
+  // Apply default filters based on profile
+  if (isCurrentCollaboratorCDP.value) {
+    responsableNameSearch.value = `${collaborator.firstName ?? ''} ${collaborator.lastName ?? ''}`.trim()
+  }
+  if (isCurrentCollaboratorDispatcher.value) {
+    hideAssignedLots.value = true
+  }
+
+  // Mark session as initialized
+  isSessionInitialized.value = true
+}
+
+watch(
+  currentCollaborator,
+  (collaborator) => {
+    if (!collaborator) return
+
+    // Only initialize if this is the first visit of this session
+    if (!isSessionInitialized.value) {
+      initializeFiltersForSession(collaborator)
+    }
+    // Otherwise, filters keep their sessionStorage values
+  },
+  { immediate: true },
+)
+
+const lots = computed(() => {
+  let filteredLots: ListableLot[] = props.data || []
+
+  if (hideAssignedLots.value) {
+    filteredLots = filteredLots.filter(lot => !lot.responsable || !lot.responsable.email)
+  }
+
+  if (o2iSearch.value) {
+    const o2indexSearchTerm = o2iSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter(lot => lot.o2i.toLowerCase().includes(o2indexSearchTerm))
+  }
+
+  if (nameSearch.value) {
+    const nameSearchTerm = nameSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter(lot => lot.name?.toLowerCase().includes(nameSearchTerm))
+  }
+
+  if (factorySearch.value && factorySearch.value.length > 0) {
+    const factorySearchTerm = new Set(factorySearch.value.map((f: string) => f.toLowerCase()))
+    filteredLots = filteredLots.filter(
+      lot => lot.factory?.name && factorySearchTerm.has(lot.factory?.name?.toLowerCase()),
+    )
+  }
+
+  if (responsableNameSearch.value) {
+    const nameSearchTerm = responsableNameSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter((lot) => {
+      const name = `${lot.responsable?.firstName ?? ''} ${lot.responsable?.lastName ?? ''}`.trim()
+      return name.toLowerCase().includes(nameSearchTerm)
+    })
+  }
+  if (statusSearch.value && statusSearch.value.length > 0) {
+    const selectedStatuses = new Set(statusSearch.value.map(Number))
+    filteredLots = filteredLots.filter(lot => selectedStatuses.has(Number(lot.status?.id)))
+  }
+  return filteredLots
+})
+
+const filteredO2is = computed(() => lots.value.map(l => l.o2i))
+const { data: anomalySummaries } = useFetchLotsAnomalies(filteredO2is)
+
+const resetPage = () => {
+  pagination.value.pageIndex = 0
+  table.value?.tableApi.setPageIndex(0)
+}
+
+const columns = computed<TableColumn<ListableLot>[]>(() => [
+  {
+    accessorKey: 'name',
+    id: 'name',
+    enableMultiSort: true,
+    meta: {
+      class: {
+        td: 'max-w-[400px] overflow-hidden text-ellipsis',
+      },
+    },
+    header: ({ column }) => h('div', { class: 'text-left' }, getHeader(column, t('lotTable.tables.lot.name'))),
+  },
+  {
+    accessorKey: 'o2i',
+    id: 'o2i',
+    enableMultiSort: true,
+    header: ({ column }) => h('div', { class: 'text-left' }, getHeader(column, t('lotTable.tables.lot.o2i'))),
+    cell: ({ row }) => {
+      return row.getValue('o2i')
+    },
+  },
+  {
+    header: t('lotTable.tables.lot.factory'),
+    id: 'factory',
+    enableMultiSort: true,
+    accessorFn: (lot: ListableLot) => lot.factory?.name ?? '',
+    cell: ({ row }) => {
+      const factory = row.original.factory
+      return factory ? factory.name : 'N/A'
+    },
+  },
+  {
+    id: 'productionCell',
+    enableMultiSort: true,
+    header: ({ column }) =>
+      h('div', { class: 'text-left' }, getHeader(column, t('lotTable.tables.lot.productionCell'))),
+    accessorFn: (lot: ListableLot) => {
+      const productionCell = lot.productionCell
+
+      return productionCell ? productionCell.name : ''
+    },
+    cell: ({ row }) => {
+      return row.getValue('productionCell') || ''
+    },
+  },
+  {
+    accessorKey: 'issueType',
+    id: 'issueType',
+    enableMultiSort: true,
+    header: ({ column }) => h('div', { class: 'text-left' }, getHeader(column, t('lotTable.tables.lot.lotType'))),
+    cell: ({ row }) => {
+      return row.getValue('issueType') || 'N/A'
+    },
+  },
+  {
+    id: 'responsable',
+    enableMultiSort: true,
+    header: ({ column }) => h('div', { class: 'text-left' }, getHeader(column, t('lotTable.tables.lot.responsable'))),
+    accessorFn: (lot: ListableLot) => {
+      const responsable = lot.responsable
+      if (responsable && (responsable.firstName || responsable.lastName)) {
+        return `${responsable.firstName ?? ''} ${responsable.lastName ?? ''}`.trim()
+      }
+      return 'N/A'
+    },
+    cell: ({ row }) => {
+      return row.getValue('responsable') || 'N/A'
+    },
+  },
+  {
+    id: 'opportunityApprobationDate',
+    enableMultiSort: true,
+    accessorFn: (lot: ListableLot) =>
+      lot.opportunityApprobationDate ? new Date(lot.opportunityApprobationDate).getTime() : 0,
+    header: ({ column }) => h('div', {}, getHeader(column, t('lotTable.tables.lot.opportunityApprobationDate'))),
+    cell: ({ row }) => {
+      return useDateFormat(row.original.opportunityApprobationDate, 'DD/MM/YYYY').value
+    },
+  },
+  {
+    accessorKey: 'opportunityType',
+    id: 'opportunityType',
+    enableSorting: true,
+    header: ({ column }) => h('div', {}, getHeader(column, t('lotTable.tables.lot.opportunityType'))),
+  },
+  {
+    id: 'status',
+    accessorKey: 'status',
+    enableSorting: true,
+    header: ({ column }) => h('div', {}, getHeader(column, t('lotTable.tables.lot.status'))),
+    accessorFn: (lot: ListableLot) => {
+      const status = lot.status as { id: number, name: string }
+      return status ? status.name : 'N/A'
+    },
+    cell: ({ row }) => {
+      return row.getValue('status') as string
+    },
+  },
+])
+
+function getHeader(column: Column<ListableLot>, label: string) {
+  const isSorted = column.getIsSorted()
+
+  return h(
+    UDropdownMenu,
+    {
+      'content': {
+        align: 'start',
+      },
+      'aria-label': 'Actions dropdown',
+      'items': [
+        {
+          label: t('lotTable.sort.asc'),
+          type: 'checkbox',
+          icon: 'i-lucide-arrow-up-narrow-wide',
+          checked: isSorted === 'asc',
+          onSelect: () => {
+            if (isSorted === 'asc') {
+              column.clearSorting()
+            }
+            else {
+              column.toggleSorting(false, true)
+            }
+          },
+        },
+        {
+          label: t('lotTable.sort.desc'),
+          icon: 'i-lucide-arrow-down-wide-narrow',
+          type: 'checkbox',
+          checked: isSorted === 'desc',
+          onSelect: () => {
+            if (isSorted === 'desc') {
+              column.clearSorting()
+            }
+            else {
+              column.toggleSorting(true, true)
+            }
+          },
+        },
+      ],
+    },
+    () =>
+      h(UButton, {
+        'color': 'neutral',
+        'variant': 'ghost',
+        label,
+        'icon': isSorted
+          ? (isSorted === 'asc'
+              ? 'i-lucide-arrow-up-narrow-wide'
+              : 'i-lucide-arrow-down-wide-narrow')
+          : 'i-lucide-arrow-up-down',
+        'class': '-mx-2.5 data-[state=open]:bg-elevated',
+        'aria-label': `Sort by ${isSorted === 'asc' ? 'descending' : 'ascending'}`,
+      }),
+  )
+}
+type ColumnSort = { id: string, desc: boolean }
+type SortingState = ColumnSort[]
+const sorting = useSessionStorage<SortingState>('lots-sorting', [])
+const pagination = useSessionStorage('lots-pagination', {
+  pageIndex: 0,
+  pageSize: 10,
+})
+</script>

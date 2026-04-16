@@ -1,0 +1,34 @@
+import type { H3Event } from 'h3'
+
+type RuntimeConfig = ReturnType<typeof useRuntimeConfig>
+type ProviderLogoutHandler = (config: RuntimeConfig, redirectTo: string) => string | null
+
+/**
+ * Registry of SSO logout handlers per provider.
+ * Return the redirect URL for SSO logout, or null to redirect locally.
+ * Add a new entry here to support additional providers.
+ */
+const providerLogoutHandlers: Record<string, ProviderLogoutHandler> = {
+  auth0: (config, redirectTo) => {
+    const returnTo = encodeURIComponent(
+      new URL(redirectTo, config.public.authBaseURL).toString(),
+    )
+    return `https://${config.auth0Domain}/v2/logout?client_id=${config.auth0ClientId}&returnTo=${returnTo}`
+  },
+  microsoft: (_config, redirectTo) => redirectTo,
+}
+
+export default defineEventHandler(async (event: H3Event) => {
+  const query = getQuery(event)
+  const redirectTo = (query.redirectTo as string) || '/'
+
+  const session = await getUserSession(event)
+  const provider = (session as Record<string, unknown>).provider as string | undefined
+
+  await clearUserSession(event)
+
+  const handler = provider ? providerLogoutHandlers[provider] : null
+  const logoutUrl = handler ? handler(useRuntimeConfig(), redirectTo) : redirectTo
+
+  return sendRedirect(event, logoutUrl ?? redirectTo)
+})

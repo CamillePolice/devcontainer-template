@@ -1,0 +1,108 @@
+# Code Review — `main` → `PMPFLOW/delete-manual-ventilated-time`
+
+**Date**: 2026-03-25
+**Reviewer**: Claude Code (claude-sonnet-4.6)
+**Commits**: 13 commits, 18 files changed (+637 / -56) — includes 3 post-review fix commits
+
+---
+
+## Summary
+
+This branch adds the ability to list and delete manual reventilations (fixed worklogs) from the UO detail view. It introduces two new API routes (`GET /api/worklogs/fixed` and `DELETE /api/worklogs/fixed/:id`), a new composable (`useFixedWorklogs`), a new `FixedWorklogsSlideover` component, and wires a gear icon into the existing `TimesSection` and `StandardBundleSection` tables. A `hasActiveFixedWorklogs` correlated subquery is added to the worklog aggregation query to drive icon state. The branch also updates the Prettier config.
+
+The feature is functionally sound. The transaction logic for the delete operation is correct and properly recomputes `fixedStatus` after deletion. Three ⚠️ issues identified during review were addressed in follow-up commits: partial-failure UX in the slideover, missing tooltip in `StandardBundleSection`, and dead code removal in `useUo`.
+
+---
+
+## Score: 9/10 — Excellent (after post-review fixes applied)
+
+---
+
+## Files
+
+### `server/api/worklogs/fixed.get.ts` (NEW)
+- Auth: covered by the global `/api/*` middleware in `server/middleware/auth.ts`. No issue.
+- Input validation is correct: `o2i` is required and type-checked; `accountId` and `fixedO2i` are optional with proper type-narrowing.
+- ℹ️ INFO: No ownership check — any authenticated user can fetch fixed worklogs for any lot by passing an arbitrary `o2i`. Acceptable if lot access is not role-gated elsewhere, but worth noting.
+
+### `server/api/worklogs/fixed/[id].delete.ts` (NEW)
+- Auth: covered by middleware.
+- Input guard: `Number(getRouterParam(...))` combined with `!id || isNaN || <= 0` is correct.
+- No ownership check on the `id`: any authenticated user can delete any `fixed_worklog` row by ID. A `TODO` comment has been added to the route flagging where to add this check if multi-tenancy is required.
+- ℹ️ INFO: Returns `{ success: true }` on a DELETE, which is fine, though HTTP 204 No Content is the more idiomatic response for a delete that returns nothing meaningful.
+
+### `server/utils/worklog.ts`
+- `getFixedWorklogsForLot`: query is clean, joins are correct, ordering by `desc(fixedWorklog.createdAt)` is appropriate.
+- `deleteFixedWorklog`: transaction logic is correct — it deletes the row first, then recomputes the remaining sum, then updates `fixedStatus` back to `TO_FIX / PARTIALLY_FIXED / FIXED`. The three-state logic matches the existing `fixWorklog` logic.
+- The `statusCode` re-throw pattern (`if ((error as { statusCode?: number }).statusCode) throw error`) is consistent with the rest of the codebase.
+- `hasActiveFixedWorklogs` correlated subquery on line 52: the subquery filters `fw2.fixed_o2i = aggregatedWorklogView.o2i` but the flag is meant to indicate whether _this collaborator's worklogs_ have been reventilated. The `AND w2.account_id = aggregatedWorklogView.accountId` clause correctly scopes it per collaborator. Looks correct.
+- ⚠️ WARNING: The `remainingTotal` comparison uses raw numeric values from the database (minutes/centimes?) compared to `sourceWorklog.quantity` which is also raw. The `getWorklogsForO2i` return path runs `convertWorklogQuantity`, but here the comparison is on pre-conversion values. This is actually correct since both `remainingTotal` and `sourceWorklog.quantity` are raw, but it is worth an explicit comment to avoid future confusion when a developer reads the adjacent code that converts to hours.
+
+### `shared/types/worklog.ts`
+- `FixedWorklogDetail` type is well-structured and nullable fields are correctly typed (`string | null`).
+- ℹ️ INFO: The blank lines between each property make the type verbose for a shared type file. Minor style point.
+
+### `shared/types/table.ts`
+- `lotO2i: string` and `accountId: string | null` added to `WorklogRowData`. These are needed to pass context to the slideover. Clean addition.
+- `hasActiveFixedWorklogs: boolean` correctly non-optional (with `?? false` fallback in `transformWorklogsToTableRows`).
+
+### `app/composables/useFixedWorklogs.ts` (NEW)
+- `fetchFixedWorklogsApi` silently returns `[]` on error — acceptable for a read path.
+- `deleteFixedWorklogsApi` uses `Promise.allSettled` which correctly handles partial failures and returns results for inspection by the caller.
+- ✅ FIXED: The `as string` cast on the template literal has been removed (`refactor` commit).
+
+### `app/composables/useUo.ts`
+- `MaybeRefOrGetter<UoDetails[]>` + `watchEffect` + `toValue()` is the correct VueUse-idiomatic pattern to make `uoMap` reactive. Good fix.
+- `ReventilationSection.vue` now passes `allUos` (a `Ref`) and `TimesSection.vue` passes `() => props.uos` (a getter); `StandardBundleSection.vue` passes `allUos` (a `ComputedRef`). All three are valid `MaybeRefOrGetter` values.
+- ✅ FIXED: `deleteFixedWorklog` and `deleteFixedWorklogs` (dead code) removed from `useUo` (`refactor` commit).
+- `transformWorklogsToTableRows` now accepts `lotO2i` as a third parameter — the default value `= ''` makes it backward compatible.
+
+### `app/components/uo/FixedWorklogsSlideover.vue` (NEW)
+- Component structure follows project conventions (script setup, i18n block, NuxtUI components). Good.
+- `watch(() => props.open, ..., { immediate: true })` with `immediate: true` means `loadFixedWorklogs()` is called once on mount even if `open` is `false`. Since `pending` is false initially and `fixedWorklogs` starts as `[]`, the "empty" state will flash briefly on first open until the `watch` fires again when `open` becomes `true`. This is benign but could be avoided by removing `immediate: true` (the `v-if="activeWorklogRow"` guard on the parent already controls mount).
+- ✅ FIXED: `save()` now only emits `saved` and closes the slideover on full success. On partial failure, the slideover stays open and reloads the list so the user can see remaining items (`fix` commit).
+- The `markedForDeletion` toggle creates a new `Set` on each toggle — correct pattern for Vue 3 reactivity.
+- `groupedWorklogs` uses `entry.targetUoType ?? t('unknown')` — correct fallback.
+
+### `app/components/uo/TimesSection.vue`
+- Gear icon wrapped in `UTooltip` with tooltip text shown only when `!hasActiveFixedWorklogs`. This is the correct UX: disabled button with explanatory tooltip.
+- `openSlideover` correctly sets `activeWorklogRow` and opens the slideover.
+- `@saved="emit('refresh')"` propagation chain is correct: Slideover → TimesSection → Overview.vue → parent page.
+
+### `app/components/uo/StandardBundleSection.vue`
+- ✅ FIXED: Gear icon now wrapped in `UTooltip` matching `TimesSection` behaviour (`fix` commit).
+- `openSlideover` logic mirrors `TimesSection` — consistent.
+- `uos: allUos` (ComputedRef) passed to `useUo` — correct.
+
+### `app/components/lot/Overview.vue`
+- `@refresh="emit('refresh')"` added to three section components. Clean and necessary for the gear icon's `@saved` event to propagate up to the page level.
+
+### `.prettierrc`
+- `singleAttributePerLine: true` — this is a significant formatting change that will affect all Vue template diffs going forward. Ensure the team is aligned.
+- `arrowParens: "avoid"` changes `(x) => x` to `x => x` for single-param arrow functions.
+- These are cosmetic/tooling changes. No functional impact.
+
+---
+
+## Cross-cutting Concerns
+
+**Authorization**: Both new API routes rely solely on authentication (any logged-in user can read/delete any fixed worklog by ID or lot O2I). If the application has collaborator-scoped access (e.g., a PM can only see their own lots), an ownership check against `event.context.user` should be added to the DELETE route at minimum.
+
+**Error propagation — `save()` partial failure**: ✅ Fixed — slideover now closes only on full success; on error it stays open and reloads.
+
+**Dead code in `useUo`**: ✅ Fixed — `deleteFixedWorklog` and `deleteFixedWorklogs` removed from `useUo`.
+
+---
+
+## Post-Review Fixes Applied
+
+All ⚠️ warnings addressed in 3 follow-up commits:
+
+1. ✅ `fix(uo): keep slideover open on partial deletion failure` — `FixedWorklogsSlideover.save()` only closes on full success
+2. ✅ `fix(uo): add tooltip on disabled gear icon in StandardBundleSection` — aligns with `TimesSection` UX
+3. ✅ `refactor(uo): remove dead deleteFixedWorklog functions and cleanup` — removes dead code from `useUo`, drops `as string` cast, adds ownership `TODO` to DELETE route
+
+## Remaining Items
+
+- ℹ️ `server/api/worklogs/fixed/[id].delete.ts` — ownership check TODO in place; implement if multi-tenancy is confirmed as a requirement
+- ℹ️ `server/utils/worklog.ts` — consider a comment clarifying that `remainingTotal` and `sourceWorklog.quantity` are raw DB units (not converted hours), to prevent future regression

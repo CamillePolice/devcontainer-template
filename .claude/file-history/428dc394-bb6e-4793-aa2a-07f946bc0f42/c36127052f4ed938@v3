@@ -1,0 +1,136 @@
+# Code Review — `PMPFLOW-93/reventilation-infos` → `main`
+
+**Date :** 2026-03-20
+**Branche :** `PMPFLOW-93/reventilation-infos`
+**Commit :** `ff1a98f refactor: update UoUnit component usage for improved styling and consistency`
+**Fichiers :** 5 · +112 / -16 lignes · Vue 3 / TypeScript
+
+---
+
+## Score global : 7/10 — Good
+
+La branche enrichit correctement `ReventilationSlideover` avec les détails des UOs (nom produit, code, profil, o2i, badge parent, quantités). La refonte de `UoUnit` pour déplacer le `ml-1` vers les call sites est la bonne approche.
+
+---
+
+## Problèmes à corriger avant merge
+
+### ⚠️ Bug moyen — `useUo` reçoit un snapshot statique, pas une référence réactive
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```typescript
+// Actuel — snapshot au moment du mount
+const { mappedUos } = useUo({ uos: props.uos })
+
+// Recommandé — référence réactive
+const { mappedUos } = useUo({ uos: toRef(props, 'uos') })
+```
+
+Si le parent re-rend avec un nouveau tableau `uos`, la map interne de `useUo` devient obsolète.
+Les quantités affichées peuvent alors être incorrectes ou figées.
+
+---
+
+### ⚠️ `o2iParent` peut être `null` même pour un Forfait standard + string littérale évitable
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```html
+<!-- Actuel -->
+<UBadge v-if="group.type === 'Forfait standard'">
+  Parent: {{ item.o2iParent }}
+</UBadge>
+
+<!-- Recommandé -->
+<UBadge v-if="group.type === UoTypeEnum.FORFAIT_STANDARD && item.o2iParent">
+  Parent: {{ item.o2iParent }}
+</UBadge>
+```
+
+```typescript
+import { UoTypeEnum } from '~/shared/types/uo'
+```
+
+Deux améliorations combinées :
+
+1. **`&& item.o2iParent`** — `UoDetails.o2iParent` est typé `string | null`. Sans ce garde, le badge affiche "Parent: " avec une valeur vide pour un bundle racine.
+2. **`UoTypeEnum.FORFAIT_STANDARD`** — la constante existe déjà dans `shared/types/uo.ts` (valeur `'Forfait standard'`). L'utiliser évite la string littérale : refactoring-safe, autocomplétion IDE, cohérent avec l'usage dans `billing.ts`.
+
+---
+
+## Points d'amélioration mineurs
+
+### ℹ️ Double cast `unknown` dans `getDisplayInfo`
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```typescript
+// Actuel — contourne le typage
+function getDisplayInfo(item: unknown) {
+  const o2i = (item as UoDetails).o2i
+  const originalQuantity = (item as UoDetails).originalQuantity
+  ...
+}
+
+// Recommandé — intersection type précise
+function getDisplayInfo(item: RadioGroupItem & UoDetails) {
+  const { o2i, originalQuantity } = item
+  ...
+}
+```
+
+Typer en `RadioGroupItem & UoDetails` est plus sûr car `normalizedUo` est déjà construit avec les deux formes.
+
+---
+
+### ℹ️ Concaténation dans le template à extraire
+
+**Fichier :** `app/components/uo/ReventilationSlideover.vue`
+
+```html
+<!-- Actuel — lisible mais difficile à maintenir -->
+<span>{{ item.productName }} ({{ item.productCode }} - {{ item.profile }})</span>
+
+<!-- Recommandé — computed ou helper -->
+<span>{{ formatUoLabel(item) }}</span>
+```
+
+```typescript
+function formatUoLabel(item: UoDetails): string {
+  return `${item.productName} (${item.productCode} - ${item.profile})`
+}
+```
+
+---
+
+## Points positifs ✅
+
+- Narrowing correct de `UoCore[]` → `UoDetails[]` pour la prop `uos`
+- Badge parent correctement conditionné sur le type Forfait standard
+- Refactoring `UoUnit` / `ml-1` propre et cohérent dans les 3 composants existants (`HistoricBundleSection`, `StandardBundleSection`, `TimesSection`)
+- Fallback `?? 0` défensif sur les quantités manquantes
+- Import explicite `./Unit.vue` cohérent avec le pattern du fichier
+
+---
+
+## Analyse fichier par fichier
+
+| Fichier | Statut | Note |
+|---|---|---|
+| `app/components/uo/Unit.vue` | Modifié | ✅ Suppression correcte du `ml-1` |
+| `app/components/uo/HistoricBundleSection.vue` | Modifié | ✅ Ajout `class="ml-1"` en compensation |
+| `app/components/uo/StandardBundleSection.vue` | Modifié | ✅ Ajout `class="ml-1"` en compensation |
+| `app/components/uo/TimesSection.vue` | Modifié | ✅ Ajout `class="ml-1"` + trailing comma style |
+| `app/components/uo/ReventilationSlideover.vue` | Modifié | ⚠️ Voir problèmes ci-dessus |
+
+---
+
+## Récapitulatif des actions
+
+| # | Action | Fichier | Urgence |
+|---|---|---|---|
+| 1 | `toRef(props, 'uos')` pour la réactivité | `ReventilationSlideover.vue` | **Obligatoire** |
+| 2 | Garde `&& item.o2iParent` + `UoTypeEnum.FORFAIT_STANDARD` sur le badge | `ReventilationSlideover.vue` | **Obligatoire** |
+| 3 | Typer `getDisplayInfo` avec intersection type | `ReventilationSlideover.vue` | Recommandé |
+| 4 | Extraire `formatUoLabel` | `ReventilationSlideover.vue` | Optionnel |

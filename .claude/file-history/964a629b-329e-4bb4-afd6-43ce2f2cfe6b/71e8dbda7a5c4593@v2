@@ -1,0 +1,186 @@
+<template>
+  <div v-if="errorValue">
+    <UAlert
+      color="warning"
+      :title="t('errorTitle')"
+    >
+      {{ errorValue }}
+    </UAlert>
+  </div>
+  <div v-else>
+    <UCard class="mb-8">
+      <template #header>
+        <CardTitle
+          :title="lot?.name || 'Lot'"
+          icon="/icons/folder.png"
+        />
+      </template>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-20 text-secondary-700">
+        <div>
+          <div class="mb-4">
+            <span class="font-bold">{{ t("quoteDescription") }} : </span><span class="">{{ lot?.quoteDescription }}</span>
+          </div>
+          <div>
+            <span class="font-bold">{{ t("lotDescription") }} : </span><span class="">{{ lot?.description }}</span>
+          </div>
+        </div>
+        <div>
+          <ul>
+            <li>
+              <span class="font-bold">{{ t("o2i") }} : </span>
+              <ULink
+                class="font-mono text-secondary-600"
+                :href="`${config.public.jiraBaseUrl}${lot?.o2i}`"
+                target="_blank"
+              >
+                {{ lot?.o2i }}
+              </ULink>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("client") }} : </span>
+              <span class="">{{ lot?.clientName }} ({{ lot?.universalNumber }})</span>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("commercial") }} : </span>
+              <span class="">{{ sales }}</span>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("bpj") }} : </span>
+              <span class="">{{ lot?.bpj }}</span> -
+              <span class="">{{ lot?.bpjName }}</span>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("desiredDeploymentDate") }} : </span>
+              <span class="">{{
+                useDateFormat(lot?.desiredDeploymentDate, "DD/MM/YYYY")
+              }}</span>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("factory") }} : </span>
+              <span class="">{{ lot?.factory?.name }}</span>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("productionCell") }} : </span>
+              <span class="">{{ lot?.productionCell?.name }}</span>
+            </li>
+            <li>
+              <span class="font-bold">{{ t("billingTrigger") }} : </span>
+              <span class="">{{ lot?.billingTrigger }}</span>
+            </li>
+            <li v-if="lot?.downPayment">
+              <span class="font-bold">{{ t("downPaymentLabel") }} </span>
+              <span class="">{{ props.data?.milestones[0]?.stepPercent }} %</span>
+            </li>
+          </ul>
+        </div>
+        <div class="flex flex-col">
+          <OwnerInput
+            v-if="lot?.o2i"
+            class="rounded-xl p-4"
+            :lot-o2i="lot.o2i"
+            :current-responsable="lot.responsable"
+            @updated="handleOwnerUpdated"
+          />
+        </div>
+      </div>
+    </UCard>
+    <UoTimesSection
+      v-if="uos?.['TIME']?.length"
+      class="mb-6"
+      :uos="uos?.['TIME']"
+      :lot-factory="lot?.factory"
+      @refresh="emit('refresh')"
+    />
+    <UoMaterialsSection
+      v-if="uos?.['MATERIAL']?.length"
+      class="mb-6"
+      :uos="uos?.['MATERIAL']"
+      :lot-factory="lot?.factory"
+    />
+    <UoStandardBundleSection
+      v-if="uos?.['STANDARD_BUNDLE']?.length"
+      class="mb-6"
+      :uos="uos?.['STANDARD_BUNDLE']"
+      :lot-factory="lot?.factory"
+      @refresh="emit('refresh')"
+    />
+    <UoHistoricBundleSection
+      v-if="uos?.['HISTORIC_BUNDLE']?.length"
+      :uos="uos?.['HISTORIC_BUNDLE']"
+      :lot-factory="lot?.factory"
+    />
+    <UoReventilationSection
+      v-if="toFixWorklogs?.length"
+      class="my-6"
+      :uos-time="uos?.['TIME']"
+      :uos-standard-bundle="uos?.['STANDARD_BUNDLE']"
+      :to-fix-worklogs="toFixWorklogs"
+    />
+  </div>
+</template>
+
+<script lang="ts" setup>
+import type { LotOverview } from '#shared/types/lot'
+import type { FetchError } from 'ofetch'
+import { useDateFormat } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+const { getByEmail } = useCollaboratorStore()
+
+const props = defineProps<{
+  data: LotOverview | null | undefined
+  error: FetchError | null | undefined
+  pending: boolean
+}>()
+
+const emit = defineEmits<{
+  (e: 'refresh'): void
+}>()
+
+const lot = computed(() => props.data?.lot)
+const uos = computed(() => props.data?.uos)
+const toFixWorklogs = computed(() => props.data?.toFixWorklogs)
+const sales = computed(() => {
+  const email = props.data?.lot?.salesEmail
+  const salesInfo = email ? getByEmail(email) : undefined
+  return salesInfo ? salesInfo.firstName + ' ' + salesInfo.lastName : ''
+})
+const errorValue = computed(() => props.error)
+
+function handleOwnerUpdated() {
+  emit('refresh')
+}
+</script>
+
+<i18n lang="yaml">
+fr:
+  o2i: O2I
+  errorTitle: Erreur lors du chargement des données du lot
+  lotDescription: Description du lot
+  quoteDescription: Description de l'opportunité
+  client: Client
+  commercial: Commercial
+  bpj: BPJ
+  desiredDeploymentDate: Date de MEP souhaitée
+  factory: Factory
+  productionCell: Cellule de production
+  billingTrigger: Condition de facturation
+  attributionAndMilestones: Attribution et jalons
+  downPaymentLabel: "Acompte : "
+en:
+  o2i: O2I
+  errorTitle: Error loading lot data
+  lotDescription: Lot Description
+  quoteDescription: Quote description
+  client: Client
+  commercial: Sales Representative
+  bpj: BPJ
+  desiredDeploymentDate: Desired Deployment Date
+  factory: Factory
+  productionCell: Production Cell
+  billingTrigger: Billing Condition
+  attributionAndMilestones: Attribution and Milestones
+  downPaymentLabel: "Down-payment : "
+</i18n>

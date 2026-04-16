@@ -1,0 +1,36 @@
+export default defineI18nConfig(() => ({
+  legacy: false,
+  locale: 'fr',
+  messages: {
+    fr: {
+      navigation: {
+        lots: 'Liste des lots',
+        closure: 'Clôture',
+      },
+      pages: {
+        lots: {
+          title: 'Liste des lots',
+        },
+        lot: {
+          title: 'Détail du lot',
+          breadcrumb: 'Liste des lots',
+        },
+      },
+    },
+    en: {
+      navigation: {
+        lots: 'Lots list',
+        closure: 'Closure',
+      },
+      pages: {
+        lots: {
+          title: 'Lots list',
+        },
+        lot: {
+          title: 'Lot detail',
+          breadcrumb: 'Lots list',
+        },
+      },
+    },
+  },
+}))

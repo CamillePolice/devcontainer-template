@@ -1,0 +1,159 @@
+<template>
+  <div class="flex items-center justify-center gap-2">
+    <UModal
+      v-model:open="isModalOpen"
+      title="Quantité à comptabiliser (période en cours)"
+      close-icon="i-lucide-x"
+      :transition="true"
+      :ui="{
+        footer: 'flex justify-center gap-3',
+      }"
+    >
+      <UButton
+        icon="i-heroicons-cog-6-tooth"
+        size="xs"
+        variant="ghost"
+        color="neutral"
+      />
+      <template #body>
+        <UForm
+          ref="formRef"
+          :schema="materialDeclarationSchema"
+          :state="state"
+          class="space-y-4"
+          @submit="onSubmit"
+        >
+          <UFormField
+            label="Quantité produite"
+            name="quantity"
+            required
+          >
+            <UInput
+              v-model.number="state.quantity"
+              type="number"
+              min="0"
+              class="w-20"
+              input-class="text-center"
+            />
+          </UFormField>
+
+          <UFormField
+            label="Date de mise à disposition"
+            name="date"
+            required
+          >
+            <UInput
+              v-model="state.date"
+              type="date"
+              class="w-36"
+              input-class="text-center"
+            />
+          </UFormField>
+        </UForm>
+      </template>
+
+      <template #footer="{ close }">
+        <UButton
+          variant="outline"
+          color="neutral"
+          @click="close()"
+        >
+          Annuler
+        </UButton>
+
+        <UButton
+          color="primary"
+          class="px-6"
+          :disabled="!canSubmit"
+          @click="handleSubmit"
+        >
+          Confirmer
+        </UButton>
+      </template>
+    </UModal>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { z } from 'zod'
+import { useUo } from '~/composables/useUo'
+
+const props = defineProps<{
+  mappedUo: MappedUo
+}>()
+
+const emit = defineEmits<{
+  (
+    e: 'createMaterialDeclaration',
+    o2i: string,
+    quantity: number,
+    date: string,
+  ): void
+}>()
+
+const isModalOpen = ref(false)
+const formRef = ref()
+
+const { validateMaterialQuantity } = useUo({ uos: [props.mappedUo.uo] })
+
+const state = reactive({
+  quantity: 0,
+  date: new Date().toISOString().split('T')[0],
+})
+
+const materialDeclarationSchema = z.object({
+  quantity: z
+    .number({ message: 'La quantité est obligatoire' })
+    .min(1, 'La quantité doit être supérieure à 0')
+    .refine((quantity: number) => {
+      const validation = validateMaterialQuantity(props.mappedUo, quantity)
+      return validation.isValid
+    }, 'La quantité saisie ferait passer le reste à livrer en dessous de 0%'),
+  date: z
+    .string({ message: 'La date est obligatoire' })
+    .min(1, 'La date de mise à disposition est obligatoire'),
+})
+
+const canSubmit = computed(() => {
+  try {
+    materialDeclarationSchema.parse(state)
+    return true
+  }
+  catch {
+    return false
+  }
+})
+
+watch(isModalOpen, (isOpen) => {
+  if (!isOpen) {
+    state.quantity = 0
+    state.date = ''
+  }
+})
+
+async function onSubmit(event: { data: { quantity: number, date: string } }) {
+  try {
+    const validatedData = materialDeclarationSchema.parse(event.data)
+
+    emit(
+      'createMaterialDeclaration',
+      props.mappedUo.uo.o2i,
+      validatedData.quantity,
+      validatedData.date,
+    )
+
+    isModalOpen.value = false
+    state.quantity = 0
+    state.date = ''
+  }
+  catch (error) {
+    console.error('Validation error:', error)
+  }
+}
+
+async function handleSubmit() {
+  if (formRef.value) {
+    await formRef.value.submit()
+  }
+}
+</script>

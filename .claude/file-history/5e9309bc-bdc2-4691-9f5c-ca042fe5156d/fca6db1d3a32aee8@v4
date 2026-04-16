@@ -1,0 +1,126 @@
+# self-devis
+
+Application permettant aux clients de simuler leurs devis. La simulation se base sur des bundles définis par les commerciaux de Claranet, offrant une abstraction des ressources utilisées afin de simplifier la compréhension de ces devis.
+
+[![Nuxt](https://img.shields.io/badge/Nuxt-4-00DC82?style=flat-square&logo=nuxt.js&logoColor=white)](https://nuxt.com)
+[![NuxtUI](https://img.shields.io/badge/NuxtUI-v4-00DC82?style=flat-square&logo=nuxt.js&logoColor=white)](https://ui.nuxt.com)
+[![Vue](https://img.shields.io/badge/Vue-3-4FC08D?style=flat-square&logo=vue.js&logoColor=white)](https://vuejs.org)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=flat-square&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Drizzle ORM](https://img.shields.io/badge/Drizzle-ORM-C5F74F?style=flat-square&logoColor=black)](https://orm.drizzle.team)
+[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-15-4169E1?style=flat-square&logo=postgresql&logoColor=white)](https://www.postgresql.org)
+[![VueUse](https://img.shields.io/badge/VueUse-composables-4FC08D?style=flat-square)](https://vueuse.org)
+[![Pinia](https://img.shields.io/badge/Pinia-state-FFD859?style=flat-square)](https://pinia.vuejs.org)
+
+## Stack technique
+
+| Couche          | Technologie                         |
+| --------------- | ----------------------------------- |
+| Frontend        | Nuxt 4, Vue 3, TypeScript           |
+| UI              | NuxtUI v4, Tailwind CSS             |
+| État            | Pinia                               |
+| Auth            | OpenID Connect (Auth0 ou Microsoft) |
+| ORM             | Drizzle ORM                         |
+| Base de données | PostgreSQL 15                       |
+| i18n            | @nuxtjs/i18n (fr-FR, en-US)         |
+| Utilitaires     | VueUse                              |
+
+## Prérequis
+
+- Node.js >= 20
+- npm >= 10
+- Docker & Docker Compose (pour PostgreSQL local)
+- Accès au registry NPM Claranet (token GitLab)
+
+## Installation
+
+```bash
+# Cloner le dépôt
+git clone git.fr.clara.net/camille.police/self-devis
+cd self-devis
+
+# Copier et configurer les variables d'environnement
+cp .env.example .env
+# Éditer .env avec vos valeurs
+
+# Installer les dépendances
+npm install
+```
+
+## Variables d'environnement
+
+Copier `.env.example` en `.env` et renseigner les valeurs :
+
+| Variable                      | Description                                                                         |
+| ----------------------------- | ----------------------------------------------------------------------------------- |
+| `GITLAB_NPM_TOKEN`            | Token d'accès au registry NPM Claranet                                              |
+| `ONION_AUTH_PROVIDER`         | Fournisseur d'authentification (ex. `auth0`)                                        |
+| `NUXT_AUTH0_CLIENT_ID`        | Client ID Auth0 (depuis le dashboard Auth0)                                         |
+| `NUXT_AUTH0_CLIENT_SECRET`    | Secret Auth0 (depuis le dashboard Auth0)                                            |
+| `NUXT_AUTH0_DOMAIN`           | Domaine Auth0 (ex. `your-domain.auth0.com`)                                         |
+| `NUXT_AUTH0_ROLES_NAMESPACE`  | Namespace des rôles dans le token Auth0 — laisser vide si rôles à la racine du token |
+| `DATABASE_URL`                | URL de connexion PostgreSQL                                                         |
+| `SESSION_PASSWORD`            | Mot de passe de chiffrement des sessions (min. 32 chars)                            |
+| `NUXT_ENV`                    | Environnement : `local`, `staging` ou `production`                                  |
+
+## Démarrage
+
+```bash
+# Démarrer PostgreSQL (et PgAdmin) via Docker
+docker compose up -d
+
+# Appliquer les migrations de base de données
+npm run db:migrate
+
+# Démarrer le serveur de développement
+npm run dev
+```
+
+L'application est accessible sur `http://localhost:3000`.
+
+PgAdmin est accessible sur `http://localhost:5050`.
+
+## Scripts disponibles
+
+| Commande              | Description                   |
+| --------------------- | ----------------------------- |
+| `npm run dev`         | Serveur de développement      |
+| `npm run build`       | Build de production           |
+| `npm run lint`        | Vérification ESLint           |
+| `npm run typecheck`   | Vérification TypeScript       |
+| `npm run db:generate` | Générer les migrations Drizzle |
+| `npm run db:migrate`  | Appliquer les migrations      |
+| `npm run db:push`     | Push du schéma sans migration |
+| `npm run db:studio`   | Interface Drizzle Studio      |
+
+## Structure du projet
+
+```
+self-devis/
+├── app/
+│   ├── components/       # Composants Vue
+│   ├── composables/      # Composables réutilisables
+│   ├── i18n/locales/     # Traductions (fr-FR, en-US)
+│   ├── middlewares/      # Middlewares Nuxt
+│   ├── pages/            # Pages (routing automatique)
+│   ├── plugins/          # Plugins Nuxt
+│   └── stores/           # Stores Pinia
+├── server/
+│   ├── database/
+│   │   └── schemas/      # Schémas Drizzle ORM
+│   └── utils/            # Utilitaires serveur
+├── shared/               # Code partagé client/serveur
+├── utils/                # Utilitaires racine
+├── docs/                 # Documentation
+│   └── guidelines/       # Conventions de code
+└── public/               # Assets statiques
+```
+
+## Conventions
+
+- Composition API + `<script setup lang="ts">` uniquement
+- VueUse en priorité sur les composables custom
+- Commits conventionnels avec le tag `[AI]` pour les commits assistés par IA
+- `npm run lint` + `npm run typecheck` obligatoires avant chaque tâche
+
+Voir [`docs/guidelines/coding.md`](docs/guidelines/coding.md) pour les conventions complètes.
+

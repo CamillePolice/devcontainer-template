@@ -1,0 +1,67 @@
+import { AppError, createValidationError } from '~~/server/utils/error'
+import { getLotByO2i, updateLotDeploymentDate } from '~~/server/utils/lot'
+import { pushDeploymentDateToJira } from '~~/server/utils/jira'
+import { sendAdminErrorEmail } from '~~/server/utils/email'
+
+interface UpdateDeploymentDateBody {
+  deploymentDate: string
+}
+
+export default defineEventHandler(async (event) => {
+  try {
+    const o2i = getRouterParam(event, 'o2i')
+    if (!o2i) {
+      throw createValidationError('Lot O2I identifier is required')
+    }
+
+    const body = await readBody<UpdateDeploymentDateBody>(event)
+    if (!body?.deploymentDate) {
+      throw createValidationError('deploymentDate is required')
+    }
+
+    // Read current value for potential rollback
+    const current = await getLotByO2i(o2i)
+    const previousDate = current.plannedDeploymentDate
+      ? current.plannedDeploymentDate.toISOString().split('T')[0]
+      : undefined
+
+    const result = await updateLotDeploymentDate(o2i, body.deploymentDate)
+
+    // Await Jira push — rollback DB on failure to keep systems in sync
+    const jiraResult = await pushDeploymentDateToJira(o2i, body.deploymentDate)
+    if (!jiraResult.success && jiraResult.error !== 'Jira API not configured') {
+      console.error('Rolling back lot deployment date update due to Jira push failure', { o2i, error: jiraResult.error })
+      if (previousDate) {
+        await updateLotDeploymentDate(o2i, previousDate)
+      }
+      else {
+        console.warn('Cannot roll back lot deployment date: no previous value existed', { o2i })
+      }
+      sendAdminErrorEmail(
+        `Échec de synchronisation de la date de déploiement avec Jira`,
+        `La mise à jour de la date de déploiement dans ProjectFlow a réussi, mais la synchronisation avec Jira a échoué. La modification a été annulée pour maintenir la cohérence des données.\n\nLot concerné: ${o2i}\nChamp concerné: Date de déploiement\nProblème rencontré: ${jiraResult.error}\nAction recommandée: Vérifiez la configuration de la synchronisation Jira et mettez à jour manuellement la date de déploiement du lot ${o2i} si nécessaire.\nDate: ${new Date().toLocaleString('fr-FR', { dateStyle: 'full', timeStyle: 'short' })}`,
+      )
+      throw createError({
+        statusCode: 502,
+        statusMessage: 'Failed to sync deployment date with Jira. Change has been rolled back.',
+      })
+    }
+
+    return result
+  }
+  catch (error) {
+    if (error instanceof AppError) {
+      throw error.toH3Error()
+    }
+
+    if (isError(error)) {
+      throw error
+    }
+
+    console.error('Unexpected error in update lot deployment date API:', error)
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Internal server error',
+    })
+  }
+})

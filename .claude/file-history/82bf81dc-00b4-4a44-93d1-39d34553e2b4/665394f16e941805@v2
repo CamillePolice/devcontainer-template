@@ -1,0 +1,69 @@
+import { pgTable, pgView, integer, varchar, date, pgEnum, real, uniqueIndex } from 'drizzle-orm/pg-core'
+import { relations } from 'drizzle-orm'
+import { uo } from './uo'
+import { collaborator } from './collaborator'
+
+export const worklogStatus = pgEnum('worklog_status', [
+  'ACTIF',
+  'BILLED',
+])
+
+export const worklogFixedStatus = pgEnum('worklog_fixed_status', [
+  'NONE',
+  'TO_FIX',
+  'PARTIALLY_FIXED',
+  'FIXED',
+])
+
+export const fixedWorklogMethod = pgEnum('fixed_worklog_method', ['AUTO', 'MANUAL'])
+
+export const worklog = pgTable('worklog', {
+  id: integer('id').generatedByDefaultAsIdentity().primaryKey(),
+  tempoId: varchar('tempo_id', { length: 255 }).notNull().unique(),
+  accountId: varchar('account_id', { length: 255 }).notNull().references(
+    () => collaborator.accountId),
+  o2i: varchar('o2i', { length: 45 }).notNull(),
+  o2iReferenceCarte: varchar('o2i_reference_carte', { length: 45 }),
+  date: date('date').notNull(),
+  quantity: real('quantity').notNull(),
+  fixedStatus: worklogFixedStatus('fixed_status').notNull(),
+  status: worklogStatus('status').notNull(),
+  createdAt: date('created_at').notNull().defaultNow(),
+  updatedAt: date('updated_at')
+    .$onUpdate(() => new Date().toISOString())
+    .defaultNow(),
+})
+
+export const fixedWorklog = pgTable('fixed_worklog', {
+  id: integer().generatedByDefaultAsIdentity().primaryKey(),
+  referenceId: integer('reference_id').notNull().references(
+    () => worklog.id),
+  o2i: varchar('o2i', { length: 45 }).notNull(),
+  fixedO2i: varchar('fixed_o2i', { length: 45 }).notNull().references(
+    () => uo.o2i),
+  quantity: real('quantity').notNull(),
+  method: fixedWorklogMethod('method').notNull().default('MANUAL'),
+  createdAt: date('created_at').notNull().defaultNow(),
+  updatedAt: date('updated_at')
+    .$onUpdate(() => new Date().toISOString())
+    .defaultNow(),
+},
+table => [
+  uniqueIndex('fixed_worklog_ref_fixed_o2i_uniq')
+    .on(table.referenceId, table.fixedO2i),
+])
+
+export const aggregatedWorklogView = pgView('aggregated_worklog_view', {
+  accountId: varchar('account_id').notNull(),
+  o2i: varchar('o2i').notNull(),
+  status: worklogStatus('status'),
+  quantity: real('quantity').notNull(),
+  fixedStatus: worklogFixedStatus('fixed_status'),
+  date: date('date'),
+  createdAt: date('created_at'),
+  updatedAt: date('updated_at'),
+}).existing()
+
+export const worklogRelations = relations(worklog, ({ many }) => ({
+  fixedWorklogs: many(fixedWorklog, { relationName: 'worklogFixedWorklogs' }),
+}))

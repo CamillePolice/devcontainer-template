@@ -1,0 +1,26 @@
+
+Tâche : 
+Actuellement lorsqu'un utilisateur fait une re-estimation sur une UO,  il a pas la possibilité de la supprimer ou de revenir en arrière, il faudrait donc qu'un bouton pour pouvoir revenir à la somme des temps pointés par les utilisateurs.
+
+
+
+Exemple : il y a déjà 2,24 jours de saisis par des utilisateurs, si le CDP re-estime à 3 jours par erreur, il n’est facile de revenir à 2,24 jours (sauf à faire la somme manuellement).
+
+Solution envisagée :
+Ajouter un bouton reset du temps pour enlever les ré-estimations lorsqu’il y a un ajustement en cours
+
+mettre un espace entre la zone et le texte (entre parenthèse)
+
+Code identifié : 
+<UoPendingQuantityInput
+            :uo="row.original.uo"
+            :pending-quantity="row.original.pendingQuantity"
+            @pending-quantity-change="handlePendingQuantityChange"
+          />
+          <span v-if="config.public.recetteEnabled">({{
+            formatDisplayNumber(row.original.uo.quantityAdjustment)
+          }})</span>
+          <UoUnit
+            class="ml-1"
+            :row="row.original"
+          />

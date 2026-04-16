@@ -1,0 +1,86 @@
+{
+  "common": {
+    "selectAll": "Tout cocher",
+    "deselectAll": "Tout décocher"
+  },
+  "anomalies": {
+    "lotTimeOverrun": "Le temps total imputé ({total} {unit}) dépasse les jours vendus ({sold} {unit}) sur ce lot.",
+    "uoOverrun": "L'UO {name} ({o2i}) est en dépassement : {total} {unit} / {original} {unit} prévus."
+  },
+  "navigation": {
+    "lots": "Liste des lots",
+    "closure": "Clôture"
+  },
+  "pages": {
+    "lots": {
+      "title": "Liste des lots"
+    },
+    "lot": {
+      "title": "Détail du lot",
+      "breadcrumb": "Liste des lots"
+    }
+  },
+  "lotTable": {
+    "filterLabel": "Filtrer par : ",
+    "filters": {
+      "name": "Rechercher par nom du lot",
+      "o2i": "Rechercher par carte O2I",
+      "factory": "Rechercher par factory",
+      "responsable": "Rechercher par nom du responsable",
+      "status": "Filtrer par statut",
+      "hideAssigned": "Afficher uniquement les lots non assignés"
+    },
+    "sort": {
+      "asc": "Croissant",
+      "desc": "Décroissant"
+    },
+    "actions": {
+      "view": "Consulter",
+      "preview": "Aperçu"
+    },
+    "anomalyTooltip": "{count} anomalie(s) détectée(s)",
+    "tables": {
+      "lot": {
+        "name": "Nom du lot",
+        "o2i": "O2I",
+        "factory": "Factory",
+        "responsable": "Responsable",
+        "opportunityApprobationDate": "Créé le",
+        "opportunityType": "Type de la carte",
+        "productionCell": "Cellule de production",
+        "lotType": "Type de lot",
+        "status": "Statut"
+      }
+    }
+  },
+  "lot": {
+    "toasts": {
+      "updateResponsable": {
+        "success": {
+          "title": "Responsable mis à jour",
+          "description": "Le responsable du lot a été mis à jour avec succès"
+        },
+        "error": {
+          "title": "Erreur",
+          "description": "Impossible de mettre à jour le responsable du lot"
+        }
+      },
+      "updateDeploymentDate": {
+        "success": {
+          "title": "Date de MEP mise à jour",
+          "description": "La date de MEP prévisionnelle a été mise à jour avec succès"
+        },
+        "error": {
+          "title": "Erreur",
+          "description": "Impossible de mettre à jour la date de MEP prévisionnelle"
+        }
+      }
+    }
+  },
+  "synapps": {
+    "cmp": "Compagnie (CMP)",
+    "prjs": "Projets associés (PRJ)",
+    "viewInSynapps": "Voir dans SynApps",
+    "noData": "Aucune donnée SynApps disponible"
+  }
+}

@@ -1,0 +1,6 @@
+declare module 'nitropack' {
+  interface NitroRuntimeHooks {
+    'microsoft-auth:authenticated': (payload: { user: unknown }) => void
+    'auth0-auth:authenticated': (payload: { user: unknown }) => void
+  }
+}

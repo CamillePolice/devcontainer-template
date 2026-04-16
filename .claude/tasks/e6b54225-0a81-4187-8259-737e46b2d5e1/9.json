@@ -1,0 +1,10 @@
+{
+  "id": "9",
+  "subject": "Task 2 — Logique script Table.vue",
+  "description": "Computed suggestions + renommage ref + prédicat filtrage + init CDP",
+  "status": "completed",
+  "blocks": [
+    "11"
+  ],
+  "blockedBy": []
+}

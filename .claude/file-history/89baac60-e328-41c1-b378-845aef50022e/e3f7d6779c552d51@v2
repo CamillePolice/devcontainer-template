@@ -1,0 +1,147 @@
+# Code Review — `main` → `PMPFLOW-93/reventilation-infos`
+
+## Summary
+
+- **Axe 1 — Couleurs de statut** : nouveau composable `useLotStatusColors` + intégration dans `lot/Table.vue` pour le mapping statut → couleur de badge
+- **Axe 2 — Refactors UI sur les sections UO** : ajout d'unités dans les cellules de tableaux (`StandardBundleSection`, `TimesSection`), enrichissement de `ReventilationSlideover` (nom produit, code, profil, badge parent) et calcul des temps totaux
+- **Qualité générale** : bonne — code bien structuré, typé, conventions du projet respectées
+- **Points d'attention avant merge** : réactivité cassée dans l'initialisation de `useUo` (présent dans deux composants), et typage contourné (`unknown` + double cast) dans `ReventilationSlideover`
+
+## Score: 7/10 — Good
+
+---
+
+## Bloquants — À corriger avant merge
+
+Aucun bloquant au sens sécurité/crash irrécupérable, mais deux avertissements critiques fonctionnellement.
+
+---
+
+## Files
+
+### `app/composables/useLotStatusColors.ts` — Added
+
+**Issues:**
+
+- ⚠️ WARNING — ligne 35 — `'cancelled'` est mappé sur `{ color: 'success', category: 'green' }`. Sémantiquement, un statut annulé ne devrait pas être vert (couleur associée au succès). La valeur `'neutral'` serait plus appropriée, sauf si c'est volontairement un choix métier (lot annulé = terminé du point de vue facturation).
+- ⚠️ WARNING — ligne 28 — Faute de frappe dans la clé : `'approvising bis'` semble être `'approving bis'`. Si la valeur vient d'un référentiel Jira, vérifier l'orthographe exacte car un mismatch silencieux entraîne le fallback vers la couleur neutre.
+- ℹ️ INFO — lignes 7-8 — L'interface `StatusColorMapping` exporte `color: 'neutral' | 'primary' | 'success' | 'info'` mais `'primary'` n'est jamais utilisée dans `statusColorMap`. Soit la retirer de l'union type, soit documenter qu'elle est réservée à l'extension future.
+- ℹ️ INFO — ligne 17 — Le `statusColorMap` est un module-level constant (non réactif, non instancié par Vue). C'est correct ici puisque les statuts sont statiques, mais la fonction `useLotStatusColors` retourne un objet non réactif : un simple `export function getStatusColor()` aurait suffi. Le wrapper composable n'apporte rien fonctionnellement, sauf cohérence de style.
+
+**Positives:**
+
+- ✅ Normalisation lowercase + trim avant lookup : robuste vis-à-vis des variations de casse en provenance de l'API.
+- ✅ `defaultColorMapping` constant séparé plutôt qu'un littéral inline : facilite les tests et la cohérence.
+- ✅ JSDoc sur toutes les fonctions publiques.
+
+---
+
+### `app/components/lot/Table.vue` — Modified
+
+**Issues:**
+
+- ℹ️ INFO — ligne 89 — Le `getStatusColor()` est appelé directement dans le template sans `computed`. Dans une table potentiellement grande, cet appel est recalculé à chaque cycle de détection de changements pour chaque ligne. Pour une table statique/read-only, c'est acceptable ; à surveiller si la table devient interactive.
+
+**Positives:**
+
+- ✅ Intégration propre du composable en une ligne dans le `<script setup>`.
+- ✅ Changement minimal et ciblé.
+
+---
+
+### `app/components/uo/Unit.vue` — Modified
+
+**Issues:**
+
+- ℹ️ INFO — La suppression de `ml-1` sur le `<span>` interne est intentionnelle (margin déplacée sur le composant appelant via `class="ml-1"`). La cohérence est maintenue dans tous les composants qui utilisent `UoUnit` — bonne approche.
+
+**Positives:**
+
+- ✅ Le pattern de délégation du spacing au parent (`class="ml-1"` sur le composant) est correct et plus flexible.
+
+---
+
+### `app/components/uo/HistoricBundleSection.vue` — Modified
+
+**Positives:**
+
+- ✅ Refactor purement cosmétique et conforme à la nouvelle convention de `UoUnit`.
+
+---
+
+### `app/components/uo/StandardBundleSection.vue` — Modified
+
+**Issues:**
+
+- ℹ️ INFO — Le pattern `{{ row.original.billedQuantity\n}}<UoUnit .../>` (valeur sur une ligne, composant sur la suivante) est répété 6 fois. Ce n'est pas un bug, mais un helper de formatage (ex. un composant `UoQuantityWithUnit`) éliminerait la duplication.
+
+**Positives:**
+
+- ✅ Cohérence parfaite avec `TimesSection.vue` — les deux fichiers suivent exactement le même pattern.
+
+---
+
+### `app/components/uo/TimesSection.vue` — Modified
+
+**Issues:**
+
+- ℹ️ INFO — ligne 89 (après diff) — `<span v-else>{{ row.original.raf }}<UoUnit class="ml-1" .../></span>` : le `</` de fermeture est à l'intérieur du `<span>`, ce qui peut créer un whitespace visuel entre la valeur et l'unité si le formatter HTML ajoute un saut de ligne. À vérifier visuellement.
+
+**Positives:**
+
+- ✅ Refactoring de `transformWorklogsToTableRows` vers une forme multi-ligne : lisibilité améliorée.
+
+---
+
+### `app/components/uo/ReventilationSection.vue` — Modified
+
+**Issues:**
+
+- ⚠️ WARNING — ligne 63 — `useUo({ uos: allUos.value })` : le composable reçoit la **valeur** de `allUos` au moment du setup, pas la ref. `useUo` construit un `reactive Map` à partir de ce tableau au moment de l'initialisation (`for (const uo of param.uos)`). Si `props.uosTime` ou `props.uosStandardBundle` arrivent de manière asynchrone (données chargées après le montage du composant), `uoMap` sera vide et `fixWorklogs` ne trouvera jamais l'UO cible via `uoMap.get(selectedO2i)`. Il faudrait passer `toRef(props, 'uosTime')` ou une ref réactive et adapter `useUo` à recevoir une `Ref<UoDetails[]>`, ou utiliser un `watch` pour ré-instancier.
+- ⚠️ WARNING — ligne 143 — `alert('Veuillez sélectionner une UO et un temps valide')` : usage d'`alert()` natif dans une app qui dispose de `useToast()`. Incohérence UX, et les `alert()` bloquent le thread UI. Deux occurrences dans `fixWorklog`.
+- ℹ️ INFO — ligne 116 — Dans `columns`, la cellule `timeToReallocate` retourne une string `"${r.timeToReallocate || 0} H"` mais la colonne a un slot `#timeToReallocate-cell` dans le template qui rend un `<UInput>`. La valeur calculée de la `cell` function est donc ignorée au rendu — la définition `cell` dans la colonne est trompeuse / dead code pour cette colonne spécifique.
+- ℹ️ INFO — Les colonnes `totalTime`, `raf`, `ttr`, `progress` sont présentes dans les clés i18n (`table.header.*`) mais absentes de la définition `columns` dans le script — des clés i18n orphelines.
+
+**Positives:**
+
+- ✅ Le `watch` avec `{ immediate: true }` pour construire la map des worklogs locaux est élégant : il centralise l'agrégation par `accountId` au bon endroit.
+- ✅ Formatage TypeScript du `defineProps` multi-lignes : bien plus lisible qu'avant.
+- ✅ Ajout de l'unité "Heure" dans les headers de colonnes — amélioration UX directe.
+
+---
+
+### `app/components/uo/ReventilationSlideover.vue` — Modified
+
+**Issues:**
+
+- ⚠️ WARNING — ligne 136 — `useUo({ uos: props.uos })` : même problème de réactivité que dans `ReventilationSection`. Le composable est initialisé avec la valeur de `props.uos` au moment du setup. Si le parent transmet des UOs chargées après le montage, `mappedUos` sera calculé sur un `uoMap` vide, et `getDisplayInfo()` retournera `totalQuantity: 0` pour toutes les UOs.
+- ⚠️ WARNING — lignes 162-170 — `getDisplayInfo(item: unknown)` : le paramètre est typé `unknown` et casté deux fois en `UoDetails`. Le slot `#description` de `URadioGroup` fournit l'item via un slot scope typé `RadioGroupItem` (qui est `UoDetails & RadioGroupItem` après le spread dans `groupedUos`). Utiliser le type correct directement ou typer l'item du slot correctement éviterait ce double cast non sécurisé.
+- ⚠️ WARNING — lignes 75-78 — `getDisplayInfo(item)` est appelé **deux fois** dans le même template pour le même `item`. Chaque appel effectue un `.find()` sur `mappedUos.value`. Pour N UOs, c'est 2×N lookups. Stocker le résultat dans une variable locale ou utiliser un `computed` éviterait ce double parcours.
+- ℹ️ INFO — ligne 59 — La comparaison `group.type === 'Forfait standard'` est une string hardcodée en français dans le template. Si la valeur `type` vient de l'API et peut évoluer, cette comparaison deviendra silencieusement fausse. Préférer une constante ou une enum partagée dans `shared/types/`.
+- ℹ️ INFO — ligne 115 — Import explicite de `UoUnit` via chemin relatif `'./Unit.vue'` alors que les autres composants utilisent l'auto-import Nuxt. Incohérence mineure.
+
+**Positives:**
+
+- ✅ Enrichissement de l'affichage des UOs dans le slideover (nom produit, code, profil, parent) : nette amélioration de l'ergonomie.
+- ✅ Le slot `#label` et `#description` de `URadioGroup` sont bien exploités pour un rendu riche sans rompre l'accessibilité du groupe radio.
+- ✅ Changement du type de prop `uos` de `UoCore[]` vers `UoDetails[]` : typage plus précis aligné sur l'usage réel.
+
+---
+
+## Cross-cutting concerns
+
+**Réactivité de `useUo`** : Le pattern `useUo({ uos: someComputedRef.value })` est utilisé dans au moins deux composants (`ReventilationSection` ligne 63, `ReventilationSlideover` ligne 136). Le composable `useUo` est conçu pour recevoir un tableau plain et construit sa Map au setup. Ce pattern est correct uniquement si les données sont disponibles de façon synchrone au moment du montage. Dans un contexte SSR désactivé + fetch asynchrone (ce qui est le cas de ce projet), c'est un risque de bug difficile à reproduire en dev mais réel en prod.
+
+**Mélange FR/EN dans les i18n inline** : `ReventilationSection.vue` contient `chooseUoLink: "Choisissez l'UO"` dans la section `en:` — une clé française dans la traduction anglaise. Mineur mais à corriger pour la cohérence.
+
+**`alert()` vs `useToast()`** : Deux appels `alert()` subsistent dans `ReventilationSection.fixWorklog`. L'app utilise `useToast()` partout ailleurs — ces deux appels sont des régressions UX.
+
+---
+
+## Top Recommendations
+
+1. Corriger la réactivité de `useUo` dans `ReventilationSection` et `ReventilationSlideover` : passer une `Ref` ou `ComputedRef` au composable plutôt que `.value`, ou re-construire la Map via un `watchEffect` interne au composable.
+2. Remplacer les deux `alert()` dans `ReventilationSection.fixWorklog` par des appels `useToast()` pour la cohérence UX.
+3. Dans `ReventilationSlideover`, stocker le résultat de `getDisplayInfo(item)` dans une variable locale du slot ou dans un `computed` pour éviter le double `.find()` par ligne rendue.
+4. Corriger la faute de frappe `'approvising bis'` dans `useLotStatusColors` et revalider la sémantique de `'cancelled'` → `'success'`.
+5. Typer correctement le paramètre de `getDisplayInfo` (retirer `unknown`) en exploitant le type du slot scope `URadioGroup`.

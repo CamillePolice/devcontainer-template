@@ -1,0 +1,25 @@
+import type { RouteLocationNormalized } from 'vue-router'
+
+export default defineNuxtRouteMiddleware((to: RouteLocationNormalized) => {
+  const { isAuthenticated } = useOnionAuth()
+  const isPublicRoute = to.meta.public === true
+  const isAuthRoute = to.path.startsWith('/api/auth/')
+  const isLoginRoute = to.path === '/login' || to.path === '/logout'
+
+  if (
+    !isPublicRoute
+    && !isAuthRoute
+    && !isLoginRoute
+    && !isAuthenticated.value
+  ) {
+    if (import.meta.client) {
+      const redirectCookie = useCookie('auth-redirect', {
+        maxAge: 300,
+        sameSite: 'lax',
+      })
+      redirectCookie.value = to.fullPath
+    }
+
+    return navigateTo('/login')
+  }
+})

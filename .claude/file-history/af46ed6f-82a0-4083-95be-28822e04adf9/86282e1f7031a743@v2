@@ -1,0 +1,499 @@
+<template>
+  <div class="w-full space-y-4 pb-4">
+    <UCard>
+      <div class="flex items-center gap-4">
+        <div>{{ t("filterLabel") }}</div>
+        <UInput
+          v-model="nameSearch"
+          placeholder="Rechercher par nom du lot"
+          icon="i-lucide-search"
+          class="max-w-xs"
+          @input="resetPage"
+        />
+        <UInput
+          v-model="o2iSearch"
+          placeholder="Rechercher par carte O2I"
+          icon="i-lucide-search"
+          class="max-w-xs"
+          @input="resetPage"
+        />
+        <USelect
+          v-model="factorySearch"
+          multiple
+          :items="factoryItems"
+          placeholder="Rechercher par factory"
+          class="w-48"
+          @update:model-value="resetPage"
+        />
+        <UInput
+          v-model="responsableEmailSearch"
+          placeholder="Rechercher par email du responsable"
+          icon="i-lucide-mail"
+          class="max-w-xs"
+          @input="resetPage"
+        />
+        <USelect
+          v-model="statusSearch"
+          multiple
+          :items="props.statusItems ?? []"
+          placeholder="Filtrer par status"
+          class="w-48"
+          @update:model-value="resetPage"
+        />
+        <USwitch
+          v-model="hideAssignedLots"
+          label="Afficher uniquement les lots non assignés"
+          @update:model-value="resetPage"
+        />
+      </div>
+      <UTable
+        ref="table"
+        v-model:sorting="sorting"
+        v-model:pagination="pagination"
+        :data="lots"
+        :columns="columns"
+        :loading="pending"
+        :pagination-options="{
+          getPaginationRowModel: getPaginationRowModel(),
+        }"
+        :sorting-options="{
+          enableMultiSort: true,
+          enableMultiRemove: true,
+          enableSortingRemoval: true,
+          isMultiSortEvent: () => true,
+        }"
+        class="flex-1"
+      >
+        <template #name-cell="{ row }">
+          <div class="max-w-100 overflow-hidden text-ellipsis">
+            <ULink
+              :to="{ name: 'lots-o2i', params: { o2i: row.getValue('o2i') } }"
+            >
+              {{ row.getValue("name") }}
+            </ULink>
+          </div>
+        </template>
+        <template #o2i-cell="{ row }">
+          <div class="max-w-100 overflow-hidden text-ellipsis">
+            <ULink
+              class="font-mono"
+              :href="`${config.public.jiraBaseUrl}${row.getValue('o2i')}`"
+              target="_blank"
+            >
+              {{ row.getValue("o2i") }}
+            </ULink>
+          </div>
+        </template>
+        <template #status-cell="{ row }">
+          <div class="flex items-center gap-2">
+            <UBadge
+              class="capitalize"
+              variant="subtle"
+              color="neutral"
+            >
+              {{ row.getValue("status") }}
+            </UBadge>
+          </div>
+        </template>
+        <template #actions-cell="{ row }">
+          <div class="flex items-center gap-2">
+            <UButton
+              color="neutral"
+              variant="outline"
+              label="Consulter"
+              :to="{ name: 'lots-o2i', params: { o2i: row.getValue('o2i') } }"
+              size="sm"
+            />
+          </div>
+        </template>
+      </UTable>
+
+      <div class="flex justify-center border-t border-default pt-4">
+        <UPagination
+          :page="pagination.pageIndex + 1"
+          :default-page="
+            (table?.tableApi?.getState().pagination.pageIndex || 0) + 1
+          "
+          :items-per-page="table?.tableApi?.getState().pagination.pageSize"
+          :total="table?.tableApi?.getFilteredRowModel().rows.length"
+          @update:page="(p) => table?.tableApi?.setPageIndex(p - 1)"
+        />
+      </div>
+    </UCard>
+  </div>
+</template>
+
+<script setup lang="ts">
+import { storeToRefs } from 'pinia'
+import { getPaginationRowModel } from '@tanstack/vue-table'
+import type { ListableLot } from '#shared/types/lot'
+import type { Collaborator } from '#shared/types/collaborator'
+import type { Factory } from '#shared/types/filters'
+import type { Column } from '@tanstack/vue-table'
+import type { TableColumn } from '@nuxt/ui'
+import { useDateFormat, useSessionStorage } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
+
+const UButton = resolveComponent('UButton')
+const UDropdownMenu = resolveComponent('UDropdownMenu')
+
+const { t } = useI18n()
+const table = useTemplateRef('table')
+const config = useRuntimeConfig()
+
+const collaboratorStore = useCollaboratorStore()
+const {
+  currentCollaborator,
+  isCurrentCollaboratorDispatcher,
+  isCurrentCollaboratorCDP,
+} = storeToRefs(collaboratorStore)
+
+// Receive data and loading state as props from the parent page
+const props = defineProps<{
+  data: ListableLot[] | null | undefined
+  pending: boolean
+  statusItems: { id: number, name: string }[] | undefined
+  factories: Factory[] | undefined
+}>()
+
+const factoryItems = computed(
+  () =>
+    props.factories?.map(f => ({
+      label: f.name,
+      value: f.name,
+    })) ?? [],
+)
+
+// All filters become persistent in sessionStorage
+const nameSearch = useSessionStorage('nameSearch', '')
+const o2iSearch = useSessionStorage('o2iSearch', '')
+const factorySearch = useSessionStorage<string[]>('factorySearch', [])
+const statusSearch = useSessionStorage<string[]>('statusSearch', [])
+
+const responsableEmailSearch = useSessionStorage('responsableEmailSearch', '')
+const hideAssignedLots = useSessionStorage('hideAssignedLots', false)
+
+// New system to identify if the session has been initialized
+const isSessionInitialized = useSessionStorage(
+  'lots-session-initialized',
+  false,
+)
+
+// Function to initialize filters based on user profile
+const initializeFiltersForSession = (collaborator: Collaborator) => {
+  // Apply default filters based on profile
+  if (isCurrentCollaboratorCDP.value) {
+    responsableEmailSearch.value = collaborator.email || ''
+  }
+  if (isCurrentCollaboratorDispatcher.value) {
+    hideAssignedLots.value = true
+  }
+
+  // Mark session as initialized
+  isSessionInitialized.value = true
+}
+
+watch(
+  currentCollaborator,
+  (collaborator) => {
+    if (!collaborator) return
+
+    // Only initialize if this is the first visit of this session
+    if (!isSessionInitialized.value) {
+      initializeFiltersForSession(collaborator)
+    }
+    // Otherwise, filters keep their sessionStorage values
+  },
+  { immediate: true },
+)
+
+const lots = computed(() => {
+  let filteredLots: ListableLot[] = props.data || []
+
+  if (hideAssignedLots.value) {
+    filteredLots = filteredLots.filter(
+      lot => !lot.responsable || !lot.responsable.email,
+    )
+  }
+
+  if (o2iSearch.value) {
+    const o2indexSearchTerm = o2iSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter(lot =>
+      lot.o2i.toLowerCase().includes(o2indexSearchTerm),
+    )
+  }
+
+  if (nameSearch.value) {
+    const nameSearchTerm = nameSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter(lot =>
+      lot.name?.toLowerCase().includes(nameSearchTerm),
+    )
+  }
+
+  if (factorySearch.value && factorySearch.value.length > 0) {
+    const factorySearchTerm = new Set(
+      factorySearch.value.map((f: string) => f.toLowerCase()),
+    )
+    filteredLots = filteredLots.filter(
+      lot =>
+        lot.factory?.name
+        && factorySearchTerm.has(lot.factory?.name?.toLowerCase()),
+    )
+  }
+
+  if (responsableEmailSearch.value) {
+    const emailSearchTerm = responsableEmailSearch.value.toLowerCase()
+    filteredLots = filteredLots.filter(lot =>
+      lot.responsable?.email?.toLowerCase().includes(emailSearchTerm),
+    )
+  }
+  if (statusSearch.value && statusSearch.value.length > 0) {
+    const selectedStatuses = new Set(statusSearch.value.map(Number))
+    filteredLots = filteredLots.filter(lot =>
+      selectedStatuses.has(Number(lot.status?.id)),
+    )
+  }
+  return filteredLots
+})
+
+const resetPage = () => {
+  pagination.value.pageIndex = 0
+  table.value?.tableApi.setPageIndex(0)
+}
+
+const columns = computed<TableColumn<ListableLot>[]>(() => [
+  {
+    accessorKey: 'name',
+    id: 'name',
+    enableMultiSort: true,
+    meta: {
+      class: {
+        td: 'max-w-[400px] overflow-hidden text-ellipsis',
+      },
+    },
+    header: ({ column }) =>
+      h('div', { class: 'text-left' }, getHeader(column, t('tables.lot.name'))),
+  },
+  {
+    accessorKey: 'o2i',
+    id: 'o2i',
+    enableMultiSort: true,
+    header: ({ column }) =>
+      h('div', { class: 'text-left' }, getHeader(column, t('tables.lot.o2i'))),
+    cell: ({ row }) => {
+      return row.getValue('o2i')
+    },
+  },
+  {
+    header: t('tables.lot.factory'),
+    id: 'factory',
+    enableMultiSort: true,
+    accessorFn: (lot: ListableLot) => lot.factory?.name ?? '',
+    cell: ({ row }) => {
+      const factory = row.original.factory
+      return factory ? factory.name : 'N/A'
+    },
+  },
+  {
+    id: 'productionCell',
+    enableMultiSort: true,
+    header: ({ column }) =>
+      h(
+        'div',
+        { class: 'text-left' },
+        getHeader(column, t('tables.lot.productionCell')),
+      ),
+    accessorFn: (lot: ListableLot) => {
+      const productionCell = lot.productionCell
+
+      return productionCell ? productionCell.name : ''
+    },
+    cell: ({ row }) => {
+      return row.getValue('productionCell') || ''
+    },
+  },
+  {
+    accessorKey: 'issueType',
+    id: 'issueType',
+    enableMultiSort: true,
+    header: ({ column }) =>
+      h(
+        'div',
+        { class: 'text-left' },
+        getHeader(column, t('tables.lot.lotType')),
+      ),
+    cell: ({ row }) => {
+      return row.getValue('issueType') || 'N/A'
+    },
+  },
+  {
+    id: 'responsable',
+    enableMultiSort: true,
+    header: ({ column }) =>
+      h(
+        'div',
+        { class: 'text-left' },
+        getHeader(column, t('tables.lot.responsable')),
+      ),
+    accessorFn: (lot: ListableLot) => {
+      const responsable = lot.responsable
+      if (responsable && (responsable.firstName || responsable.lastName)) {
+        return `${responsable.firstName ?? ''} ${responsable.lastName ?? ''}`.trim()
+      }
+      return 'N/A'
+    },
+    cell: ({ row }) => {
+      return row.getValue('responsable') || 'N/A'
+    },
+  },
+  {
+    id: 'opportunityApprobationDate',
+    enableMultiSort: true,
+    accessorFn: (lot: ListableLot) =>
+      lot.opportunityApprobationDate
+        ? new Date(lot.opportunityApprobationDate).getTime()
+        : 0,
+    header: ({ column }) =>
+      h(
+        'div',
+        {},
+        getHeader(column, t('tables.lot.opportunityApprobationDate')),
+      ),
+    cell: ({ row }) => {
+      return useDateFormat(
+        row.original.opportunityApprobationDate,
+        'DD/MM/YYYY',
+      ).value
+    },
+  },
+  {
+    accessorKey: 'opportunityType',
+    id: 'opportunityType',
+    enableSorting: true,
+    header: ({ column }) =>
+      h('div', {}, getHeader(column, t('tables.lot.opportunityType'))),
+  },
+  {
+    id: 'status',
+    accessorKey: 'status',
+    enableSorting: true,
+    header: ({ column }) =>
+      h('div', {}, getHeader(column, t('tables.lot.status'))),
+    accessorFn: (lot: ListableLot) => {
+      const status = lot.status as { id: number, name: string }
+      return status ? status.name : 'N/A'
+    },
+    cell: ({ row }) => {
+      return row.getValue('status') as string
+    },
+  },
+  {
+    id: 'actions',
+    accessorKey: 'actions',
+    header: '',
+    enableSorting: false,
+    cell: ({ row }) => {
+      return row.getValue('o2i')
+    },
+  },
+])
+
+function getHeader(column: Column<ListableLot>, label: string) {
+  const isSorted = column.getIsSorted()
+
+  return h(
+    UDropdownMenu,
+    {
+      'content': {
+        align: 'start',
+      },
+      'aria-label': 'Actions dropdown',
+      'items': [
+        {
+          label: 'Asc',
+          type: 'checkbox',
+          icon: 'i-lucide-arrow-up-narrow-wide',
+          checked: isSorted === 'asc',
+          onSelect: () => {
+            if (isSorted === 'asc') {
+              column.clearSorting()
+            }
+            else {
+              column.toggleSorting(false, true)
+            }
+          },
+        },
+        {
+          label: 'Desc',
+          icon: 'i-lucide-arrow-down-wide-narrow',
+          type: 'checkbox',
+          checked: isSorted === 'desc',
+          onSelect: () => {
+            if (isSorted === 'desc') {
+              column.clearSorting()
+            }
+            else {
+              column.toggleSorting(true, true)
+            }
+          },
+        },
+      ],
+    },
+    () =>
+      h(UButton, {
+        'color': 'neutral',
+        'variant': 'ghost',
+        label,
+        'icon': isSorted
+          ? (isSorted === 'asc'
+              ? 'i-lucide-arrow-up-narrow-wide'
+              : 'i-lucide-arrow-down-wide-narrow')
+          : 'i-lucide-arrow-up-down',
+        'class': '-mx-2.5 data-[state=open]:bg-elevated',
+        'aria-label': `Sort by ${isSorted === 'asc' ? 'descending' : 'ascending'}`,
+      }),
+  )
+}
+type ColumnSort = { id: string, desc: boolean }
+type SortingState = ColumnSort[]
+const sorting = useSessionStorage<SortingState>('lots-sorting', [])
+const pagination = useSessionStorage('lots-pagination', {
+  pageIndex: 0,
+  pageSize: 10,
+})
+</script>
+
+<i18n lang="yaml">
+fr:
+  filterLabel: "Filtrer par : "
+  title: "Forfait standard"
+  status: "Statut"
+  tables:
+    lot:
+      name: "Nom du lot"
+      o2i: "O2I"
+      factory: "Factory"
+      responsable: "Responsable"
+      opportunityApprobationDate: "Créé le"
+      opportunityType: "Type de la carte"
+      productionCell: "Cellule de production"
+      lotType: "Type de lot"
+      status: "Statut"
+      actions: "Actions"
+en:
+  filterLabel: "Sort by : "
+  title: "Standard bundle"
+  status: "Status"
+  tables:
+    lot:
+      name: "Order Name"
+      o2i: "O2I"
+      factory: "Factory"
+      responsable: "Manager"
+      opportunityApprobationDate: "Created on"
+      opportunityType: "Card Type"
+      productionCell: "Production Cell"
+      lotType: "Lot Type"
+      status: "Status"
+      actions: "Actions"
+</i18n>

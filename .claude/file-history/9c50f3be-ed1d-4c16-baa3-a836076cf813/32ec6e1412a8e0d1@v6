@@ -1,0 +1,100 @@
+<template>
+  <div class="flex items-center justify-between w-full text-left">
+    <div class="me-4">
+      <div
+        v-if="!hideParent && uo.productNameParent"
+        class="text-[12px] font-bold"
+      >
+        {{ uo.productCodeParent }} - {{ uo.productNameParent }}
+      </div>
+      <div class="text-[10px]">
+        {{ uo.productName }}
+      </div>
+      <div class="text-[12px] font-bold">
+        {{ formatedProductCode }}
+        <span
+          v-if="config.public.recetteEnabled"
+          class="ml-2"
+        >({{ uo.o2i }})</span>
+      </div>
+      <div
+        v-if="props.uo.factory.key !== props.lotFactory?.key"
+        class="flex items-center w-full gap-1"
+      >
+        <img
+          class="w-3 h-3"
+          src="/icons/factory-warning.png"
+        >
+        <div style="color: #be4c00">
+          Factory {{ uo.factory.name }}
+        </div>
+      </div>
+    </div>
+    <div class="flex items-center gap-1 w-fit">
+      <UTooltip
+        v-if="isOverrun"
+        :text="t('overrunWarning')"
+      >
+        <UIcon
+          name="i-heroicons-exclamation-triangle"
+          class="text-warning-500 w-6 h-6 shrink-0"
+        />
+      </UTooltip>
+      <div v-if="times">
+        <div
+          v-if="uo.originalQuantity"
+          class="bg-gray-950 px-4 py-1 rounded-full text-gray-50 font-bold"
+        >
+          {{ uo.originalQuantity }}{{ uo.unit }}
+        </div>
+      </div>
+      <UButton
+        v-if="expandable"
+        color="neutral"
+        variant="ghost"
+        icon="i-lucide-chevron-down"
+        square
+        aria-label="Expand"
+        :ui="{
+          leadingIcon: [
+            'transition-transform',
+            isExpanded ? 'duration-200 rotate-180' : '',
+          ],
+        }"
+        @click="$emit('toggle-expand')"
+      />
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+
+const props = defineProps<{
+  uo: UoCore
+  times?: boolean
+  lotFactory?: Factory
+  expandable?: boolean
+  isExpanded?: boolean
+  isOverrun?: boolean
+  hideParent?: boolean
+}>()
+
+defineEmits<{
+  (e: 'toggle-expand'): void
+}>()
+
+const formatedProductCode = computed(() =>
+  props.uo.productCode?.replaceAll('_', ' '),
+)
+</script>
+
+<i18n lang="yaml">
+fr:
+  overrunWarning: 'UO en dépassement'
+en:
+  overrunWarning: 'UO overrun'
+</i18n>

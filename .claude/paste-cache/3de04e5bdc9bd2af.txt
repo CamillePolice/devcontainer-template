@@ -1,0 +1,27 @@
+    at async #enhanceFrames (node_modules/youch-core/build/index.js:232:27)
+ ERROR  [request error] [unhandled] [GET] http://localhost:3000/api/lot-status                           10:15:25 AM
+
+ 
+ℹ Error: Failed query: select "id", "name" from "lot_status"
+params: 
+
+ ⁃ at NodePgPreparedQuery.queryWithCache (node_modules/drizzle-orm/pg-core/session.js:41:15)
+ ⁃ at process.processTicksAndRejections (node:internal/process/task_queues:103:5)
+ ⁃ (async file://node_modules/drizzle-orm/node-postgres/session.js:117:22)
+ ⁃ at async getLotStatuses (.nuxt/dev/index.mjs:4796:19)
+
+   4791 ┃      throw handleDatabaseError(error, "getLotByO2i");
+   4792 ┃    }
+   4793 ┃  }
+   4794 ┃  async function getLotStatuses() {
+   4795 ┃    const database = await useDB();
+ ❯ 4796 ┃    const results = await database.select({
+   4797 ┃      id: lotStatus.id,
+   4798 ┃      name: lotStatus.name
+   4799 ┃    }).from(lotStatus);
+   4800 ┃    if (results.length === 0) {
+   4801 ┃      return void 0;
+
+ ⁃ (async file://node_modules/h3/dist/index.mjs:2017:19)
+ ⁃ at async Object.callAsync (node_modules/unctx/dist/index.mjs:72:16)
+ ⁃ at async Server.toNodeHandle (node_modules/h3/dist/index.mjs:2316:7)

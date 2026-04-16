@@ -1,0 +1,90 @@
+import type { RawUserData } from '../types/auth-bridge-contracts'
+import type {
+  AuthProvider,
+  AuthOptions,
+  UserSession,
+} from '../../shared/types/auth-interfaces'
+
+/**
+ * Login with a specific provider
+ */
+async function login(
+  provider: string,
+  options: AuthOptions = {},
+): Promise<void> {
+  const { redirectUrl = '/', params = {} } = options
+
+  const baseUrl = useRuntimeConfig().public.authBaseURL
+  const loginUrl = new URL(`/auth/${provider}`, baseUrl)
+
+  loginUrl.searchParams.set('redirect', redirectUrl)
+
+  for (const [key, value] of Object.entries(params)) {
+    loginUrl.searchParams.set(key, value)
+  }
+
+  await navigateTo(loginUrl.toString(), { external: true })
+}
+
+/**
+ * Logout — delegates to the server to handle SSO logout per provider
+ */
+async function logout(options: AuthOptions = {}): Promise<void> {
+  const { redirectUrl = '/' } = options
+  await navigateTo(
+    `/auth/logout?redirectTo=${encodeURIComponent(redirectUrl)}`,
+    { external: true },
+  )
+}
+
+/**
+ * Main composable for onion-auth authentication
+ * Implements AuthProvider interface for compatibility with UI layers
+ */
+export const useOnionAuth = (): AuthProvider => {
+  const { user, session: rawSession } = useUserSession()
+
+  const userSession: ComputedRef<UserSession | null> = computed(() => {
+    if (!user.value) {
+      return null
+    }
+
+    const userData = user.value as RawUserData
+
+    const raw = rawSession.value as { provider?: string; loggedInAt?: number } | null
+
+    const session: UserSession = {
+      user: {
+        username:
+          userData.username
+          || userData.name
+          || userData.login
+          || userData.email
+          || userData.preferred_username
+          || '',
+        profile: {
+          id: userData.profile?.sub || userData.id || '',
+          name: userData.profile?.name || userData.name || userData.given_name,
+          email: userData.profile?.email || userData.email,
+        },
+        picture: userData.picture,
+        roles: userData.roles ?? [],
+        groups: userData.groups ?? [],
+      },
+      provider: raw?.provider,
+      loggedInAt: raw?.loggedInAt,
+    }
+
+    return session
+  })
+
+  const isAuthenticated = computed(() => !!userSession.value)
+
+  return {
+    userSession,
+    isAuthenticated,
+    loggedIn: isAuthenticated,
+    login,
+    logout,
+  }
+}

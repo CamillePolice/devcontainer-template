@@ -1,0 +1,563 @@
+<template>
+  <USlideover
+    v-model:open="isOpen"
+    side="right"
+    :ui="{
+      content: 'w-2/3 max-w-none',
+    }"
+  >
+    <template #header>
+      <div class="flex items-start justify-between gap-4 w-full">
+        <div class="flex flex-col gap-1 min-w-0">
+          <h3 class="text-lg font-bold truncate">
+            {{ data?.lot?.name || o2i }}
+          </h3>
+          <div class="flex items-center gap-3 text-sm">
+            <ULink
+              class="font-mono text-secondary-600"
+              :href="`${config.public.jiraBaseUrl}${o2i}`"
+              target="_blank"
+            >
+              {{ o2i }}
+            </ULink>
+            <UBadge
+              v-if="data?.lot?.status"
+              variant="subtle"
+              :color="getStatusColor(data.lot.status.name).color"
+              class="capitalize"
+            >
+              {{ data.lot.status.name }}
+            </UBadge>
+          </div>
+        </div>
+        <UTooltip :text="t('viewDetail')">
+          <UButton
+            v-if="o2i"
+            color="neutral"
+            variant="ghost"
+            icon="i-lucide-square-arrow-out-up-right"
+            size="sm"
+            :to="{ name: 'lots-o2i', params: { o2i } }"
+          />
+        </UTooltip>
+      </div>
+    </template>
+
+    <template #body>
+      <div
+        v-if="pending"
+        class="flex justify-center items-center py-12"
+      >
+        <UIcon
+          name="i-lucide-loader-circle"
+          class="animate-spin text-3xl text-muted"
+        />
+      </div>
+
+      <div
+        v-else-if="error"
+        class="py-4"
+      >
+        <UAlert
+          color="error"
+          icon="i-lucide-triangle-alert"
+          :title="t('errorTitle')"
+        />
+      </div>
+
+      <div
+        v-else
+        class="space-y-6 text-sm"
+      >
+        <!-- Informations générales -->
+        <section>
+          <h4 class="font-semibold text-base mb-3">
+            {{ t('sections.info') }}
+          </h4>
+          <dl class="grid grid-cols-2 gap-x-8 gap-y-3">
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.client') }}
+              </dt>
+              <dd>{{ data?.lot?.clientName ? `${data.lot.clientName} (${data.lot.universalNumber})` : '-' }}</dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.commercial') }}
+              </dt>
+              <dd>{{ sales || '-' }}</dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.responsable') }}
+              </dt>
+              <dd>{{ responsable || '-' }}</dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.plannedDeploymentDate') }}
+              </dt>
+              <dd>
+                {{
+                  data?.lot?.plannedDeploymentDate
+                    ? useDateFormat(data.lot.plannedDeploymentDate, 'DD/MM/YYYY').value
+                    : '-'
+                }}
+              </dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.factory') }}
+              </dt>
+              <dd>{{ data?.lot?.factory?.name || '-' }}</dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.productionCell') }}
+              </dt>
+              <dd>{{ data?.lot?.productionCell?.name || '-' }}</dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.billingTrigger') }}
+              </dt>
+              <dd>{{ data?.lot?.billingTrigger || '-' }}</dd>
+            </div>
+
+            <div>
+              <dt class="font-medium text-muted whitespace-nowrap">
+                {{ t('fields.bpj') }}
+              </dt>
+              <dd>
+                <span v-if="data?.lot?.bpj">
+                  {{ data.lot.bpjName ? `${data.lot.bpjName} (${data.lot.bpj})` : data.lot.bpj }}
+                </span>
+                <span v-else>-</span>
+              </dd>
+            </div>
+
+            <template v-if="data?.lot?.bpj">
+              <div>
+                <dt class="font-medium text-muted whitespace-nowrap">
+                  {{ t('fields.cmp') }}
+                </dt>
+                <dd>
+                  <span
+                    v-if="synappsPending"
+                    class="text-muted"
+                  >
+                    <UIcon
+                      name="i-lucide-loader-circle"
+                      class="animate-spin"
+                    />
+                  </span>
+                  <span
+                    v-else-if="synappsStatus === 'error'"
+                    class="text-sm text-muted"
+                  >{{
+                    t('fields.synappsError')
+                  }}</span>
+                  <ULink
+                    v-else-if="synappsData?.cmp"
+                    :href="synappsData.cmp.url"
+                    target="_blank"
+                    class="inline-flex items-center gap-1 text-secondary-600"
+                  >
+                    {{ synappsData.cmp.name }}
+                    <UIcon
+                      name="i-lucide-external-link"
+                      class="text-xs"
+                    />
+                  </ULink>
+                  <span v-else>-</span>
+                </dd>
+              </div>
+
+              <div>
+                <dt class="font-medium text-muted whitespace-nowrap">
+                  {{ t('fields.prjs') }}
+                </dt>
+                <dd>
+                  <span
+                    v-if="synappsPending"
+                    class="text-muted"
+                  >
+                    <UIcon
+                      name="i-lucide-loader-circle"
+                      class="animate-spin"
+                    />
+                  </span>
+                  <span
+                    v-else-if="synappsStatus === 'error'"
+                    class="text-sm text-muted"
+                  >{{
+                    t('fields.synappsError')
+                  }}</span>
+                  <span
+                    v-else-if="synappsData?.prjs?.length"
+                    class="flex flex-col gap-1"
+                  >
+                    <ULink
+                      v-for="prj in visiblePrjs"
+                      :key="prj.id"
+                      :href="prj.url"
+                      target="_blank"
+                      class="inline-flex items-center gap-1 text-secondary-600"
+                    >
+                      {{ prj.name }}
+                      <UIcon
+                        name="i-lucide-external-link"
+                        class="text-xs"
+                      />
+                    </ULink>
+                    <UButton
+                      v-if="synappsData.prjs.length > PRJ_PREVIEW_COUNT"
+                      variant="ghost"
+                      color="neutral"
+                      size="xs"
+                      class="self-start -ml-1 mt-0.5 font-normal"
+                      :icon="showAllPrjs ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'"
+                      @click="showAllPrjs = !showAllPrjs"
+                    >
+                      {{
+                        showAllPrjs
+                          ? t('fields.prjsCollapse')
+                          : t('fields.prjsExpand', { count: synappsData.prjs.length - PRJ_PREVIEW_COUNT })
+                      }}
+                    </UButton>
+                  </span>
+                  <span v-else>-</span>
+                </dd>
+              </div>
+            </template>
+          </dl>
+        </section>
+
+        <USeparator />
+
+        <!-- Descriptions -->
+        <section>
+          <h4 class="font-semibold text-base mb-3">
+            {{ t('sections.descriptions') }}
+          </h4>
+          <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1.5">
+            <dt class="font-medium text-muted whitespace-nowrap">
+              {{ t('fields.quoteDescription') }}
+            </dt>
+            <dd>{{ data?.lot?.quoteDescription || '-' }}</dd>
+
+            <dt class="font-medium text-muted whitespace-nowrap">
+              {{ t('fields.lotDescription') }}
+            </dt>
+            <dd>{{ data?.lot?.description || '-' }}</dd>
+          </dl>
+        </section>
+
+        <USeparator />
+
+        <!-- Réventilation -->
+        <section>
+          <h4 class="font-semibold text-base mb-3 flex items-center gap-2">
+            {{ t('sections.reventilations') }}
+            <UBadge
+              class="px-2"
+              :color="reventilationCount > 0 ? 'error' : 'neutral'"
+              size="sm"
+              variant="subtle"
+            >
+              {{ reventilationCount }}
+            </UBadge>
+          </h4>
+          <div
+            v-if="reventilationCount === 0"
+            class="text-muted"
+          >
+            {{ t('noReventilations') }}
+          </div>
+          <ul
+            v-else
+            class="grid grid-cols-2 gap-x-6 gap-y-1"
+          >
+            <li
+              v-for="entry in mergedReventilations"
+              :key="entry.accountId"
+              class="flex items-center gap-2 flex-wrap"
+            >
+              <UIcon
+                name="i-lucide-triangle-alert"
+                class="text-error shrink-0"
+              />
+              <span>{{ entry.firstName }} {{ entry.lastName }}</span>
+              <span class="text-muted">— {{ entry.totalRemaining }} h</span>
+            </li>
+          </ul>
+        </section>
+
+        <USeparator />
+
+        <!-- Factories & Cellules -->
+        <section>
+          <h4 class="font-semibold text-base mb-3">
+            {{ t('sections.factories') }}
+          </h4>
+          <div
+            v-if="uniqueFactories.length === 0"
+            class="text-muted"
+          >
+            -
+          </div>
+          <div
+            v-else
+            class="flex flex-wrap gap-2"
+          >
+            <UBadge
+              v-for="factory in uniqueFactories"
+              :key="factory"
+              color="neutral"
+              variant="subtle"
+            >
+              {{ factory }}
+            </UBadge>
+          </div>
+          <div
+            v-if="uniqueCells.length > 0"
+            class="flex flex-wrap gap-2 mt-2"
+          >
+            <UBadge
+              v-for="cell in uniqueCells"
+              :key="cell"
+              color="neutral"
+              variant="outline"
+            >
+              {{ cell }}
+            </UBadge>
+          </div>
+        </section>
+
+        <USeparator />
+
+        <!-- Récapitulatif des UOs -->
+        <section>
+          <h4 class="font-semibold text-base mb-3">
+            {{ t('sections.uos') }}
+          </h4>
+          <div
+            v-if="allUos.length === 0"
+            class="text-muted"
+          >
+            {{ t('noUos') }}
+          </div>
+          <div
+            v-else
+            class="grid grid-cols-2 gap-x-6"
+          >
+            <div
+              v-for="uo in allUos"
+              :key="uo.o2i"
+              class="grid grid-cols-[120px_1fr_auto] items-center gap-3 py-1.5 border-b border-default"
+            >
+              <UBadge
+                color="neutral"
+                variant="outline"
+                class="justify-center"
+              >
+                {{ uo.type }}
+              </UBadge>
+              <div class="min-w-0">
+                <div class="font-medium truncate">
+                  {{ uo.productName || t('placeholder.uoName') }}
+                </div>
+                <div class="text-muted text-xs font-mono">
+                  {{ uo.productCode || t('placeholder.uoRef') }}
+                </div>
+              </div>
+              <div class="text-right shrink-0">
+                <span
+                  v-if="uo.originalQuantity != null"
+                  class="font-medium"
+                >
+                  {{ uo.originalQuantity }} {{ uo.unit || 'JH' }}
+                </span>
+                <span
+                  v-else
+                  class="text-muted"
+                >
+                  {{ t('placeholder.soldDays') }}
+                </span>
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </template>
+  </USlideover>
+</template>
+
+<script setup lang="ts">
+import type { UoCore } from '#shared/types/uo'
+import { useDateFormat } from '@vueuse/core'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+const { getStatusColor } = useLotStatusColors()
+const { getByEmail } = useCollaboratorStore()
+
+const props = defineProps<{
+  o2i: string | undefined
+}>()
+
+const isOpen = defineModel<boolean>('open', { default: false })
+
+const o2i = computed(() => props.o2i ?? '')
+
+const { data, error, pending, execute } = useFetchLotOverview(o2i, {
+  immediate: false,
+})
+
+watch(
+  () => props.o2i,
+  (val) => {
+    if (val) execute()
+  },
+  { immediate: true },
+)
+
+const sales = computed(() => {
+  const email = data.value?.lot?.salesEmail
+  const info = email ? getByEmail(email) : undefined
+  return info ? `${info.firstName} ${info.lastName}` : undefined
+})
+
+const responsable = computed(() => {
+  const r = data.value?.lot?.responsable
+  if (!r) return
+  return `${r.firstName ?? ''} ${r.lastName ?? ''}`.trim() || undefined
+})
+
+const reventilationCount = computed(() => data.value?.toFixWorklogs?.length ?? 0)
+
+const mergedReventilations = computed(() => {
+  const worklogs = data.value?.toFixWorklogs ?? []
+  const map = new Map<
+    string,
+    { accountId: string, firstName: string | null, lastName: string | null, totalRemaining: number }
+  >()
+  for (const wl of worklogs) {
+    const key = wl.accountId
+    const remaining = wl.quantity - (wl.fixedQuantity ?? 0)
+    const existing = map.get(key)
+    if (existing) {
+      existing.totalRemaining = Math.round((existing.totalRemaining + remaining) * 100) / 100
+    }
+    else {
+      map.set(key, {
+        accountId: wl.accountId,
+        firstName: wl.firstName,
+        lastName: wl.lastName,
+        totalRemaining: remaining,
+      })
+    }
+  }
+  return [...map.values()]
+})
+
+const allUos = computed<UoCore[]>(() => {
+  if (!data.value?.uos) return []
+  const { TIME, MATERIAL, STANDARD_BUNDLE, HISTORIC_BUNDLE } = data.value.uos
+  const bundleUos = STANDARD_BUNDLE.flatMap(b => b.uos)
+  return [...(TIME ?? []), ...(MATERIAL ?? []), ...bundleUos, ...(HISTORIC_BUNDLE ?? [])]
+})
+
+const uniqueFactories = computed(() => {
+  const names = allUos.value.map(u => u.factory?.name).filter((n): n is string => !!n)
+  return [...new Set(names)]
+})
+
+const uniqueCells = computed(() => {
+  const names = allUos.value.map(u => u.productionCell?.name).filter((n): n is string => !!n)
+  return [...new Set(names)]
+})
+
+const bpj = computed(() => data.value?.lot?.bpj ?? undefined)
+
+const { data: synappsData, pending: synappsPending, status: synappsStatus } = useFetchSynappsInfo(bpj)
+
+const PRJ_PREVIEW_COUNT = 5
+const showAllPrjs = ref(false)
+const visiblePrjs = computed(() => {
+  const prjs = synappsData.value?.prjs ?? []
+  return showAllPrjs.value ? prjs : prjs.slice(0, PRJ_PREVIEW_COUNT)
+})
+</script>
+
+<i18n lang="yaml">
+fr:
+  errorTitle: Erreur lors du chargement des données du lot
+  noReventilations: Aucune réventilation détectée
+  noUos: Aucune UO sur ce lot
+  viewDetail: Voir le détail du lot
+  sections:
+    info: Informations générales
+    descriptions: Descriptions
+    reventilations: Réventilations détectées
+    factories: Factories & Cellules de production
+    uos: Récapitulatif des UOs
+  fields:
+    client: Client
+    commercial: Commercial
+    responsable: Responsable
+    plannedDeploymentDate: Date de MEP prévisionnelle
+    factory: Factory
+    productionCell: Cellule de production
+    billingTrigger: Condition de facturation
+    bpj: BPJ
+    quoteDescription: Description de l'opportunité
+    lotDescription: Description du lot
+    cmp: Compagnie (CMP)
+    prjs: Projets SynApps (PRJ)
+    prjsExpand: 'Voir {count} de plus'
+    prjsCollapse: Réduire
+    synappsError: Erreur lors du chargement des données SynApps
+  placeholder:
+    uoName: Nom non renseigné
+    uoRef: Référence non renseignée
+    soldDays: Jours vendus non renseignés
+en:
+  errorTitle: Error loading lot data
+  noReventilations: No reventilations detected
+  noUos: No UOs on this lot
+  viewDetail: View lot details
+  sections:
+    info: General Information
+    descriptions: Descriptions
+    reventilations: Detected Reventilations
+    factories: Factories & Production Cells
+    uos: UOs Summary
+  fields:
+    client: Client
+    commercial: Sales Representative
+    responsable: Owner
+    plannedDeploymentDate: Planned Deployment Date
+    factory: Factory
+    productionCell: Production Cell
+    billingTrigger: Billing Condition
+    bpj: BPJ
+    quoteDescription: Quote Description
+    lotDescription: Lot Description
+    cmp: Company (CMP)
+    prjs: SynApps Projects (PRJ)
+    prjsExpand: 'Show {count} more'
+    prjsCollapse: Collapse
+    synappsError: Error loading SynApps data
+  placeholder:
+    uoName: Name not provided
+    uoRef: Reference not provided
+    soldDays: Sold days not provided
+</i18n>

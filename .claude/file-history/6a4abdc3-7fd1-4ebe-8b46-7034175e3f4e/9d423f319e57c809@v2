@@ -1,0 +1,148 @@
+/**
+ * Interfaces standardisées pour l'intégration auth
+ * Basées sur le principe d'inversion de dépendance
+ */
+
+import type { Ref, ComputedRef } from 'vue'
+
+/**
+ * Options pour les opérations d'authentification
+ */
+export interface AuthOptions {
+  redirectUrl?: string
+  params?: Record<string, string>
+}
+
+export interface LogoutOptions {
+  redirectUrl?: string
+}
+
+/**
+ * Format standardisé pour les données utilisateur
+ */
+export interface StandardUserData {
+  username?: string
+  profilePicture?: string
+  roles?: string[]
+  groups?: string[]
+  metadata?: Record<string, unknown>
+}
+
+/**
+ * Session utilisateur complète
+ */
+export interface UserSession {
+  user: {
+    username?: string
+    profile?: {
+      name?: string
+      email?: string
+      picture?: string
+      sub?: string
+    }
+    picture?: string
+    roles?: string[]
+    groups?: string[]
+  }
+  provider?: string
+  loggedInAt?: number
+}
+
+/**
+ * Interface que doit implémenter tout provider d'authentification
+ * Permet à onion-auth d'être remplacé par n'importe quel autre système
+ */
+export interface AuthProvider {
+  /**
+   * Session utilisateur réactive
+   */
+  userSession: Ref<UserSession | null>
+
+  /**
+   * État d'authentification calculé
+   */
+  isAuthenticated: ComputedRef<boolean>
+
+  /**
+   * Alias de isAuthenticated
+   */
+  loggedIn: ComputedRef<boolean>
+
+  /**
+   * Fonction de connexion
+   */
+  login(provider: string, options?: AuthOptions): Promise<void>
+
+  /**
+   * Fonction de déconnexion
+   */
+  logout(options?: LogoutOptions): Promise<void>
+}
+
+/**
+ * Interface que doit implémenter tout consumer UI
+ * Permet à onion-layout-nuxt-ui d'être utilisé avec différents providers
+ */
+export interface UIConsumer {
+  /**
+   * Injecte un provider d'authentification
+   */
+  setAuthProvider(provider: AuthProvider, config?: AuthIntegrationConfig): void
+
+  /**
+   * Met à jour manuellement les données utilisateur (optionnel)
+   */
+  updateUserData?(userData: StandardUserData | null): void
+}
+
+/**
+ * Fonction de transformation des données utilisateur
+ * Convertit une session brute en format standardisé
+ */
+export type UserDataTransformer = (
+  session: UserSession | null,
+) => StandardUserData | null
+
+/**
+ * Configuration pour l'intégration auth
+ */
+export interface AuthIntegrationConfig {
+  /**
+   * Fonction personnalisée de transformation des données utilisateur
+   */
+  userDataTransformer?: UserDataTransformer
+
+  /**
+   * Options de debug
+   */
+  debug?: boolean
+
+  /**
+   * Callbacks
+   */
+  onConnect?: () => void
+  onDisconnect?: () => void
+  onError?: (error: Error) => void
+}
+
+/**
+ * Fonction de transformation par défaut
+ */
+export const defaultUserDataTransformer: UserDataTransformer = (session) => {
+  if (!session?.user) {
+    return null
+  }
+
+  const user = session.user
+  return {
+    username:
+      user.username || user.profile?.name || user.profile?.email || undefined,
+    profilePicture: user.picture || user.profile?.picture,
+    roles: user.roles,
+    groups: user.groups,
+    metadata: {
+      provider: session.provider,
+      loggedInAt: session.loggedInAt,
+    },
+  }
+}

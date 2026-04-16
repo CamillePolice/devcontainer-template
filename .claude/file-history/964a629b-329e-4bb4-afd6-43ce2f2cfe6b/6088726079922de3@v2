@@ -1,0 +1,162 @@
+# Plan: Gestion des reventilations manuelles (PMPFLOW-194, PMPFLOW-195, PMPFLOW-131)
+
+## Context
+
+Les worklogs importes de Tempo peuvent etre marques `TO_FIX` quand ils necessitent une reallocation manuelle vers des UOs specifiques. Le systeme existant permet de "fixer" ces worklogs via `POST /api/worklogs/fix` qui cree des lignes `fixed_worklog`. Il manque la possibilite de **voir** et **supprimer** ces reventilations manuelles. L'objectif est d'ajouter une icone roue crantee sur les lignes collaborateurs des tableaux UO pour visualiser et gerer les reventilations en cours.
+
+**Suppression = suppression physique** (DELETE en BDD, pas de soft delete). Apres suppression, le `fixedStatus` du worklog source est recalcule (TO_FIX ou PARTIALLY_FIXED selon le reste).
+
+---
+
+## Etape 1 -- Types partages
+
+**Fichier** : `shared/types/worklog.ts`
+- Ajouter type `FixedWorklogDetail` : `{ id, referenceId, o2i, fixedO2i, quantity, createdAt, worklogDate, worklogStatus, accountId, email, firstName, lastName, targetProductName, targetProductCode }`
+- Etendre `AggregatedWorklog` avec `hasActiveFixedWorklogs?: boolean`
+
+**Fichier** : `shared/types/table.ts`
+- Etendre `WorklogRowData` avec `accountId: string | null` et `hasActiveFixedWorklogs: boolean`
+
+Pas de migration BDD necessaire -- pas de nouvelle colonne.
+
+---
+
+## Etape 2 -- Backend : enrichir les worklogs avec `hasActiveFixedWorklogs`
+
+**Fichier** : `server/utils/worklog.ts`
+- `getWorklogsForO2i` : ajouter une sous-requete SQL dans le SELECT :
+  ```sql
+  COALESCE((SELECT COUNT(*) > 0 FROM fixed_worklog fw2
+    INNER JOIN worklog w2 ON w2.id = fw2.reference_id
+    WHERE fw2.fixed_o2i = aggregated_worklog_view.o2i
+      AND w2.account_id = aggregated_worklog_view.account_id), false)
+  AS has_active_fixed_worklogs
+  ```
+
+**Fichier** : `server/utils/augmented-uo.ts`
+- Propager `hasActiveFixedWorklogs` dans le mapping des worklogs vers `AggregatedWorklog`
+
+---
+
+## Etape 3 -- PMPFLOW-195 : API liste des fixed_worklogs
+
+**Nouveau fichier** : `server/api/worklogs/fixed.get.ts`
+- Route : `GET /api/worklogs/fixed?o2i=<lotO2i>&accountId=<accountId>&fixedO2i=<uoO2i>`
+- Retourne `FixedWorklogDetail[]` (les reventilations actives uniquement, pas d'historique)
+
+**Fonction utilitaire** dans `server/utils/worklog.ts` :
+- `getFixedWorklogsForLot(lotO2i, accountId?, fixedO2i?)` : JOIN fixed_worklog + worklog + collaborator + uo, conversion quantites en heures, tri par createdAt DESC
+
+---
+
+## Etape 4 -- PMPFLOW-194 : API suppression individuelle d'une reventilation
+
+**Nouveau fichier** : `server/api/worklogs/fixed/[id].delete.ts`
+- Route : `DELETE /api/worklogs/fixed/:id`
+
+**Fonction utilitaire** dans `server/utils/worklog.ts` :
+- `deleteFixedWorklog(fixedWorklogId: number)` dans une transaction :
+  1. Fetch la ligne `fixed_worklog` par `id`, valider qu'elle existe
+  2. Valider que le `worklog` source a `status === 'ACTIF'` (pas BILLED)
+  3. **DELETE** la ligne `fixed_worklog`
+  4. Recalculer `worklog.fixedStatus` du worklog source :
+     - `SELECT COALESCE(SUM(quantity), 0) FROM fixed_worklog WHERE reference_id = :worklogId`
+     - Si somme === 0 -> `fixedStatus = 'TO_FIX'`
+     - Si somme > 0 mais < worklog.quantity -> `fixedStatus = 'PARTIALLY_FIXED'`
+     - Si somme >= worklog.quantity -> `fixedStatus = 'FIXED'` (ne devrait pas arriver apres suppression)
+
+---
+
+## Etape 5 -- Frontend : composable et data flow
+
+**Fichier** : `app/composables/useUo.ts`
+- Modifier `transformWorklogsToTableRows` pour passer `accountId` et `hasActiveFixedWorklogs`
+- Ajouter `deleteFixedWorklog(id: number)` au composable (DELETE vers `/api/worklogs/fixed/:id` + toast succes/erreur)
+- Ajouter `deleteFixedWorklogs(ids: number[])` : boucle sur `deleteFixedWorklog` pour chaque id (appels sequentiels)
+
+---
+
+## Etape 6 -- Frontend : icone roue crantee + slideover (PMPFLOW-131)
+
+**Nouveau fichier** : `app/components/uo/FixedWorklogsSlideover.vue`
+- Props : `o2i`, `accountId`, `collaboratorName`, `v-model:open`
+- A l'ouverture, fetch `GET /api/worklogs/fixed?fixedO2i=<o2i>&accountId=<accountId>`
+
+**Layout du slideover (selon maquettes `cadrage/image-20260227-130759.png`)** :
+
+Reutiliser le pattern `USlideover` de `ReventilationSlideover.vue` (memes `ui` props) :
+```
+ui: { wrapper: 'flex items-center justify-center',
+      content: 'w-full sm:max-w-2xl rounded-2xl shadow-xl p-8',
+      header: 'pb-4', title: 'text-left text-xl font-semibold',
+      body: 'pt-2', footer: 'pt-6 flex justify-end gap-3' }
+```
+
+Structure du body :
+- **Titre header** : "Modification de la ventilation" (`text-xl font-semibold`)
+- **Description** : texte explicatif sous le titre
+- **Groupage** par personne (`text-base font-bold`, ex: "Personne C") puis par type UO (sous-titre `text-sm font-semibold text-gray-700`, ex: "Forfait", "T&M")
+- **Chaque item** dans un div avec `flex items-center justify-between` :
+  - Gauche : profil (`text-[10px]`), nom produit bold (`text-[12px] font-bold`), factory warning orange/rouge si differente du lot
+  - Droite : quantite (en heures) + icone poubelle (`i-heroicons-trash`, `UButton` ghost/error) si `worklogStatus === 'ACTIF'`
+  - Items billes : affiches sans poubelle (pas supprimables)
+- **Toggle local** : clic poubelle = marque l'item pour suppression (barrer visuellement ou retirer de la liste)
+- **Footer** : `UButton` "Annuler" (variant `outline`, color `neutral`, size `xl`) + `UButton` "Enregistre ma modification" (color `error`/rouge, size `xl`)
+- Au clic "Enregistre" : boucle `deleteFixedWorklog(id)` pour chaque item marque, refresh la liste, emit `saved`
+
+**Roue crantee (selon maquette `cadrage/image-20260227-130645.png`)** :
+- Icone `i-heroicons-cog-6-tooth` positionnee inline apres le nom du collaborateur (`ml-2`)
+- `UButton` variant `ghost`, size `xs`
+- Active : color `primary` (cliquable)
+- Grisee : color `neutral` + `disabled` (pas de reventilation manuelle)
+
+**Fichiers modifies** :
+- `app/components/uo/TimesSection.vue` : dans le slot `#identifiers-cell`, ajouter un `UButton` roue crantee (`i-heroicons-cog-6-tooth`) a cote de l'avatar collaborateur. Active (color primary) si `hasActiveFixedWorklogs`, sinon grise (color neutral + disabled). Click ouvre le slideover.
+- `app/components/uo/StandardBundleSection.vue` : meme modification dans son slot `#identifiers-cell`
+
+---
+
+## Fichiers critiques
+
+| Fichier | Modification |
+|---------|-------------|
+| `shared/types/worklog.ts` | +`FixedWorklogDetail`, extend `AggregatedWorklog` |
+| `shared/types/table.ts` | Extend `WorklogRowData` |
+| `server/utils/worklog.ts` | +`getFixedWorklogsForLot`, +`deleteFixedWorklog`, modifier `getWorklogsForO2i` |
+| `server/utils/augmented-uo.ts` | Propager `hasActiveFixedWorklogs` |
+| `server/api/worklogs/fixed.get.ts` | Nouveau : GET liste fixed_worklogs |
+| `server/api/worklogs/fixed/[id].delete.ts` | Nouveau : DELETE individuel d'une reventilation |
+| `app/composables/useUo.ts` | Modifier `transformWorklogsToTableRows`, +`deleteFixedWorklog`, +`deleteFixedWorklogs` (boucle) |
+| `app/components/uo/FixedWorklogsSlideover.vue` | Nouveau : slideover de gestion |
+| `app/components/uo/TimesSection.vue` | Ajouter roue crantee sur lignes collaborateurs |
+| `app/components/uo/StandardBundleSection.vue` | Ajouter roue crantee sur lignes collaborateurs |
+
+---
+
+## Strategie de branches Git
+
+Branche de base : `PMPFLOW/delete-manual-ventilated-time` (creee depuis `main`).
+Chaque tache part de cette branche de base :
+
+| Branche | Base | Contenu |
+|---------|------|---------|
+| `PMPFLOW-195/api-liste-fixed-worklogs` | `PMPFLOW/delete-manual-ventilated-time` | Etapes 1 (types) + 2 (hasActiveFixedWorklogs) + 3 (GET API) |
+| `PMPFLOW-194/api-suppression-reventilation` | `PMPFLOW/delete-manual-ventilated-time` | Etape 4 (DELETE API + util deleteFixedWorklog) |
+| `PMPFLOW-131/ui` | `PMPFLOW/delete-manual-ventilated-time` | Etapes 5 (composable) + 6 (gear icon + slideover UI) |
+
+Ordre d'implementation : PMPFLOW-195 -> PMPFLOW-194 -> PMPFLOW-131 (le front depend des 2 APIs).
+
+---
+
+## Verification
+
+1. `npm run typecheck` : aucune erreur TS
+2. `npm run lint` : aucune erreur ESLint
+3. Test manuel :
+   - Ouvrir un lot avec des worklogs TO_FIX
+   - Effectuer une reventilation manuelle via la section existante
+   - Verifier que la roue crantee devient active sur la ligne collaborateur dans TimesSection/StandardBundleSection
+   - Cliquer sur la roue : le slideover affiche la reventilation avec date, quantite, UO cible
+   - Supprimer la reventilation : la ligne disparait, le worklog source revient en TO_FIX
+   - Verifier que les quantites dans la vue agregee sont correctes (le temps revient sur la source)
+   - Verifier qu'une reventilation dont le worklog est BILLED ne peut pas etre supprimee

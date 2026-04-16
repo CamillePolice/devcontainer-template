@@ -1,0 +1,388 @@
+# Plan d'implémentation — `@claranet/onion-doc`
+
+## Contexte
+
+Les équipes Claranet rédigent leur documentation dans Confluence mais souhaitent l'exposer via Nuxt Content v3 sans double saisie. Le plan initial (`cadrage/PLAN_confluence-to-nuxt.md`) pose une bonne architecture mais contient **10 erreurs ou manques** identifiés lors de la revue (syntaxe MDC inexistante, webhook auth incohérente, auto-génération dangereuse de `content.config.ts`, build tool inadapté, absence de rate limiting/pagination/gestion d'erreurs/sync incrémental).
+
+Ce plan corrigé est prêt à exécuter.
+
+---
+
+## Décisions d'architecture
+
+| Décision | Choix | Justification |
+|---|---|---|
+| Type de package | **Module Nuxt** (`defineNuxtModule`) | Besoin d'enregistrer des routes serveur, CLI compilée, cœur Nuxt-indépendant |
+| Build tool | **unbuild** | Standard écosystème unjs/Nuxt (pas tsup) |
+| XML parser | **fast-xml-parser** | Léger (~50KB), zero-dep, arbre JSON natif |
+| Localisation | **Monorepo onion-layers** | Partage CI, Lerna, registry GitLab |
+| Callouts | **Configurable** (`blockquote` par défaut) | `::callout` MDC n'existe pas nativement |
+| `content.config.ts` | **Schema Zod exporté** (pas d'auto-génération) | Évite d'écraser la config existante |
+| Slugification | **Custom** (normalize NFD + regex) | Pas de dépendance supplémentaire |
+
+---
+
+## Arborescence cible
+
+```
+onion-doc/
+├── src/
+│   ├── index.ts                    # Exports publics (types, schema, converter, client)
+│   ├── cli.ts                      # CLI (citty)
+│   ├── types.ts                    # Interfaces TypeScript
+│   ├── schema.ts                   # Schema Zod exportable pour content.config.ts
+│   ├── client/
+│   │   ├── confluence-client.ts    # Client API Confluence v2 (ofetch, retry, pagination)
+│   │   └── types.ts                # Types réponse API Confluence
+│   ├── converter/
+│   │   ├── storage-to-markdown.ts  # Convertisseur XML → Markdown (fast-xml-parser)
+│   │   ├── macro-handlers.ts       # Un handler par macro Confluence
+│   │   └── callout-renderer.ts     # Rendu configurable (blockquote/html/mdc)
+│   ├── sync/
+│   │   ├── tree-fetcher.ts         # Parcours récursif BFS de l'arbre de pages
+│   │   ├── page-writer.ts          # Écriture .md avec frontmatter YAML
+│   │   ├── state-manager.ts        # Gestion .onion-doc-state.json (sync incrémental)
+│   │   └── sync-engine.ts          # Orchestrateur (skip+log sur erreur, SyncResult)
+│   ├── nuxt/
+│   │   ├── module.ts               # defineNuxtModule (configKey: 'onionDoc')
+│   │   └── runtime/
+│   │       └── server/api/_onion-doc/
+│   │           └── webhook.post.ts # Handler webhook (JWT HS256, pas X-Hub-Signature)
+│   └── utils/
+│       └── slugify.ts              # Slugification FR (normalize NFD)
+├── tests/
+│   ├── converter/
+│   │   ├── storage-to-markdown.test.ts
+│   │   └── macro-handlers.test.ts
+│   ├── client/
+│   │   └── confluence-client.test.ts
+│   ├── sync/
+│   │   ├── tree-fetcher.test.ts
+│   │   └── sync-engine.test.ts
+│   └── utils/
+│       └── slugify.test.ts
+├── .playground/                    # App Nuxt de test
+│   ├── nuxt.config.ts
+│   ├── content.config.ts
+│   ├── content/confluence/
+│   ├── app/pages/[...slug].vue
+│   └── .env.example
+├── build.config.ts                 # Configuration unbuild (3 entrées)
+├── package.json
+├── tsconfig.json
+├── vitest.config.mjs
+├── eslint.config.js
+└── README.md
+```
+
+---
+
+## Fichiers monorepo à modifier
+
+1. **`/Users/cpo/Documents/projects/onion/package.json`** (ligne 8) — ajouter `"onion-doc"` dans `workspaces`
+2. **`/Users/cpo/Documents/projects/onion/lerna.json`** (ligne 16) — ajouter `"onion-doc"` dans `packages`
+3. **`/Users/cpo/Documents/projects/onion/.gitlab-ci.yml`** (lignes 41, 46) — ajouter `onion-doc/node_modules/` dans cache et artifacts
+
+---
+
+## Dépendances
+
+```json
+{
+  "dependencies": {
+    "@nuxt/kit": "^4.0.0",
+    "citty": "^0.1.6",
+    "consola": "^3.2.3",
+    "defu": "^6.1.4",
+    "fast-xml-parser": "^4.4.0",
+    "ofetch": "^1.4.1",
+    "zod": "^3.23.0"
+  },
+  "devDependencies": {
+    "@nuxt/content": "^3.0.0",
+    "@nuxt/eslint": "latest",
+    "@nuxt/test-utils": "latest",
+    "eslint": "^9.39.1",
+    "eslint-plugin-unicorn": "^62.0.0",
+    "nuxt": "^4.2.1",
+    "typescript": "^5.9.3",
+    "unbuild": "^3.0.0",
+    "vitest": "^3.0.0"
+  },
+  "peerDependencies": {
+    "@nuxt/content": ">=3.0.0"
+  }
+}
+```
+
+| Dépendance | Rôle |
+|---|---|
+| `fast-xml-parser` | Parse le Confluence Storage Format (XML/XHTML) en arbre JSON |
+| `ofetch` | Client HTTP avec retry intégré + backoff exponentiel (standard unjs) |
+| `@nuxt/kit` | `defineNuxtModule`, `addServerHandler`, `createResolver` |
+| `citty` | Framework CLI (écosystème unjs) |
+| `consola` | Logging structuré |
+| `defu` | Merge profond d'options |
+| `zod` | Schema pour collections Nuxt Content v3 |
+| `unbuild` | Build (3 entry points : index, cli, nuxt/module) |
+
+---
+
+## Corrections appliquées (vs plan original)
+
+### #1 — Callouts : pas de `::callout` natif MDC
+
+Option `calloutStyle` configurable :
+- **`blockquote`** (défaut) : `> [!NOTE]\n> contenu` (GitHub Alerts)
+- **`html`** : `<div class="callout callout-info">contenu</div>`
+- **`mdc`** : `::prose-callout{type="info"}\ncontenu\n::` (nécessite composant Vue côté consommateur)
+
+### #2 — Webhook : JWT HS256 (pas HMAC X-Hub-Signature)
+
+Confluence Cloud envoie un JWT dans `Authorization: Bearer <jwt>`. Validation via `crypto.createHmac('sha256', secret)` natif Node.js — pas de dépendance externe.
+
+### #3 — Schema Zod exporté, pas d'auto-génération
+
+```typescript
+// Le consommateur intègre dans son content.config.ts :
+import { confluencePageSchema } from '@claranet/onion-doc'
+
+export default defineContentConfig({
+  collections: {
+    docs: defineCollection({
+      type: 'page',
+      source: 'confluence/**/*.md',
+      schema: confluencePageSchema,
+    }),
+  },
+})
+```
+
+CLI `onion-doc init` : génère le fichier **seulement s'il n'existe pas**, sinon affiche le code à ajouter.
+
+### #4 — unbuild au lieu de tsup
+
+```typescript
+// build.config.ts
+import { defineBuildConfig } from 'unbuild'
+export default defineBuildConfig({
+  entries: ['./src/index', './src/cli', './src/nuxt/module'],
+  declaration: 'compatible',
+  rollup: { emitCJS: true },
+  externals: ['@nuxt/kit', '@nuxt/content', 'nuxt', 'zod'],
+})
+```
+
+### #5 — Rate limiting (retry exponentiel via ofetch)
+
+```typescript
+ofetch.create({
+  retry: 3,
+  retryStatusCodes: [429, 500, 502, 503, 504],
+  // backoff: 1s, 2s, 4s
+})
+```
+
+### #6 — Pagination cursor-based
+
+Le fetcher itère via le `cursor` dans `_links.next` jusqu'à épuisement.
+
+### #7 — Stratégie d'erreur : skip + log + continue
+
+`SyncResult` contient `succeeded[]` et `failed[]`. Une page en erreur ne bloque pas les autres.
+
+### #8 — Sync incrémental
+
+Fichier `.onion-doc-state.json` stocke `{ version, lastModified, outputPath }` par page. Modes : webhook (page unique), `--since` (delta), `--full` (tout).
+
+### #9 — Slugification FR
+
+Custom : `normalize('NFD')` + strip diacritiques + lowercase + regex. Collision → suffixe ID Confluence.
+
+### #10 — Module Nuxt (pas Layer)
+
+`defineNuxtModule` avec `configKey: 'onionDoc'`. Route webhook enregistrée via `addServerHandler`.
+
+---
+
+## Phases d'implémentation
+
+### Phase 1 — Scaffolding et build (~0.5j)
+
+**Objectif :** Le package build et est reconnu par le monorepo.
+
+**Actions :**
+1. Créer `onion-doc/` avec l'arborescence de base
+2. `package.json` complet (exports, bin, scripts, deps)
+3. `build.config.ts` (unbuild, 3 entrées)
+4. `tsconfig.json` (extends playground)
+5. `vitest.config.mjs` (copie de `onion-auth/vitest.config.mjs`)
+6. `eslint.config.js` (adapté de `onion-auth/eslint.config.js` — sans les overrides Vue pages/components puisque onion-doc n'a pas de composants)
+7. Placeholders : `src/index.ts`, `src/cli.ts`, `src/nuxt/module.ts`
+8. Modifier les 3 fichiers racine monorepo
+9. `npm install` depuis la racine
+
+**Vérification :**
+```bash
+cd onion-doc && npm run build       # dist/ avec index.mjs, cli.mjs, nuxt/module.mjs
+npm run lint                        # 0 erreur
+cd .. && npx lerna ls               # Liste @claranet/onion-doc
+```
+
+---
+
+### Phase 2 — Types, schema Zod, slugify (~0.5j)
+
+**Objectif :** Fondations TypeScript en place et testées.
+
+**Actions :**
+1. `src/types.ts` — interfaces `OnionDocOptions`, `SyncResult`, `SyncedPage`, `FailedPage`, `CalloutStyle`, `PageTreeNode`
+2. `src/schema.ts` — `confluencePageSchema` (Zod)
+3. `src/utils/slugify.ts` — normalize NFD + regex
+4. `tests/utils/slugify.test.ts` — cas FR (accents), espaces, vide, collision
+5. `src/index.ts` — re-exports
+
+**Vérification :**
+```bash
+npm run test -- tests/utils/slugify.test.ts
+npm run build
+```
+
+---
+
+### Phase 3 — Client API Confluence (~1j)
+
+**Objectif :** Client HTTP avec retry, pagination, types stricts.
+
+**Actions :**
+1. `src/client/types.ts` — types réponse API v2 (`ConfluencePage`, `ConfluencePaginatedResponse`)
+2. `src/client/confluence-client.ts` :
+   - `createConfluenceClient(options)` — instance ofetch avec Basic Auth, retry 3x backoff exponentiel
+   - `fetchPage(client, pageId)` — `GET /pages/{id}?body-format=storage`
+   - `fetchPageChildren(client, pageId)` — pagination cursor complète
+   - `fetchPageAttachments(client, pageId)` — liste des pièces jointes
+3. `tests/client/confluence-client.test.ts` — mock ofetch, test pagination 2 pages, test retry 429
+
+**Vérification :**
+```bash
+npm run test -- tests/client/
+```
+
+---
+
+### Phase 4 — Convertisseur XML → Markdown (~2j)
+
+**Objectif :** Conversion fiable du Storage Format. Phase la plus critique.
+
+**Sous-phases :**
+
+**4a — Structure de base (0.5j) :**
+Titres, paragraphes, texte enrichi (`strong`, `em`, `code`), liens, sauts de ligne.
+
+**4b — Tableaux, images, listes (0.5j) :**
+Tables → GFM, `ac:image` → `![alt](url)`, listes multi-niveaux.
+
+**4c — Macros simples (0.25j) :**
+Code fenced, TOC (ignoré), anchor, children (ignoré).
+
+**4d — Callouts configurables (0.5j) :**
+`callout-renderer.ts` avec les 3 styles. Handlers pour info/warning/note/tip/panel.
+
+**4e — Expand + fallback (0.25j) :**
+`<details><summary>` pour expand. Toute macro inconnue → `consola.warn` + ignorée.
+
+**Fichiers :**
+- `src/converter/storage-to-markdown.ts`
+- `src/converter/macro-handlers.ts`
+- `src/converter/callout-renderer.ts`
+- `tests/converter/storage-to-markdown.test.ts`
+- `tests/converter/macro-handlers.test.ts`
+
+**Vérification :**
+```bash
+npm run test -- tests/converter/
+```
+
+---
+
+### Phase 5 — Moteur de synchro (~1j)
+
+**Objectif :** Fetch arbre → convert → write .md avec frontmatter.
+
+**Actions :**
+1. `src/sync/tree-fetcher.ts` — `fetchPageTree(client, rootPageId)` → BFS récursif, retourne `PageTreeNode[]`
+2. `src/sync/page-writer.ts` — génère frontmatter YAML, crée dossiers, gère slugs + collisions
+3. `src/sync/state-manager.ts` — load/save `.onion-doc-state.json`
+4. `src/sync/sync-engine.ts` — `syncAll(options)` + `syncPage(pageId, options)` → `SyncResult`
+5. Tests : mock client, vérifier récursion, vérifier skip+log sur erreur
+
+**Vérification :**
+```bash
+npm run test -- tests/sync/
+```
+
+---
+
+### Phase 6 — CLI (~0.5j)
+
+**Objectif :** `onion-doc sync` et `onion-doc init` fonctionnels.
+
+**Actions :**
+1. `src/cli.ts` avec citty :
+   - `sync` — `--full`, `--since <date>`, `--root-page-id`, env vars fallback (`CONFLUENCE_DOMAIN`, `CONFLUENCE_EMAIL`, `CONFLUENCE_API_TOKEN`)
+   - `init` — vérifie `content.config.ts`, génère ou affiche le code
+2. Affichage structuré du `SyncResult`
+
+**Vérification :**
+```bash
+npm run build
+node dist/cli.mjs --help
+node dist/cli.mjs sync --help
+node dist/cli.mjs init --help
+```
+
+---
+
+### Phase 7 — Module Nuxt + Webhook (~1j)
+
+**Objectif :** Intégration Nuxt avec webhook Confluence.
+
+**Actions :**
+1. `src/nuxt/module.ts` — `defineNuxtModule`, `addServerHandler`, runtimeConfig
+2. `src/nuxt/runtime/server/api/_onion-doc/webhook.post.ts` — validation JWT HS256 natif, extraction pageId, appel `syncPage()`
+3. `.playground/` complet : nuxt.config, content.config, page test, .env.example
+
+**Vérification :**
+```bash
+npm run dev:prepare    # unbuild --stub + nuxt prepare
+npm run dev            # Playground démarre
+# curl -X POST localhost:3000/api/_onion-doc/webhook → 401 (pas de JWT)
+```
+
+---
+
+### Phase 8 — Documentation + CI (~0.5j)
+
+**Actions :**
+1. `README.md` : installation, config module, config CLI, schema Zod, calloutStyle, webhook setup, sync incrémental
+2. Vérifier CI complète
+
+**Vérification :**
+```bash
+cd /Users/cpo/Documents/projects/onion
+npm run lint && npm run test && npm run build
+npx lerna ls    # @claranet/onion-doc listé
+```
+
+---
+
+## Risques
+
+| Risque | Mitigation |
+|---|---|
+| Complexité Storage Format XML | Sous-phases 4a→4e, tests extensifs par macro |
+| Macros custom non documentées | Ignore + warn, pas de crash |
+| Arbre 1000+ pages | Pagination cursor + retry + sync incrémental |
+| Images inline (attachments privés) | V1 : URLs absolues Confluence. V2 : download local |
+| JWT webhook mal documenté Atlassian | Test avec ngrok + webhook réel |
+| `fast-xml-parser` + XHTML mal formé | try/catch par page (correction #7) |

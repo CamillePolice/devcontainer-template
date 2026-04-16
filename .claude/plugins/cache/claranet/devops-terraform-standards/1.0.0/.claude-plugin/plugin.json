@@ -1,0 +1,10 @@
+{
+  "name": "devops-terraform-standards",
+  "version": "1.0.0",
+  "description": "Claranet Terraform/OpenTofu coding standards, module discovery, and security best practices",
+  "author": {
+    "name": "Claranet"
+  },
+  "license": "Internal Use",
+  "keywords": ["terraform", "opentofu", "infrastructure", "devops", "security", "modules"]
+}

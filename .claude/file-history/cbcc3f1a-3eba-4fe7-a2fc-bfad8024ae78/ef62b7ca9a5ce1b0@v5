@@ -1,0 +1,204 @@
+<template>
+  <USlideover
+    :open="open"
+    close-icon="i-lucide-x"
+    :transition="true"
+    :ui="{
+      wrapper: 'flex items-center justify-center',
+      content: 'w-full sm:max-w-lg rounded-2xl shadow-xl p-6 space-y-6',
+      header: 'pb-2',
+      title: 'text-left text-xl font-semibold',
+      body: 'pt-2',
+      footer: 'pt-4 flex justify-end gap-3',
+    }"
+    @update:open="$emit('update:open', $event)"
+  >
+    <template #header>
+      <div class="space-y-2">
+        <h2 class="text-xl font-semibold">
+          {{ t('title') }}
+        </h2>
+      </div>
+    </template>
+
+    <template #body>
+      <p class="text-sm text-gray-600 mb-6">
+        {{ t('description') }}
+      </p>
+
+      <div
+        v-if="uo.materialDeclarations.length === 0"
+        class="text-sm text-gray-500 text-center py-8"
+      >
+        {{ t('empty') }}
+      </div>
+
+      <div
+        v-else
+        class="space-y-1"
+      >
+        <div
+          v-for="material in uo.materialDeclarations"
+          :key="material.id"
+          class="flex items-center justify-between py-2 border-b border-gray-100"
+          :class="{ 'opacity-50 line-through': markedForDeletion.has(material.id) }"
+        >
+          <p class="text-sm">
+            {{ t('produced') }} — {{ useDateFormat(material.availabilityDate, 'DD/MM/YYYY') }}
+          </p>
+          <div class="flex items-center gap-3">
+            <span class="text-sm font-medium">{{ material.quantity }}</span>
+            <UBadge
+              v-if="material.status === 'BILLED'"
+              color="neutral"
+              variant="soft"
+              size="sm"
+            >
+              {{ t('billed') }}
+            </UBadge>
+            <UButton
+              v-else
+              icon="i-lucide-trash-2"
+              variant="ghost"
+              size="xs"
+              :color="markedForDeletion.has(material.id) ? 'error' : 'neutral'"
+              @click="toggleMark(material.id)"
+            />
+          </div>
+        </div>
+      </div>
+    </template>
+
+    <template #footer>
+      <UButton
+        variant="outline"
+        color="neutral"
+        size="xl"
+        @click="cancel"
+      >
+        {{ t('cancel') }}
+      </UButton>
+      <UButton
+        color="error"
+        size="xl"
+        :loading="saving"
+        :disabled="markedForDeletion.size === 0"
+        @click="save"
+      >
+        {{ t('confirm') }}
+      </UButton>
+    </template>
+  </USlideover>
+</template>
+
+<script lang="ts" setup>
+import { useDateFormat } from '@vueuse/core'
+import { useToast } from '#ui/composables/useToast'
+import { useI18n } from 'vue-i18n'
+
+const { t } = useI18n()
+const toast = useToast()
+
+const props = defineProps<{
+  open: boolean
+  uo: UoDetails
+}>()
+
+const emit = defineEmits<{
+  (e: 'update:open', value: boolean): void
+  (e: 'saved', deletedIds: number[]): void
+}>()
+
+const markedForDeletion = ref(new Set<number>())
+const saving = ref(false)
+
+watch(
+  () => props.open,
+  (val) => {
+    if (val) {
+      markedForDeletion.value = new Set()
+    }
+  },
+)
+
+function toggleMark(id: number) {
+  const next = new Set(markedForDeletion.value)
+  if (next.has(id)) next.delete(id)
+  else next.add(id)
+  markedForDeletion.value = next
+}
+
+function cancel() {
+  emit('update:open', false)
+}
+
+async function save() {
+  if (markedForDeletion.value.size === 0) {
+    emit('update:open', false)
+    return
+  }
+
+  saving.value = true
+  const ids = [...markedForDeletion.value]
+
+  const results = await Promise.allSettled(
+    ids.map(id =>
+      $fetch(`/api/uos/${props.uo.o2i}/material-quantity-declarations/${id}`, {
+        method: 'DELETE',
+      }),
+    ),
+  )
+
+  saving.value = false
+
+  const succeededIds = ids.filter((_, i) => results[i]?.status === 'fulfilled')
+  const hasError = results.some(r => r.status === 'rejected')
+
+  if (succeededIds.length > 0) {
+    emit('saved', succeededIds)
+    const next = new Set(markedForDeletion.value)
+    for (const id of succeededIds) next.delete(id)
+    markedForDeletion.value = next
+  }
+
+  if (hasError) {
+    toast.add({
+      title: t('saveError'),
+      color: 'error',
+    })
+  }
+  else {
+    toast.add({
+      title: t('saveSuccessTitle'),
+      description: t('saveSuccessDescription', { count: ids.length, o2i: props.uo.o2i }),
+      color: 'success',
+    })
+    emit('update:open', false)
+  }
+}
+</script>
+
+<i18n lang="yaml">
+fr:
+  title: Quantités de matériel
+  description: Gérez les quantités de matériel déclarées pour cette UO.
+  empty: Aucune déclaration de matériel.
+  produced: Produit
+  billed: Comptabilisé
+  cancel: Annuler
+  confirm: Confirmer la suppression
+  saveSuccessTitle: Quantité de matériel
+  saveSuccessDescription: La quantité de matériel a été supprimée pour la UO {o2i}. | {count} quantités de matériel ont été supprimées pour la UO {o2i}.
+  saveError: Une erreur est survenue lors de la suppression
+en:
+  title: Material quantities
+  description: Manage the declared material quantities for this UO.
+  empty: No material declarations.
+  produced: Produced
+  billed: Billed
+  cancel: Cancel
+  confirm: Confirm deletion
+  saveSuccessTitle: Material quantity
+  saveSuccessDescription: The material quantity has been deleted for UO {o2i}. | {count} material quantities have been deleted for UO {o2i}.
+  saveError: An error occurred during deletion
+</i18n>

@@ -1,0 +1,398 @@
+<template>
+  <div>
+    <UCard>
+      <template #header>
+        <CardTitle
+          :title="t('title')"
+          icon="/icons/card.png"
+        />
+      </template>
+      <UAccordion
+        :items="uos"
+        type="multiple"
+        :ui="{
+          trailingIcon: 'hidden',
+        }"
+      >
+        <template #leading="{ open }">
+          <div class="pointer-events-auto cursor-pointer flex items-center">
+            <UIcon
+              :name="
+                open ? 'i-heroicons-chevron-up' : 'i-heroicons-chevron-down'
+              "
+              class="w-5 h-5 transition-transform"
+            />
+            <USeparator
+              class="mr-5 ml-5 h-10"
+              orientation="vertical"
+            />
+          </div>
+        </template>
+        <template #default="uo">
+          <div class="flex flex-col items-start h-15 justify-center gap-1">
+            <div class="text-base font-bold leading-[150%]">
+              {{ stripHtml(uo.item.productName) }}
+              <span v-if="config.public.recetteEnabled">({{ uo.item.o2i }})</span>
+            </div>
+            <div
+              v-if="uo.item.factory.key !== lotFactory?.key"
+              class="flex items-center gap-1"
+              style="color: #be4c00"
+            >
+              <img
+                class="w-3 h-3"
+                src="/icons/factory-error.png"
+                alt="Factory warning"
+              >
+              <span style="color: #da0812">Factory {{ uo.item.factory.name }}</span>
+            </div>
+          </div>
+        </template>
+        <template #trailing="uo">
+          <div
+            class="ml-auto pointer-events-auto"
+            @click.stop
+          >
+            <MilestoneOverview
+              :milestones="milestones"
+              :billed-milestone="uo.item.billedMilestone"
+              :milestone-billed-at="uo.item.milestoneBilledAt"
+              @milestone-click="
+                (milestone: Milestone) =>
+                  openMilestoneModal(uo.item.o2i, milestone)
+              "
+            />
+          </div>
+        </template>
+        <template #body="uo">
+          <UTable
+            :data="getBundleUosWithType(uo.item.o2i)"
+            :columns="columns"
+            :get-sub-rows="getSubRows"
+            :ui="{
+              base: 'border-separate border-spacing-[8px] [&_tbody_tr:not([data-selectable])]:hidden [&_thead_tr]:h-[12px] [&_td:first-child]:w-[20%] [&_td:first-child]:min-w-[20%] [&_td:first-child]:max-w-[20%]',
+              th: 'text-gray-700 text-[10px] text-center p-0',
+              separator: 'hidden',
+              tr: 'data-[expanded=true]:bg-elevated/50 border-none h-[64px]',
+              td: 'text-default bg-gray-100 dark:bg-gray-50 rounded-[6px] py-[8px] px-[16px] min-w-[80px] w-[120px]',
+            }"
+          >
+            <template #identifiers-cell="{ row }">
+              <div
+                v-if="row.original.type === 'worklog'"
+                class="avatar-cell text-sm"
+              >
+                <UAvatar
+                  :alt="row.original.collaborator"
+                  class="bg-gray-800 me-2"
+                  :ui="{
+                    fallback: 'text-gray-50',
+                  }"
+                />
+                {{ row.original.collaborator }}
+              </div>
+              <UoIdentifiers
+                v-else
+                :uo="row.original.uo"
+                :times="true"
+                :lot-factory="lotFactory"
+                :expandable="true"
+                :is-expanded="row.getIsExpanded()"
+                @toggle-expand="row.toggleExpanded()"
+              />
+            </template>
+            <template #billedQuantity-cell="{ row }">
+              <div>
+                {{ formatDisplayNumber(row.original.billedQuantity)
+                }}<UoUnit
+                  class="ml-1"
+                  :row="row.original"
+                />
+              </div>
+            </template>
+            <template #pendingQuantity-cell="{ row }">
+              <div
+                v-if="row.original.type === 'worklog'"
+                class="text-sm"
+              >
+                {{ formatDisplayNumber(row.original.pendingQuantity)
+                }}<UoUnit
+                  class="ml-1"
+                  :row="row.original"
+                />
+              </div>
+              <div v-else>
+                <UoPendingQuantityInput
+                  :uo="row.original.uo"
+                  :pending-quantity="row.original.pendingQuantity"
+                  @pending-quantity-change="handlePendingQuantityChange"
+                />
+                <UoUnit
+                  class="ml-1"
+                  :row="row.original"
+                />
+              </div>
+            </template>
+            <template #totalQuantity-cell="{ row }">
+              <div>
+                <span>{{
+                  formatDisplayNumber(row.original.totalQuantity)
+                }}</span><UoUnit
+                  class="ml-1"
+                  :row="row.original"
+                />
+              </div>
+            </template>
+            <template #raf-cell="{ row }">
+              <span
+                v-if="row.original.type === 'worklog'"
+                class="empty-cell"
+              />
+              <div v-else>
+                <UoRafInput
+                  :uo="row.original.uo"
+                  :raf="row.original.raf"
+                  @raf-change="handleRafChange"
+                />
+                <UoUnit
+                  class="ml-1"
+                  :row="row.original"
+                />
+              </div>
+            </template>
+            <template #reevaluated-cell="{ row }">
+              <div
+                v-if="row.original.type === 'worklog'"
+                class="empty-cell"
+              />
+              <div v-else>
+                <span>{{
+                  formatDisplayNumber(
+                    row.original.raf + row.original.totalQuantity,
+                  )
+                }}</span><UoUnit
+                  class="ml-1"
+                  :row="row.original"
+                />
+              </div>
+            </template>
+            <template #progress-cell="{ row }">
+              <span
+                v-if="row.original.type === 'worklog'"
+                class="empty-cell"
+              />
+              <span v-else>{{ row.original.progress }} %</span>
+            </template>
+            <template #billingTrigger-cell="{ row }">
+              <span
+                v-if="row.original.type === 'worklog'"
+                class="empty-cell"
+              />
+              <span v-else>{{ row.original.uo.billingTrigger }}</span>
+            </template>
+            <template #expanded>
+              <!-- Sub-rows are rendered via getSubRows, hide the expand slot row -->
+            </template>
+          </UTable>
+        </template>
+      </UAccordion>
+    </UCard>
+
+    <MilestoneConfirmModal
+      v-model:open="isModalOpen"
+      :milestone="selectedMilestone"
+      :loading="isLoading"
+      @confirm="confirmMilestoneSelection"
+      @cancel="cancelMilestoneSelection"
+    />
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { computed, ref } from 'vue'
+import type { TableColumn } from '@nuxt/ui'
+import type { UoStandardBundle, UoDetails } from '#shared/types/uo'
+import type { Factory } from '@@/shared/types/filters'
+import { useI18n } from 'vue-i18n'
+import { useUo, transformWorklogsToTableRows } from '~/composables/useUo'
+import type { TableRowData } from '@@/shared/types/table'
+import type { Milestone } from '#shared/types/milestone'
+import { stripHtml } from '~~/shared/utils/stripHtml'
+import { formatDisplayNumber } from '@@/shared/utils/number-formatting'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+
+const props = defineProps<{ uos: UoStandardBundle[], lotFactory?: Factory }>()
+
+const milestones = useLotStore().currentLotMilestones
+
+const allUos = computed(() => {
+  const uos: UoDetails[] = []
+  for (const bundle of props.uos) {
+    for (const uo of bundle.uos) {
+      uos.push(uo)
+    }
+  }
+  return uos
+})
+
+const { findChildMappedUo, updatePendingQuantity, updateRaf, updateMilestone }
+  = useUo({
+    uos: allUos.value,
+  })
+
+// Fonction pour obtenir les UOs d'un bundle avec le type 'uo'
+function getBundleUosWithType(o2i: string): TableRowData[] {
+  return findChildMappedUo(o2i).map(uo => ({
+    ...uo,
+    type: 'uo' as const,
+  }))
+}
+
+// Fonction pour obtenir les sous-lignes (worklogs)
+const getSubRows = (row: TableRowData) => {
+  if (row.type === 'worklog') {
+    return []
+  }
+  return transformWorklogsToTableRows(
+    row.uo.worklogs || [],
+    row.uo.unit,
+    row.o2i,
+  )
+}
+
+const columns: TableColumn<TableRowData>[] = [
+  {
+    header: '',
+    accessorKey: 'identifiers',
+  },
+  {
+    header: t('table.headers.billedTime'),
+    id: 'billedQuantity',
+  },
+  {
+    header: t('table.headers.pendingTime'),
+    id: 'pendingQuantity',
+  },
+  {
+    header: t('table.headers.totalTime'),
+    id: 'totalQuantity',
+  },
+  {
+    header: t('table.headers.raf'),
+    id: 'raf',
+  },
+  {
+    header: t('table.headers.reevaluated'),
+    id: 'reevaluated',
+  },
+  {
+    header: t('table.headers.progress'),
+    id: 'progress',
+  },
+]
+
+const isModalOpen = ref(false)
+const selectedMilestone = ref<Milestone | undefined>(undefined)
+const selectedBundleO2i = ref<string | undefined>(undefined)
+const isLoading = ref(false)
+
+async function handlePendingQuantityChange(o2i: string, newValue: number) {
+  await updatePendingQuantity(o2i, newValue)
+}
+
+async function handleRafChange(o2i: string, newValue: number) {
+  await updateRaf(o2i, newValue)
+}
+
+function openMilestoneModal(bundleO2i: string, milestone: Milestone) {
+  selectedBundleO2i.value = bundleO2i
+  selectedMilestone.value = milestone
+  isModalOpen.value = true
+}
+
+function cancelMilestoneSelection() {
+  isModalOpen.value = false
+  selectedMilestone.value = undefined
+  selectedBundleO2i.value = undefined
+}
+
+async function confirmMilestoneSelection() {
+  if (!selectedMilestone.value || !selectedBundleO2i.value) return
+
+  isLoading.value = true
+
+  const bundle = props.uos.find(b => b.o2i === selectedBundleO2i.value)
+  await updateMilestone(
+    selectedBundleO2i.value,
+    selectedMilestone.value,
+    bundle,
+  )
+
+  isModalOpen.value = false
+  selectedMilestone.value = undefined
+  selectedBundleO2i.value = undefined
+  isLoading.value = false
+}
+</script>
+
+<style scoped>
+:deep(td) {
+  text-align: center;
+}
+
+:deep(td > div),
+:deep(td > span) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+:deep(th:first-child) {
+  height: 4px;
+}
+
+:deep(td:first-child > div),
+:deep(td:first-child > span) {
+  float: left;
+}
+
+:deep(td:first-child > div) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+:deep(td:has(.avatar-cell)),
+:deep(td:has(.empty-cell)) {
+  background: transparent !important;
+}
+</style>
+
+<i18n lang="yaml">
+fr:
+  title: "Forfait"
+  status: "Statut"
+  table:
+    headers:
+      productCode: "Code produit"
+      billedTime: "Temps comptabilisé"
+      pendingTime: "Temps période en cours"
+      totalTime: "Temps total"
+      raf: "RAF"
+      progress: "Avancement"
+      reevaluated: "Total réévalué"
+en:
+  title: "Bundle"
+  status: "Status"
+  table:
+    headers:
+      productCode: "Product Code"
+      billedTime: "Time billed"
+      pendingTime: "Time current period"
+      totalTime: "Total Time"
+      raf: "RAF"
+      progress: "Progress"
+      reevaluated: "Total re-evaluated"
+</i18n>

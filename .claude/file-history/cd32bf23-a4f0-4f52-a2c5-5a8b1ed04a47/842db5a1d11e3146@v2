@@ -1,0 +1,181 @@
+import { eq } from 'drizzle-orm'
+import { collaborator, collaboratorRole } from '../database/schemas'
+
+const EMAIL_BLACKLIST = new Set(['support.eto@fr.clara.net'])
+
+function escapeHtml(s: string): string {
+  return s.replaceAll('&', '&amp;').replaceAll('<', '&lt;').replaceAll('>', '&gt;').replaceAll('"', '&quot;')
+}
+
+function toRecipientList(value?: string | string[]): string[] {
+  const list = Array.isArray(value) ? value : (value ? [value] : [])
+  return list.filter(it => !EMAIL_BLACKLIST.has(it))
+}
+
+async function getAdminEmails(): Promise<string[]> {
+  try {
+    const db = await useDB()
+    const results = await db
+      .selectDistinct({ email: collaborator.email })
+      .from(collaborator)
+      .innerJoin(collaboratorRole, eq(collaborator.accountId, collaboratorRole.accountId))
+      .where(eq(collaboratorRole.role, 'admin'))
+    return results.map(r => r.email)
+  }
+  catch {
+    console.error('[email] Failed to fetch admin emails for notification')
+    return []
+  }
+}
+
+/**
+ * Parse the plain-text body (intro paragraph + Key: Value lines) into a
+ * branded HTML email matching the ProjectFlow design system (NuxtUI v4,
+ * green primary #16a34a, slate neutrals, orange warning alerts).
+ *
+ * Expected body format:
+ *   {intro sentence}
+ *
+ *   Key: Value
+ *   Key: Value
+ */
+function buildErrorEmailHtml(subject: string, body: string): string {
+  const lines = body.split('\n')
+  const introLines: string[] = []
+  const details: { key: string, value: string }[] = []
+  let pastBlank = false
+
+  for (const line of lines) {
+    if (!pastBlank && line.trim() === '') {
+      pastBlank = true
+      continue
+    }
+    if (pastBlank) {
+      const colonIdx = line.indexOf(':')
+      if (colonIdx > 0) {
+        details.push({ key: line.slice(0, colonIdx).trim(), value: line.slice(colonIdx + 1).trim() })
+      }
+    }
+    else {
+      introLines.push(line)
+    }
+  }
+
+  const intro = introLines.join(' ').trim()
+
+  const detailRows = details
+    .map(
+      ({ key, value }) =>
+        '<tr>'
+        + '<td style="padding:8px 16px;color:#64748b;font-weight:500;white-space:nowrap;vertical-align:top;width:1%;border-bottom:1px solid #f1f5f9;">'
+        + escapeHtml(key)
+        + '</td>'
+        + '<td style="padding:8px 16px;color:#0f172a;font-family:\'Courier New\',monospace;font-size:12px;word-break:break-all;border-bottom:1px solid #f1f5f9;">'
+        + escapeHtml(value)
+        + '</td>'
+        + '</tr>',
+    )
+    .join('')
+
+  const detailsSection
+    = details.length > 0
+      ? '<table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e2e8f0;border-radius:8px;border-collapse:separate;border-spacing:0;font-size:13px;">'
+      + '<thead><tr style="background-color:#f8fafc;"><th colspan="2" style="padding:10px 16px;text-align:left;color:#94a3b8;font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:0.05em;border-bottom:1px solid #e2e8f0;">D\u00E9tails de l\u2019erreur</th></tr></thead>'
+      + '<tbody>'
+      + detailRows
+      + '</tbody></table>'
+      : ''
+
+  return (
+    '<!DOCTYPE html>'
+    + '<html lang="fr"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>'
+    + '<title>'
+    + escapeHtml(subject)
+    + '</title></head>'
+    + '<body style="margin:0;padding:0;background-color:#f1f5f9;font-family:-apple-system,BlinkMacSystemFont,\'Segoe UI\',Roboto,sans-serif;">'
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="background-color:#f1f5f9;padding:40px 16px;"><tr><td align="center">'
+    + '<table width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;">'
+    // Header — amber warning bar with logo
+    + '<tr><td style="background-color:#d97706;border-radius:10px 10px 0 0;padding:24px 32px;">'
+    + '<table width="100%" cellpadding="0" cellspacing="0"><tr>'
+    + '<td><img src="cid:PFlow.png" alt="ProjectFlow" style="height:40px;display:block;border:0;" /></td>'
+    + '<td align="right"><span style="color:#fef3c7;font-size:12px;">Notification syst\u00E8me</span></td>'
+    + '</tr></table></td></tr>'
+    // Alert banner — orange left-border (matches UAlert warning/soft)
+    + '<tr><td style="background-color:#fff7ed;border-left:4px solid #f97316;border-right:1px solid #fed7aa;padding:16px 32px;">'
+    + '<table cellpadding="0" cellspacing="0"><tr>'
+    + '<td style="padding-right:10px;vertical-align:middle;font-size:20px;">\u26A0\uFE0F</td>'
+    + '<td style="color:#9a3412;font-size:15px;font-weight:600;">'
+    + escapeHtml(subject)
+    + '</td>'
+    + '</tr></table></td></tr>'
+    // Body card — white background (matches UCard)
+    + '<tr><td style="background-color:#ffffff;border-left:1px solid #e2e8f0;border-right:1px solid #e2e8f0;padding:24px 32px;">'
+    + '<p style="margin:0 0 20px;color:#475569;font-size:14px;line-height:1.6;">'
+    + escapeHtml(intro)
+    + '</p>'
+    + detailsSection
+    + '</td></tr>'
+    // Footer — muted gray
+    + '<tr><td style="background-color:#f8fafc;border:1px solid #e2e8f0;border-top:none;border-radius:0 0 10px 10px;padding:16px 32px;">'
+    + '<p style="margin:0;color:#94a3b8;font-size:12px;text-align:center;">Cet email a \u00E9t\u00E9 envoy\u00E9 automatiquement par '
+    + '<strong style="color:#64748b;">ProjectFlow</strong>.<br/>Ne pas r\u00E9pondre \u00E0 cet email.</p>'
+    + '</td></tr>'
+    + '</table></td></tr></table></body></html>'
+  )
+}
+
+/**
+ * Send an error notification email to all admin collaborators via Mailgun.
+ * Fire-and-forget — synchronous return, never throws, does not block the caller.
+ * Silently skips when Mailgun is not configured or no admin users are found.
+ */
+export function sendAdminErrorEmail(subject: string, body: string): void {
+  void (async () => {
+    try {
+      const config = useRuntimeConfig()
+      const mg = config.mailgun as { apiKey: string, domain: string, from: string, baseApiUrl: string }
+
+      if (!mg?.apiKey || !mg?.domain) {
+        return
+      }
+
+      const adminEmails = await getAdminEmails()
+      if (adminEmails.length === 0) {
+        return
+      }
+
+      const baseUrl = mg.baseApiUrl.replace(/\/$/, '')
+      const credentials = Buffer.from(`api:${mg.apiKey}`).toString('base64')
+
+      const formData = new FormData()
+
+      const logoBuffer = await useStorage('assets:logo').getItemRaw('PFlow.png')
+      if (logoBuffer) {
+        formData.append('inline', new Blob([logoBuffer], { type: 'image/png' }), 'PFlow.png')
+      }
+
+      formData.append('from', mg.from || `ProjectFlow <noreply@${mg.domain}>`)
+      formData.append('subject', `[PFlow] ${subject}`)
+      formData.append('text', body)
+      formData.append('html', buildErrorEmailHtml(subject, body))
+      for (const email of toRecipientList(adminEmails)) {
+        formData.append('to', email)
+      }
+
+      const response = await fetch(`${baseUrl}/v3/${mg.domain}/messages`, {
+        method: 'POST',
+        headers: { Authorization: `Basic ${credentials}` },
+        body: formData,
+      })
+
+      if (!response.ok) {
+        const text = await response.text()
+        console.error(`[email] Mailgun responded with ${response.status}: ${text}`)
+      }
+    }
+    catch (error) {
+      console.error('[email] Failed to send admin error notification:', error)
+    }
+  })()
+}

@@ -1,0 +1,26 @@
+{
+  "claude-plugins-official": {
+    "source": {
+      "source": "github",
+      "repo": "anthropics/claude-plugins-official"
+    },
+    "installLocation": "/Users/cpo/.claude/plugins/marketplaces/claude-plugins-official",
+    "lastUpdated": "2026-04-16T14:09:10.743Z"
+  },
+  "claranet": {
+    "source": {
+      "source": "git",
+      "url": "git@git.fr.clara.net:claranet/projects/ai/claude-code.git"
+    },
+    "installLocation": "/Users/cpo/.claude/plugins/marketplaces/claranet",
+    "lastUpdated": "2026-03-12T13:29:12.626Z"
+  },
+  "thedotmack": {
+    "source": {
+      "source": "github",
+      "repo": "thedotmack/claude-mem"
+    },
+    "installLocation": "/Users/cpo/.claude/plugins/marketplaces/thedotmack",
+    "lastUpdated": "2026-03-24T15:35:54.841Z"
+  }
+}

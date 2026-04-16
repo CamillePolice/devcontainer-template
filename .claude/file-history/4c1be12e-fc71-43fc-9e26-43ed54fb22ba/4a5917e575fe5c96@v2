@@ -1,0 +1,13 @@
+# Project
+
+Nuxt 4 / Vue 3 / TypeScript / NuxtUI v4 / Tailwind / Symfony API
+
+## Key rules
+
+- Composition API + `<script setup>` only, no Options API
+- VueUse before custom composables
+- `npm run lint` + `npm run typecheck` avant chaque tâche
+
+## Full guidelines
+
+@docs/guidelines/coding.md

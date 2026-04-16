@@ -1,0 +1,144 @@
+import { DatabaseError } from '~~/server/utils/database'
+import type { H3Error } from 'h3'
+import { createError } from 'h3'
+
+export interface PostgresErrorDetails {
+  pgError: string
+  detail?: string
+}
+
+export interface OriginalErrorDetails {
+  originalError: string
+}
+
+export type ErrorDetails
+  = | PostgresErrorDetails
+    | OriginalErrorDetails
+    | Record<string, unknown>
+    | undefined
+
+export enum ErrorType {
+  DATABASE = 'DATABASE_ERROR',
+  NOT_FOUND = 'NOT_FOUND',
+  VALIDATION = 'VALIDATION_ERROR',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  FORBIDDEN = 'FORBIDDEN',
+  INTERNAL = 'INTERNAL_SERVER_ERROR',
+}
+
+export class AppError extends Error {
+  type: ErrorType
+  statusCode: number
+  details?: ErrorDetails
+
+  constructor(message: string, type: ErrorType, statusCode: number = 500, details?: ErrorDetails) {
+    super(message)
+    this.name = 'AppError'
+    this.type = type
+    this.statusCode = statusCode
+    this.details = details
+  }
+
+  toH3Error(): H3Error {
+    return createError({
+      statusCode: this.statusCode,
+      message: this.message,
+      data: {
+        type: this.type,
+        details: this.details,
+      },
+    })
+  }
+}
+
+/**
+ * Handle database errors and convert them to AppError
+ * @param error The error to handle
+ * @param context Additional context for the error
+ */
+export function handleDatabaseError(error: unknown, context?: string): AppError {
+  console.error(`Database error ${context ? `in ${context}` : ''}:`)
+
+  if (error instanceof DatabaseError) {
+    switch (error.code) {
+      case '23505': { // unique_violation
+        return new AppError(
+          'A record with this data already exists',
+          ErrorType.VALIDATION,
+          409,
+          { pgError: error.code, detail: error.detail },
+        )
+      }
+      case '23503': { // foreign_key_violation
+        return new AppError(
+          'Referenced record does not exist',
+          ErrorType.VALIDATION,
+          400,
+          { pgError: error.code, detail: error.detail },
+        )
+      }
+      case '42P01': { // undefined_table
+        return new AppError(
+          'Database table not found',
+          ErrorType.DATABASE,
+          500,
+          { pgError: error.code },
+        )
+      }
+      case '42703': { // undefined_column
+        return new AppError(
+          'Database column not found',
+          ErrorType.DATABASE,
+          500,
+          { pgError: error.code },
+        )
+      }
+      default: {
+        return new AppError(
+          'Database operation failed',
+          ErrorType.DATABASE,
+          500,
+          { pgError: error.code },
+        )
+      }
+    }
+  }
+
+  if (error instanceof Error) {
+    return new AppError(
+      error.message || 'An unexpected database error occurred',
+      ErrorType.DATABASE,
+      500,
+      { originalError: error.name },
+    )
+  }
+
+  return new AppError(
+    'An unknown database error occurred',
+    ErrorType.DATABASE,
+    500,
+  )
+}
+
+/**
+ * Create a not found error
+ * @param entity The entity type that was not found
+ * @param identifier The identifier that was used to look up the entity
+ */
+export function createNotFoundError(entity: string, identifier?: string | number): AppError {
+  const message = identifier
+    ? `${entity} with identifier ${identifier} not found`
+    : `${entity} not found`
+  console.error(message)
+  return new AppError(message, ErrorType.NOT_FOUND, 404)
+}
+
+/**
+ * Create a validation error
+ * @param message The validation error message
+ * @param details Additional details about the validation error
+ */
+export function createValidationError(message: string, details?: Record<string, unknown>): AppError {
+  console.error(message)
+  return new AppError(message, ErrorType.VALIDATION, 400, details)
+}

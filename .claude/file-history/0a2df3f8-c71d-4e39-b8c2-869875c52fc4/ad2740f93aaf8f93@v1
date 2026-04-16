@@ -1,0 +1,55 @@
+import type { Collaborator } from '#shared/types/collaborator'
+import type { H3Event } from 'h3'
+import { getCollaboratorByEmail } from './collaborator'
+
+const AUTH_EXCLUDED_API_PREFIXES = ['/api/automations', '/api/_auth']
+
+export function shouldSkipAuthForPath(path: string): boolean {
+  if (!path.startsWith('/api')) {
+    return true
+  }
+
+  return AUTH_EXCLUDED_API_PREFIXES.some(prefix => path.startsWith(prefix))
+}
+
+export function isAdmin(collaborator: Collaborator): boolean {
+  return collaborator.roles?.some(r => r?.trim().toLowerCase() === 'admin') ?? false
+}
+
+/**
+ * Get the current authenticated user from the user session
+ */
+export async function getCurrentUser(event: H3Event): Promise<Collaborator> {
+  const session = await getUserSession(event)
+
+  const email = (session?.user as { profile?: { email?: string } })?.profile?.email
+
+  if (!email) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+      message: 'Authentication required',
+    })
+  }
+
+  const collaborator = await getCollaboratorByEmail(email)
+  return collaborator
+}
+
+/**
+ * Require admin role for the current request
+ * Throws 403 error if user is not admin
+ */
+export async function requireAdmin(event: H3Event): Promise<Collaborator> {
+  const collaborator = await getCurrentUser(event)
+
+  if (!isAdmin(collaborator)) {
+    throw createError({
+      statusCode: 403,
+      statusMessage: 'Forbidden',
+      message: 'Admin role required to access this resource',
+    })
+  }
+
+  return collaborator
+}

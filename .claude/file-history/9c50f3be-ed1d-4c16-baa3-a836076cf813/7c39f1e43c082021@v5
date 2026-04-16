@@ -1,0 +1,161 @@
+<template>
+  <UCard>
+    <template #header>
+      <CardTitle
+        :title="t('title')"
+        icon="/icons/card.png"
+      />
+    </template>
+  </UCard>
+
+  <UoFixedWorklogsSlideover
+    v-if="activeWorklogRow"
+    v-model:open="slideoverOpen"
+    :lot-o2i="activeWorklogRow.lotO2i"
+    :account-id="activeWorklogRow.accountId ?? ''"
+    :collaborator-name="activeWorklogRow.collaborator"
+    :uo-o2i="activeWorklogRow.o2i"
+    @saved="emit('refresh')"
+  />
+</template>
+
+<script lang="ts" setup>
+import { computed, nextTick } from 'vue'
+import type { TableColumn } from '@nuxt/ui'
+import { useI18n } from 'vue-i18n'
+import type { UoDetails } from '@@/shared/types/uo'
+import type { Factory } from '@@/shared/types/filters'
+import { useUo, transformWorklogsToTableRows } from '~/composables/useUo'
+import type { TableRowData, WorklogRowData } from '@@/shared/types/table'
+import { formatDisplayNumber } from '@@/shared/utils/number-formatting'
+
+const { t } = useI18n()
+const config = useRuntimeConfig()
+
+const props = defineProps<{ uos: UoDetails[], lotFactory?: Factory }>()
+
+const { mappedUos, updatePendingQuantity, resetQuantityAdjustment } = useUo({ uos: () => props.uos })
+const emit = defineEmits<{ (e: 'refresh'): void }>()
+
+const slideoverOpen = ref(false)
+const activeWorklogRow = ref<WorklogRowData | undefined>(undefined)
+
+async function openSlideover(row: WorklogRowData) {
+  activeWorklogRow.value = row
+  await nextTick()
+  slideoverOpen.value = true
+}
+
+// Transformation des UOs avec le type 'uo'
+const mappedUosWithType = computed(() => {
+  return mappedUos.value.map(uo => ({
+    ...uo,
+    type: 'uo' as const,
+  }))
+})
+
+// Fonction pour obtenir les sous-lignes (worklogs)
+const getSubRows = (row: TableRowData) => {
+  if (row.type === 'worklog') {
+    return []
+  }
+  return transformWorklogsToTableRows(row.uo.worklogs || [], row.uo.unit, row.o2i, row.uo.o2iLot)
+}
+
+const columns: TableColumn<TableRowData>[] = [
+  {
+    header: '',
+    accessorKey: 'identifiers',
+  },
+  {
+    header: t('table.headers.billedTime'),
+    id: 'billedQuantity',
+  },
+  {
+    header: t('table.headers.pendingTime'),
+    id: 'pendingQuantity',
+  },
+  {
+    header: t('table.headers.totalTime'),
+    id: 'totalQuantity',
+  },
+  {
+    header: t('table.headers.raf'),
+    id: 'raf',
+  },
+  {
+    header: t('table.headers.progress'),
+    id: 'progress',
+  },
+]
+
+async function handlePendingQuantityChange(o2i: string, newValue: number) {
+  await updatePendingQuantity(o2i, newValue)
+}
+
+const resettingO2i = ref<string | undefined>(undefined)
+
+async function handleResetQuantityAdjustment(o2i: string) {
+  resettingO2i.value = o2i
+  await resetQuantityAdjustment(o2i)
+  resettingO2i.value = undefined
+}
+</script>
+
+<style scoped>
+:deep(td) {
+  text-align: center;
+}
+
+:deep(td > div),
+:deep(td > span) {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+:deep(th:first-child) {
+  height: 4px;
+}
+
+:deep(td:first-child > div),
+:deep(td:first-child > span) {
+  float: left;
+}
+
+:deep(td:first-child > div) {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+:deep(td:has(.avatar-cell)),
+:deep(td:has(.empty-cell)) {
+  background: transparent !important;
+}
+</style>
+
+<i18n lang="yaml">
+fr:
+  title: 'Temps'
+  resetAdjustment: 'Annuler la re-estimation'
+  table:
+    headers:
+      productCode: 'Code produit'
+      totalTime: 'Temps total'
+      billedTime: 'Temps déjà comptabilisé'
+      pendingTime: 'Temps période en cours'
+      raf: 'RAF'
+      progress: '% consommé'
+en:
+  title: 'Times'
+  resetAdjustment: 'Reset re-estimation'
+  table:
+    headers:
+      productCode: 'Product Code'
+      totalTime: 'Total Time'
+      billedTime: 'Time already billed'
+      pendingTime: 'Time current period'
+      raf: 'RAF'
+      progress: '% consummed'
+</i18n>

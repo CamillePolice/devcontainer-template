@@ -1,0 +1,26 @@
+include:
+  - project: 'claranet/dos/federalapps/common-ci'
+    file: '/biome-apps-v1.yml'
+
+variables:
+  RUNTIME_VERSION: "24"
+
+.tests:
+  script:
+    - npm ci
+    - npm run lint
+    - npm run typecheck
+
+.deploy:
+  script:
+    - gcloud run deploy projectflow-${TARGET_ENV,,}
+      --image $GCP_REGION-docker.pkg.dev/biome-apps-${TARGET_ENV,,}/biome-apps-${TARGET_ENV,,}-registry/project-flow:$IMAGE_TAG
+      --port 3000
+      --platform managed
+      --region $GCP_REGION
+      --allow-unauthenticated
+      --vpc-connector="projects/biome-apps-${TARGET_ENV,,}/locations/europe-west9/connectors/vpcconnector"
+      --vpc-egress=all-traffic
+      --add-cloudsql-instances ${NUXT_DB_INSTANCE_CONNECTION_NAME}
+      --set-env-vars NUXT_DB_INSTANCE_CONNECTION_NAME="${NUXT_DB_INSTANCE_CONNECTION_NAME}",NUXT_DB_NAME="${NUXT_DB_NAME}",NUXT_DB_USER="${NUXT_DB_USER}",NUXT_DB_MIGRATIONS_FOLDER="${NUXT_DB_MIGRATIONS_FOLDER}",NUXT_MICROSOFT_CLIENT_ID="${NUXT_MICROSOFT_CLIENT_ID}",NUXT_MICROSOFT_CLIENT_SECRET="${NUXT_MICROSOFT_CLIENT_SECRET}",NUXT_MICROSOFT_TENANT_ID="${NUXT_MICROSOFT_TENANT_ID}",NUXT_SESSION_PASSWORD="${NUXT_SESSION_PASSWORD}",NUXT_PUBLIC_AUTH_BASE_URL="${NUXT_PUBLIC_AUTH_BASE_URL}",NUXT_PUBLIC_RECETTE_ENABLED="${NUXT_PUBLIC_RECETTE_ENABLED}"
+

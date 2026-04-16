@@ -1,0 +1,17 @@
+import { checkBasicAuth, checkAutomationSecret } from '../utils/auth'
+
+export default defineEventHandler(async (event) => {
+  const path = event.path
+
+  // Non-API routes (SSR pages, assets) are not protected here.
+  // Page-level auth is handled by Vue route middleware in app/middleware/.
+  if (!path.startsWith('/api/')) {
+    return
+  }
+  else if (path.startsWith('/api/automations')) {
+    checkAutomationSecret(event)
+  }
+  else {
+    checkBasicAuth(event)
+  }
+})

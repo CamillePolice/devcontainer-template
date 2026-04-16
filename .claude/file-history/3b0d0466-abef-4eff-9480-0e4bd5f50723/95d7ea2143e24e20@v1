@@ -1,0 +1,55 @@
+import type { LotAnomaly } from '#shared/types/anomaly'
+import type { AnomalyContext } from './types'
+import { computeUoTotalQuantity, roundAnomalyQuantity } from './types'
+
+export function detectLotTimeOverrun(context: AnomalyContext): LotAnomaly[] {
+  const timeUos = context.uos.TIME
+  const standardBundleChildUos = context.uos.STANDARD_BUNDLE.flatMap(bundle => bundle.uos)
+  const allTrackedUos = [...timeUos, ...standardBundleChildUos]
+
+  if (allTrackedUos.length === 0) {
+    return []
+  }
+
+  const totalSoldDays = roundAnomalyQuantity(
+    allTrackedUos.reduce((sum, uo) => sum + (uo.originalQuantity ?? 0), 0),
+  )
+  const totalConsumed = roundAnomalyQuantity(
+    allTrackedUos.reduce((sum, uo) => sum + computeUoTotalQuantity(uo), 0),
+  )
+
+  // toFixWorklogs.timeToReallocate is always in HEURE (from getToFixWorklogsForO2i).
+  // Normalize to the UO's native unit so the comparison is meaningful.
+  const uoUnit = allTrackedUos[0]!.unit?.toUpperCase() ?? 'JH'
+  const isJhUnit = uoUnit === 'JH'
+  const rawTimeToReallocate = roundAnomalyQuantity(
+    context.toFixWorklogs.reduce((sum, worklog) => sum + (worklog.timeToReallocate ?? 0), 0),
+  )
+  const timeToReallocate = isJhUnit
+    ? roundAnomalyQuantity(rawTimeToReallocate / context.hoursPerWorkday)
+    : rawTimeToReallocate
+
+  const totalWithReventilation = roundAnomalyQuantity(totalConsumed + timeToReallocate)
+
+  if (totalWithReventilation <= totalSoldDays) {
+    return []
+  }
+
+  return [
+    {
+      type: 'LOT_TIME_OVERRUN',
+      severity: 'warning',
+      messageKey: 'anomalies.lotTimeOverrun',
+      params: {
+        total: totalWithReventilation,
+        sold: totalSoldDays,
+        unit: isJhUnit ? 'j' : 'h',
+      },
+      metadata: {
+        totalConsumed: totalWithReventilation,
+        totalSoldDays,
+        timeToReallocate,
+      },
+    },
+  ]
+}

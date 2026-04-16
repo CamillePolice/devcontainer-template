@@ -1,0 +1,80 @@
+// shared/types/auth.d.ts
+declare module '#auth-utils' {
+  interface User {
+    /** Username or unique identifier */
+    username: string
+    /** User profile with basic information */
+    profile: {
+      /** Full name of the user */
+      name?: string
+      /** User's email */
+      email?: string
+      /** Avatar/profile picture URL */
+      picture?: string
+      /** Unique provider identifier */
+      sub?: string
+    }
+    /** Profile picture URL (shortcut to profile.picture) */
+    picture?: string
+    /** Roles assigned to the user (from ID token) */
+    roles?: string[]
+    /** Groups the user belongs to (from ID token) */
+    groups?: string[]
+  }
+
+  interface UserSession {
+    /** User data */
+    user?: User
+    /** Authentication provider used */
+    provider?: 'auth0' | 'microsoft'
+    /** Session timestamp */
+    loggedInAt?: number
+  }
+
+  /**
+   * Complete Onion authentication session (strict typed version)
+   */
+  interface OnionAuthSession {
+    /** User data */
+    user: User
+    /** Authentication provider used */
+    provider: AuthProvider
+    /** Login timestamp */
+    loggedInAt: number
+  }
+
+  /**
+   * Interface for the useOnionAuth composable
+   */
+  interface OnionAuthComposable {
+    /** Reactive user session */
+    userSession: import('vue').ComputedRef<OnionAuthSession | null>
+    /** Login state */
+    isAuthenticated: import('vue').ComputedRef<boolean>
+    /** @deprecated Use `isAuthenticated` instead */
+    loggedIn: import('vue').ComputedRef<boolean>
+    /** Login function */
+    login: (provider: AuthProvider, options?: LoginOptions) => Promise<void>
+    /** Logout function */
+    logout: (options?: LogoutOptions) => Promise<void>
+    /** Session refresh function */
+    refresh: () => Promise<void>
+  }
+
+  interface LoginOptions {
+    /** Redirect URL after login */
+    redirectUrl?: string
+    /** Additional parameters for the provider */
+    params?: Record<string, string>
+  }
+
+  interface LogoutOptions {
+    /** Redirect URL after logout */
+    redirectUrl?: string
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface SecureSessionData {}
+
+  type AuthProvider = 'auth0' | 'microsoft'
+}

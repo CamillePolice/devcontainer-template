@@ -1,0 +1,19 @@
+import { getProfileLabel } from '#shared/utils/profile-formatting'
+
+describe('getProfileLabel', () => {
+  it('returns the mapped label for a known key', () => {
+    expect(getProfileLabel('profil_dev')).toBe('Dev')
+    expect(getProfileLabel('profil_devops')).toBe('DevOps')
+    expect(getProfileLabel('profil_cdp')).toBe('CDP')
+  })
+
+  it('strips the profil_ prefix for unknown keys (regex fallback)', () => {
+    expect(getProfileLabel('profil_some-new-role')).toBe('some-new-role')
+    expect(getProfileLabel('profil_future-profile')).toBe('future-profile')
+  })
+
+  it('returns the raw key when no profil_ prefix and not in map', () => {
+    expect(getProfileLabel('custom_role')).toBe('custom_role')
+    expect(getProfileLabel('unknown')).toBe('unknown')
+  })
+})

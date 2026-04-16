@@ -1,0 +1,32 @@
+import type { FixedWorklogDetail } from '#shared/types/worklog'
+
+export const useFixedWorklogs = () => {
+    const fetchFixedWorklogs = async (
+        lotO2i: string,
+        accountId: string,
+        uoO2i?: string,
+    ): Promise<FixedWorklogDetail[]> => {
+        if (!lotO2i || !accountId) return []
+        try {
+            return await $fetch<FixedWorklogDetail[]>('/api/worklogs/fixed', {
+                query: { o2i: lotO2i, accountId, fixedO2i: uoO2i },
+            })
+        }
+        catch {
+            return []
+        }
+    }
+
+    const deleteFixedWorklogs = async (ids: number[]) => {
+        return Promise.allSettled(
+            ids.map(id =>
+                $fetch(`/api/worklogs/fixed/${id}` as string, { method: 'DELETE' }),
+            ),
+        )
+    }
+
+    return {
+        fetchFixedWorklogs,
+        deleteFixedWorklogs,
+    }
+}

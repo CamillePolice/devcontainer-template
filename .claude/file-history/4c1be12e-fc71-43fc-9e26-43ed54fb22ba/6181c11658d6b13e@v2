@@ -1,0 +1,45 @@
+# === Gitlab NPM Token ===
+GITLAB_NPM_TOKEN=
+
+# === Auth0 ===
+NUXT_OAUTH_AUTH0_CLIENT_ID=VkLG5qmoRGSSrQtZThZNQv0Yifurd23O
+NUXT_OAUTH_AUTH0_CLIENT_SECRET=9TIrdh2_6dy-IZzcSV1B-3LZiDGnkV6qJ1zel4PAus9_n85csBQZ7exr0z7vX2iu
+NUXT_OAUTH_AUTH0_DOMAIN=https://iam.clara.net/
+NUXT_OAUTH_AUTH0_REDIRECT_URL=http://localhost:3000/auth/auth0
+NUXT_AUTH0_CLIENT_ID=VkLG5qmoRGSSrQtZThZNQv0Yifurd23O
+NUXT_AUTH0_CLIENT_SECRET=9TIrdh2_6dy-IZzcSV1B-3LZiDGnkV6qJ1zel4PAus9_n85csBQZ7exr0z7vX2iu
+NUXT_AUTH0_DOMAIN=iam.clara.net
+
+ONION_AUTH_PROVIDER=auth0
+
+# Authentication Provider Configuration
+# Set which provider to use (microsoft or auth0)
+NUXT_PUBLIC_AUTH_PROVIDER=auth0
+
+# Sentry Error Tracking Configuration
+#NUXT_PUBLIC_SENTRY_DSN=your-sentry-dsn
+#NUXT_PUBLIC_SENTRY_SAMPLE_RATE=0.5
+
+NUXT_OAUTH_MICROSOFT_CLIENT_ID=
+NUXT_OAUTH_MICROSOFT_CLIENT_SECRET=
+NUXT_OAUTH_MICROSOFT_TENANT_ID=
+
+# === General ===
+NUXT_PUBLIC_NODE_ENV=dev
+NUXT_SESSION_PASSWORD="k/TSxjGXTsxI3hXj6aY5exY1BMhOEKBG2loewU/Oxz8=""
+
+
+# === Database ===
+NUXT_DB_HOST=localhost
+NUXT_DB_INSTANCE_CONNECTION_NAME=self_devis_db
+NUXT_DB_URL=postgres://camillep:postgres@localhost:5432/self_devis
+NUXT_DB_PORT=5432
+NUXT_DB_NAME=self_devis
+NUXT_DB_USER=camillep
+NUXT_DB_PASSWORD=postgres
+NUXT_DB_SSL=false
+NUXT_DB_MIGRATIONS_FOLDER="./server/database/migrations"
+
+### L’URL d'information OpenID : https://iam.clara.net/.well-known/openid-configuration
+#Le Client ID : VkLG5qmoRGSSrQtZThZNQv0Yifurd23O
+#Le Client Secret : 9TIrdh2_6dy-IZzcSV1B-3LZiDGnkV6qJ1zel4PAus9_n85csBQZ7exr0z7vX2iu

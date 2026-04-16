@@ -1,0 +1,42 @@
+Cadrage feature de reventilation manuelle :
+
+Création d'une route API pour annuler une re-ventilation manuelle (PMPFLOW-194)
+Création d'une route API pour checker si il y a une re-ventilation manuelle (PMPFLOW-195)
+
+PMPF-131 :
+
+L’idée est de pouvoir annuler une re-ventilation manuelle
+
+Dans la maquette, lorsqu’il y a eu une reventilation manuelle, il doit y avoir une roue crantée
+
+Celle-ci permet d’afficher un drawer avec la liste des re-ventilation déjà efectées et eventuellement déjà comptabilisées sur les périodes précédentes
+
+/
+
+Il faut pouvoir supprimer celles-ci ne sont pas encore “billed”
+
+ Il faut finalement affiché la roue crantée en grisé si pas de re-ventilation automatique
+
+
+
+ Cela demande de changer en back, que la personne à des fix en table
+
+
+Voila les règles de renventilations manuelles pour le contexte :
+Les règles de re-ventilation manuelle sont décrites ci-dessous:
+
+Règles
+
+Les temps doivent être unitaires, sans regroupement par lot et par personne. Il doit y avoir un temps pour chaque pointage par personne sur le lot
+
+Un temps peut être scindé en plusieurs sous temps lors de la re-ventilation
+
+La somme des temps re-ventilés sur les UO ne peut dépasser le temps saisi initial
+
+Après une re-ventilation manuelle, un temps peut rester positif (par exemple, sur 5 heures, si je re-ventile 3 heures, 2 heures restent non re-ventilées)
+
+Un temps peut également être re-ventilé sur une UO
+
+    UO d’un forfait
+
+    UO T&M

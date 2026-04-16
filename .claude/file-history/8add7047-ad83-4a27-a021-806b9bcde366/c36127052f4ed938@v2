@@ -1,0 +1,158 @@
+# Code Review — `PMPFLOW-93/reventilation-infos` → `main`
+
+**Date**: 2026-03-20
+**Reviewer**: Claude Code (Sonnet 4)
+**Dominant language**: TypeScript / Vue 3 (Nuxt 4 fullstack)
+
+---
+
+## Metadata
+
+| Propriété | Valeur |
+|---|---|
+| Commits | 10 |
+| Fichiers modifiés | 22 (package-lock.json exclu) |
+| Diff effectif | ~539 lignes |
+| Renames | Aucun |
+| Suppressions | Aucune |
+| Fichiers binaires | Aucun |
+
+**Commits :**
+
+- `70c1466` feat: update UI components and improve material quantity validation
+- `03192f7` chore: update vue-router to 5.0.3 in package.json
+- `e3171d6` refactor: remove unused stripHtml utility and update Vite deps
+- `66a882e` chore: add NVM setup to commit-msg hook
+- `c99feed` refactor: simplify template structure
+- `0741fb2` refactor: update progress calculation logic in useUo and change package
+- `9e348da` refactor: replace useStorage with useSessionStorage for filter persistence
+- `3e708ba` fix: add overrides for vue-router version in package.json
+- `97baafa` refactor: enhance ESLint configuration and improve item mapping in Table
+- `ff1a98f` refactor: update UoUnit component usage for improved styling
+
+---
+
+## Score : 6/10 — Average
+
+La feature (slideover reventilation) est solide et le code est globalement propre. Le diff embarque aussi beaucoup de cleanup utile (persistance des filtres, styling NuxtUI, formatage). Deux points bloquants à corriger avant merge, quatre warnings à adresser.
+
+---
+
+## Bloquants ⛔
+
+### 1. `useRuntimeConfig()` appelé hors contexte de requête — `server/utils/augmented-uo.ts`
+
+`getUoTimes()` appelle `useRuntimeConfig()` directement dans le corps de l'utilitaire. En Nitro, `useRuntimeConfig()` sans argument est lié au contexte de la requête courante via une variable globale. Dans une fonction utilitaire appelée depuis un route handler, cela fonctionne en pratique, mais c'est fragile et non garanti.
+
+```ts
+// Actuel — risqué
+const config = useRuntimeConfig()
+const timesUnit = config.public.timesUnit as string[]
+```
+
+**Correction recommandée :** passer `timesUnit` en paramètre de `getUoTimes`, ou résoudre `useRuntimeConfig()` au niveau du route handler et le transmettre.
+
+---
+
+### 2. `timesUnit` hardcodé côté client — `app/composables/useUo.ts`
+
+```ts
+// Hard-coded timesUnit values from nuxt.config.ts to avoid useRuntimeConfig issues in composables
+const timesUnit = ['JH', 'HEURE', 'H']
+```
+
+Le commentaire reconnaît le problème, mais la duplication est pire. Si `nuxt.config.ts` ajoute ou renomme une unité, le frontend diverge silencieusement. `useRuntimeConfig()` est parfaitement supporté dans les composables client.
+
+**Correction recommandée :** extraire la liste dans `shared/constants.ts` et l'importer des deux côtés — source de vérité unique.
+
+---
+
+## Warnings ⚠️
+
+### 3. Bouton mort sans handler — `app/components/uo/MaterialsSection.vue`
+
+Un `UButton` avec une icône `mdi-search` a été ajouté sans `@click`, sans tooltip, sans `aria-label`, sans fonctionnalité :
+
+```html
+<UButton
+  icon="mdi-search"
+  size="sm"
+  variant="ghost"
+  color="neutral"
+/>
+```
+
+Code mort en production. À câbler ou supprimer avant merge.
+
+---
+
+### 4. Double cast `unknown → UoDetails` — `app/components/uo/ReventilationSlideover.vue`
+
+```ts
+function getDisplayInfo(item: unknown) {
+  const o2i = (item as UoDetails).o2i
+```
+
+La signature `unknown` vient du typage lâche du slot `#label` de NuxtUI. Le double cast masque les erreurs de type. `props.uos` étant déjà typé `UoDetails[]`, les items groupés sont forcément `UoDetails` — le cast `unknown` est inutile.
+
+---
+
+### 5. `Array.find()` dans un slot `#label` — `app/components/uo/ReventilationSlideover.vue`
+
+```ts
+const mappedUo = mappedUos.value.find(uo => uo.o2i === o2i)
+```
+
+`getDisplayInfo` est appelé dans un slot `#label`, donc à chaque cycle de rendu pour chaque item. Préférer un `computed` Map keyed par `o2i` :
+
+```ts
+const mappedUoMap = computed(
+  () => new Map(mappedUos.value.map(u => [u.o2i, u]))
+)
+```
+
+---
+
+### 6. Fix `isLast` correct mais incomplet — `app/components/milestone/Overview.vue`
+
+Le fix change `==` en `===` et retire le type `index | undefined` sur `isLast`, ce qui est bien. Mais `isClickable(index: number | undefined)` deux lignes plus bas garde encore l'ancien type — à harmoniser pour la cohérence.
+
+---
+
+## Points positifs ✅
+
+- **`factoryItems` et `columns` en `computed`** dans `Table.vue` — évite les recalculs inutiles à chaque render et rend `columns` réactif aux changements de locale i18n.
+- **`useStorage` → `useSessionStorage`** — scope correct pour la persistance des filtres.
+- **Suppression de `bg-white`** sur les contenus de slideover/modal — compatible dark-mode via les tokens NuxtUI v4.
+- **Ajout de `zod` + `vite.optimizeDeps.include`** — accompagnement correct de la dépendance.
+
+---
+
+## Points à surveiller ℹ️
+
+### vue-router bump v5 + `overrides`
+
+Le champ `overrides` force toutes les dépendances transitives sur vue-router 5. Vérifier la compatibilité avec `@claranet/onion-auth` et `@claranet/onion-layout-nuxt-ui` avant merge — les bumps `.beta.3` → `.beta.10` sur ces packages semblent liés.
+
+### zod v4 comme dépendance directe
+
+zod v4 est un major. Si d'autres dépendances du projet importent zod v3, des incompatibilités sont possibles.
+
+### `eslint.debug: true` dans `.vscode/settings.json`
+
+Génère une sortie ESLint verbeuse pour tous les développeurs. À passer à `false` ou supprimer.
+
+### Guard `isFirstLoad` retiré dans `Table.vue`
+
+Le `watch({ immediate: true })` sur l'email collaborateur n'a plus de garde first-load. Vérifier que le filtre email d'un utilisateur ne se réinitialise pas à chaque navigation vers la page.
+
+---
+
+## Fichiers clés à revoir avant merge
+
+| Fichier | Problème |
+|---|---|
+| `server/utils/augmented-uo.ts` | `useRuntimeConfig()` hors contexte ⛔ |
+| `app/composables/useUo.ts` | `timesUnit` hardcodé ⛔ |
+| `app/components/uo/MaterialsSection.vue` | Bouton mort ⚠️ |
+| `app/components/uo/ReventilationSlideover.vue` | Cast `unknown` + `find()` en rendu ⚠️ |

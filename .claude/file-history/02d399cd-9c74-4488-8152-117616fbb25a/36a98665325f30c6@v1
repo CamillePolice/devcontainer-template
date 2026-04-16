@@ -1,0 +1,85 @@
+{
+  "common": {
+    "selectAll": "Select all",
+    "deselectAll": "Deselect all"
+  },
+  "anomalies": {
+    "lotTimeOverrun": "Total time logged ({total} {unit}) exceeds the sold budget ({sold} {unit}) for this lot.",
+    "uoOverrun": "UO {name} ({o2i}) is over budget: {total} {unit} logged / {original} {unit} planned."
+  },
+  "navigation": {
+    "lots": "Lots list",
+    "closure": "Closure"
+  },
+  "pages": {
+    "lots": {
+      "title": "Lots list"
+    },
+    "lot": {
+      "title": "Lot detail",
+      "breadcrumb": "Lots list"
+    }
+  },
+  "lotTable": {
+    "filterLabel": "Sort by: ",
+    "filters": {
+      "name": "Search by lot name",
+      "o2i": "Search by O2I card",
+      "factory": "Search by factory",
+      "responsable": "Search by manager name",
+      "status": "Filter by status",
+      "hideAssigned": "Show only unassigned lots"
+    },
+    "sort": {
+      "asc": "Ascending",
+      "desc": "Descending"
+    },
+    "actions": {
+      "view": "View",
+      "preview": "Preview"
+    },
+    "tables": {
+      "lot": {
+        "name": "Lot name",
+        "o2i": "O2I",
+        "factory": "Factory",
+        "responsable": "Manager",
+        "opportunityApprobationDate": "Created on",
+        "opportunityType": "Card Type",
+        "productionCell": "Production Cell",
+        "lotType": "Lot Type",
+        "status": "Status"
+      }
+    }
+  },
+  "lot": {
+    "toasts": {
+      "updateResponsable": {
+        "success": {
+          "title": "Manager updated",
+          "description": "The lot manager has been successfully updated"
+        },
+        "error": {
+          "title": "Error",
+          "description": "Unable to update the lot manager"
+        }
+      },
+      "updateDeploymentDate": {
+        "success": {
+          "title": "Deployment date updated",
+          "description": "The planned deployment date has been successfully updated"
+        },
+        "error": {
+          "title": "Error",
+          "description": "Unable to update the planned deployment date"
+        }
+      }
+    }
+  },
+  "synapps": {
+    "cmp": "Company (CMP)",
+    "prjs": "Related projects (PRJ)",
+    "viewInSynapps": "View in SynApps",
+    "noData": "No SynApps data available"
+  }
+}

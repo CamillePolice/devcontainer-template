@@ -1,0 +1,285 @@
+import { useDB } from '~~/server/utils/database'
+import { augmentedUoView } from '~~/server/database/schemas/index'
+import { eq } from 'drizzle-orm'
+import type {
+  AugmentedUo,
+  UoHistoricBundle,
+  UoStandardBundle,
+  UoType,
+} from '#shared/types/uo'
+import { UO_TYPES } from '#shared/types/uo'
+import { getWorklogsForO2i } from '~~/server/utils/worklog'
+import { createValidationError } from '~~/server/utils/error'
+import type { AggregatedWorklog } from '#shared/types/worklog'
+import { convertWorklogQuantity } from '#shared/utils/worklog-conversion'
+import { getMaterialsForO2i } from '~~/server/utils/materials'
+
+/**
+ * Get all UOs from a lot in a single query
+ * @param lotO2index The O2I identifier of the lot
+ * @returns Array of AugmentedUo objects
+ */
+export async function getAllUosByLotO2i(
+  lotO2index: string,
+): Promise<AugmentedUo[]> {
+  if (!lotO2index) {
+    throw createValidationError('Lot O2I identifier cannot be empty')
+  }
+
+  try {
+    const database = await useDB()
+    const uos = await database
+      .select({
+        o2i: augmentedUoView.o2i,
+        o2iParent: augmentedUoView.o2iParent,
+        o2iLot: augmentedUoView.o2iLot,
+        productCode: augmentedUoView.productCode,
+        productName: augmentedUoView.productName,
+        type: augmentedUoView.type,
+        id: augmentedUoView.id,
+        name: augmentedUoView.name,
+        profile: augmentedUoView.profile,
+        productionCellKey: augmentedUoView.productionCellKey,
+        productionCellName: augmentedUoView.productionCellName,
+        factoryKey: augmentedUoView.factoryKey,
+        factoryName: augmentedUoView.factoryName,
+        quantityConsumed: augmentedUoView.quantityConsumed,
+        quantityConsumedAdjustment: augmentedUoView.quantityConsumedAdjustment,
+        raf: augmentedUoView.raf,
+        rafAdjustment: augmentedUoView.rafAdjustment,
+        originalQuantity: augmentedUoView.originalQuantity,
+        quantityAdjustment: augmentedUoView.quantityAdjustment,
+        unit: augmentedUoView.unit,
+        price: augmentedUoView.price,
+        description: augmentedUoView.description,
+        billingDate: augmentedUoView.billingDate,
+        billingTrigger: augmentedUoView.billingTrigger,
+        billingDetails: augmentedUoView.billingDetails,
+        plannedDeploymentDate: augmentedUoView.plannedDeploymentDate,
+        desiredDeploymentDate: augmentedUoView.desiredDeploymentDate,
+        billedMilestoneId: augmentedUoView.billedMilestoneId,
+        billedMilestoneName: augmentedUoView.billedMilestoneName,
+        billedMilestoneStepPercent: augmentedUoView.billedMilestoneStepPercent,
+        billedMilestoneIndex: augmentedUoView.billedMilestoneIndex,
+        milestoneBilledAt: augmentedUoView.milestoneBilledAt,
+      })
+      .from(augmentedUoView)
+      .where(eq(augmentedUoView.o2iLot, lotO2index))
+      .orderBy(augmentedUoView.o2i)
+
+    return uos.map(uo => ({
+      ...uo,
+      billingDate: uo.billingDate ? new Date(uo.billingDate) : undefined,
+      milestoneBilledAt: uo.milestoneBilledAt
+        ? new Date(uo.milestoneBilledAt)
+        : undefined,
+      plannedDeploymentDate: uo.plannedDeploymentDate
+        ? new Date(uo.plannedDeploymentDate)
+        : undefined,
+      desiredDeploymentDate: uo.desiredDeploymentDate
+        ? new Date(uo.desiredDeploymentDate)
+        : undefined,
+    })) as AugmentedUo[]
+  }
+  catch (error) {
+    console.error('Error fetching augmented_uo_view')
+    throw handleDatabaseError(error, 'getAllUosByLotO2i')
+  }
+}
+
+/**
+ * Map AugmentedUo to UoCore properties
+ * @param uo AugmentedUo object
+ * @returns UoCore properties
+ */
+function mapToUoCore(uo: AugmentedUo) {
+  return {
+    o2iLot: uo.o2iLot,
+    o2i: uo.o2i,
+    type: uo.type,
+    productCode: uo.productCode,
+    productName: uo.productName,
+    profile: uo.profile,
+    description: uo.description,
+    factory: {
+      key: uo.factoryKey ?? '',
+      name: uo.factoryName ?? '',
+    },
+    productionCell: {
+      key: uo.productionCellKey ?? '',
+      name: uo.productionCellName ?? '',
+    },
+    status: {
+      id: uo.id ?? 0,
+      name: uo.name ?? '',
+    },
+    plannedDeploymentDate: uo.plannedDeploymentDate
+      ? new Date(uo.plannedDeploymentDate)
+      : undefined,
+    desiredDeploymentDate: uo.desiredDeploymentDate
+      ? new Date(uo.desiredDeploymentDate)
+      : undefined,
+    originalQuantity: uo.originalQuantity,
+    unit: uo.unit ?? undefined,
+  }
+}
+
+/**
+ * Get UoDetails objects from AugmentedUo array
+ * @param uos Array of AugmentedUo objects
+ * @param type UO type to filter by
+ * @returns Array of UoDetails objects
+ */
+export async function getUoTimes(
+  uos: AugmentedUo[],
+  type: UoType,
+): Promise<UoDetails[]> {
+  const filteredUos = uos.filter(uo => uo.type === type)
+
+  if (filteredUos.length === 0) {
+    return []
+  }
+
+  const config = useRuntimeConfig()
+  const hoursPerWorkday = Number(config.public.hoursPerWorkday) || 7
+
+  const uoO2is = filteredUos.map(uo => uo.o2i)
+  const worklogs = await getWorklogsForO2i(uoO2is)
+
+  const worklogsByO2i = new Map<string, AggregatedWorklog[]>()
+  for (const wl of worklogs) {
+    if (!worklogsByO2i.has(wl.o2i)) {
+      worklogsByO2i.set(wl.o2i, [])
+    }
+    worklogsByO2i.get(wl.o2i)!.push(wl)
+  }
+
+  const materials = await getMaterialsForO2i(uoO2is)
+  const materialsByO2i = new Map<string, MaterialDeclaration[]>()
+  for (const material of materials) {
+    if (!materialsByO2i.has(material.o2i)) {
+      materialsByO2i.set(material.o2i, [])
+    }
+    materialsByO2i.get(material.o2i)!.push(material)
+  }
+
+  return filteredUos.map((uo) => {
+    const worklogsForUO = worklogsByO2i.get(uo.o2i) ?? []
+
+    const convertedWorklogs: AggregatedWorklog[] = worklogsForUO.map(wl => ({
+      ...wl,
+      pendingQuantity: convertWorklogQuantity(
+        wl.pendingQuantity ?? 0,
+        uo.unit,
+        hoursPerWorkday,
+      ),
+      billedQuantity: convertWorklogQuantity(
+        wl.billedQuantity ?? 0,
+        uo.unit,
+        hoursPerWorkday,
+      ),
+    }))
+
+    const materialsForUO = materialsByO2i.get(uo.o2i) ?? []
+
+    // Calculate pending quantity based on UO type
+    // For material UOs: use material declarations
+    // For time UOs: use worklogs
+    const config = useRuntimeConfig()
+    const timesUnit = config.public.timesUnit as string[]
+    const isMaterialUo = !(
+      uo.unit && timesUnit.includes(uo.unit.toUpperCase())
+    )
+
+    const pendingQuantity = isMaterialUo
+      ? materialsForUO
+          .filter(md => md.status === 'PENDING')
+          .reduce((sum, md) => sum + md.quantity, 0)
+      : convertedWorklogs.reduce(
+          (sum: number, wl: AggregatedWorklog) =>
+            sum + (wl.pendingQuantity ?? 0),
+          0,
+        )
+
+    return {
+      ...mapToUoCore(uo),
+      o2iParent: uo.o2iParent,
+      quantityConsumed: uo.quantityConsumed,
+      pendingQuantity,
+      quantityAdjustment: uo.quantityAdjustment,
+      quantityConsumedAdjustment: uo.quantityConsumedAdjustment,
+      raf: uo.raf,
+      rafAdjustment: uo.rafAdjustment,
+      price: uo.price,
+      billingDate: uo.billingDate ? new Date(uo.billingDate) : undefined,
+      billingTrigger: uo.billingTrigger,
+      billingDetails: uo.billingDetails,
+      worklogs: convertedWorklogs,
+      materialDeclarations: materialsForUO,
+    }
+  })
+}
+
+/**
+ * Get UoForfaitHistorique objects from AugmentedUo array
+ * @param uos Array of AugmentedUo objects
+ * @returns Array of UoForfaitHistorique objects
+ */
+export function getUoHistoricBundle(uos: AugmentedUo[]): UoHistoricBundle[] {
+  const filteredUos = uos.filter(
+    uo => uo.type === UO_TYPES.FORFAIT_HISTORIQUE,
+  )
+
+  if (filteredUos.length === 0) {
+    return []
+  }
+
+  return filteredUos.map(uo => ({
+    ...mapToUoCore(uo),
+    quantityConsumed: uo.quantityConsumed,
+    originalQuantity: uo.originalQuantity,
+    unit: uo.unit ?? '',
+  })) as UoHistoricBundle[]
+}
+
+/**
+ * Get UoForfaitStandard objects from AugmentedUo array
+ * @param uos Array of AugmentedUo objects
+ * @returns Array of UoForfaitStandard objects
+ */
+export async function getUoStandardBundle(
+  uos: AugmentedUo[],
+): Promise<UoStandardBundle[]> {
+  const parentUos = uos.filter(
+    uo => uo.type === UO_TYPES.FORFAIT_STANDARD && !uo.o2iParent,
+  )
+
+  if (parentUos.length === 0) {
+    return []
+  }
+
+  const result: UoStandardBundle[] = []
+
+  for (const parentUo of parentUos) {
+    const childUos = await getUoTimes(
+      uos.filter(uo => uo.o2iParent === parentUo.o2i),
+      UO_TYPES.FORFAIT_STANDARD,
+    )
+
+    const forfaitStandard: UoStandardBundle = {
+      ...mapToUoCore(parentUo),
+      billedMilestone: {
+        id: parentUo.billedMilestoneId ?? undefined,
+        name: parentUo.billedMilestoneName ?? undefined,
+        stepPercent: parentUo.billedMilestoneStepPercent ?? undefined,
+        index: parentUo.billedMilestoneIndex ?? undefined,
+      },
+      milestoneBilledAt: parentUo.milestoneBilledAt,
+      uos: childUos,
+    }
+
+    result.push(forfaitStandard)
+  }
+
+  return result
+}

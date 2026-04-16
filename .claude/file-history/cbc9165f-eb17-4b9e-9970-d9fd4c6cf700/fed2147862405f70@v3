@@ -1,0 +1,30 @@
+import { requireAdmin } from '../utils/auth'
+import { verifyAutomationSecret } from '../utils/automation'
+
+export default defineEventHandler(async (event) => {
+  const path = event.path
+
+  if (!path.startsWith('/api/')) {
+    return
+  } else if (path.startsWith('/api/automations')) {
+    verifyAutomationSecret(event)
+  } else if (path.startsWith('/api/_auth')) {
+    return
+  } else {
+    const session = await getUserSession(event)
+
+    if (!session || !session.user) {
+      throw createError({
+        statusCode: 401,
+        statusMessage: 'Unauthorized',
+        message: 'Authentication required to access this resource',
+      })
+    }
+
+    event.context.user = session.user
+
+    if (path.startsWith('/api/periods')) {
+      await requireAdmin(event)
+    }
+  }
+})

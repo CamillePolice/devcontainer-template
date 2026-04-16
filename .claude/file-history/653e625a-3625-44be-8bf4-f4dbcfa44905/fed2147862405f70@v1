@@ -1,0 +1,23 @@
+/**
+ * Server middleware to protect API routes
+ * Ensures that only authenticated users can access API endpoints
+ */
+export default defineEventHandler(async (event) => {
+  const path = event.path
+
+  if (!path.startsWith('/api')) {
+    return
+  }
+
+  const session = await getUserSession(event)
+
+  if (!session || !session.user) {
+    throw createError({
+      statusCode: 401,
+      statusMessage: 'Unauthorized',
+      message: 'Authentication required to access this resource',
+    })
+  }
+
+  event.context.user = session.user
+})
